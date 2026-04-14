@@ -9,6 +9,10 @@ import { loadConfig, VAULT_ROOT } from './paths.js';
 import { ensureVault, readVaultFile, writeVaultFile, walkTree } from './vault.js';
 import { BUILTIN_TOOLS } from './tools.js';
 import { runAgent } from './agent.js';
+import { listPlaybooks, runPlaybook } from './playbooks.js';
+import { triggerList, fireTrigger, loadCronTriggers } from './triggers.js';
+import { listDrafts, approveDraft, rejectDraft } from './drafts.js';
+import { mcpServerList } from './mcp.js';
 
 const LOCAL_TOKEN = process.env.BM_LOCAL_TOKEN ?? crypto.randomBytes(24).toString('base64url');
 
@@ -35,7 +39,7 @@ async function main() {
   const app = new Hono();
   app.use('*', cors({ origin: (o) => o ?? '*', credentials: false }));
 
-  // Local auth middleware (skipped for /api/health to allow quick pings from Electron main).
+  // Local auth middleware. Webhooks authenticate via ?token=... (checked inline).
   app.use('/api/*', async (c, next) => {
     if (c.req.path === '/api/health') return next();
     const auth = c.req.header('authorization') ?? '';
@@ -55,15 +59,76 @@ async function main() {
     }),
   );
 
-  app.get('/api/tools', (c) =>
-    c.json({
-      tools: BUILTIN_TOOLS.map((t) => ({
-        name: t.name,
-        description: t.description,
-        source: 'builtin',
-      })),
-    }),
-  );
+  app.get('/api/tools', async (c) => {
+    const mcp = await mcpServerList();
+    return c.json({
+      tools: [
+        ...BUILTIN_TOOLS.map((t) => ({ name: t.name, description: t.description, source: 'builtin' })),
+        ...mcp.map((s) => ({ name: s.name, description: `MCP: ${s.command} ${s.args.join(' ')}`, source: 'mcp' })),
+      ],
+    });
+  });
+
+  app.get('/api/playbooks', async (c) => c.json({ playbooks: await listPlaybooks() }));
+  app.post('/api/playbooks/:name/run', async (c) => {
+    const name = c.req.param('name');
+    const body = await c.req.json<{ inputs?: Record<string, unknown> }>().catch(() => ({} as any));
+    try {
+      const result = await runPlaybook(name, body.inputs ?? {}, config);
+      return c.json(result);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+
+  app.get('/api/triggers', async (c) => c.json({ triggers: await triggerList() }));
+  app.post('/api/triggers/:name/fire', async (c) => {
+    const name = c.req.param('name');
+    const body = await c.req.json<{ input?: Record<string, unknown> }>().catch(() => ({} as any));
+    try {
+      const result = await fireTrigger(name, config, body.input ?? {});
+      return c.json(result);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+  app.post('/api/triggers/reload', async (c) => {
+    await loadCronTriggers(config);
+    return c.json({ ok: true });
+  });
+
+  app.get('/api/drafts', async (c) => c.json({ drafts: await listDrafts() }));
+  app.post('/api/drafts/:id/approve', async (c) => {
+    try {
+      const r = await approveDraft(c.req.param('id'));
+      return c.json(r);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+  app.post('/api/drafts/:id/reject', async (c) => {
+    try {
+      const r = await rejectDraft(c.req.param('id'));
+      return c.json(r);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+
+  // Unauthenticated webhook receiver. Uses ?token=<local-token> in URL since
+  // external systems can't attach Authorization headers easily.
+  app.post('/webhook/:name', async (c) => {
+    const token = c.req.query('token');
+    if (token !== LOCAL_TOKEN) return c.json({ error: 'unauthorized' }, 401);
+    const name = c.req.param('name');
+    const body = await c.req.json().catch(() => ({}));
+    try {
+      const result = await fireTrigger(name, config, body ?? {});
+      return c.json(result);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
 
   app.get('/api/vault/tree', async (c) => {
     const tree = await walkTree('.');
@@ -175,6 +240,8 @@ async function main() {
   console.log(`[daemon] http://127.0.0.1:${port}  token=${LOCAL_TOKEN.slice(0, 6)}…`);
   console.log(`[daemon] vault ${VAULT_ROOT}`);
   console.log(`[daemon] model ${config.default_model}  zenn=${config.zenn_api_key ? 'set' : 'MISSING'}`);
+
+  await loadCronTriggers(config).catch((err) => console.error('[triggers] load failed:', err));
 }
 
 main().catch((err) => {
