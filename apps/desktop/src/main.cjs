@@ -28,12 +28,15 @@ function startDaemon() {
   try { fs.unlinkSync(DISCOVERY_PATH); } catch {}
 
   const entry = resolveDaemonEntry();
-  const env = { ...process.env };
 
   if (app.isPackaged) {
+    // Electron's binary runs plain Node scripts when ELECTRON_RUN_AS_NODE=1.
+    // The daemon is a single esbuild bundle, so no node_modules lookup is needed.
+    const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' };
     daemonProcess = spawn(process.execPath, [entry], { env, stdio: 'inherit' });
   } else {
     // Dev: run with tsx from the workspace.
+    const env = { ...process.env };
     const tsx = path.join(__dirname, '..', '..', '..', 'node_modules', '.bin', 'tsx');
     daemonProcess = spawn(tsx, [entry], { env, stdio: 'inherit' });
   }

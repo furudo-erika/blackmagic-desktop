@@ -27,8 +27,7 @@
     ],
     "extraResources": [
       { "from": "../web/out", "to": "web", "filter": ["**/*"] },
-      { "from": "../../daemon/dist", "to": "daemon", "filter": ["**/*"] },
-      { "from": "../../daemon/node_modules", "to": "daemon-node-modules", "filter": ["**/*"] }
+      { "from": "../../daemon/dist", "to": "daemon", "filter": ["**/*"] }
     ],
     "mac": {
       "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
