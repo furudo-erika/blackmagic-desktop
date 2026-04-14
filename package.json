@@ -1,0 +1,36 @@
+{
+  "name": "blackmagic-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "packageManager": "pnpm@10.10.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "daemon"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:daemon": "pnpm --filter @bm/daemon dev",
+    "dev:web": "pnpm --filter @bm/web dev",
+    "dev:desktop": "pnpm --filter @bm/desktop dev",
+    "build": "turbo run build",
+    "build:web": "pnpm --filter @bm/web build",
+    "build:desktop": "pnpm --filter @bm/desktop build",
+    "package:mac": "pnpm --filter @bm/desktop package:mac",
+    "package:win": "pnpm --filter @bm/desktop package:win",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:e2e": "tsx scripts/e2e-smoke.ts"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
+    "@types/node": "^22.10.2"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}

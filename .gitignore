@@ -1,0 +1,14 @@
+node_modules
+.next
+dist
+out
+.turbo
+.env
+.env.local
+*.log
+.DS_Store
+apps/desktop/release
+apps/desktop/dist
+apps/web/out
+daemon/dist
+tsconfig.tsbuildinfo
