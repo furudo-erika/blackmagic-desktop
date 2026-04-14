@@ -32,7 +32,11 @@ function startDaemon() {
   if (app.isPackaged) {
     // Electron's binary runs plain Node scripts when ELECTRON_RUN_AS_NODE=1.
     // The daemon is a single esbuild bundle, so no node_modules lookup is needed.
-    const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' };
+    const env = {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      BM_WEB_ROOT: path.join(process.resourcesPath, 'web'),
+    };
     daemonProcess = spawn(process.execPath, [entry], { env, stdio: 'inherit' });
   } else {
     // Dev: run with tsx from the workspace.
@@ -89,7 +93,9 @@ async function createWindow() {
   if (!app.isPackaged && process.env.BM_DEV) {
     win.loadURL('http://localhost:3000');
   } else {
-    win.loadFile(path.join(process.resourcesPath, 'web', 'index.html'));
+    // The packaged daemon serves the static UI at /. Same-origin with the
+    // REST API — no CORS, no file:// asset-path weirdness.
+    win.loadURL(`http://127.0.0.1:${discovery.port}/`);
   }
 }
 

@@ -20,9 +20,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () =>
-    request<{ ok: boolean; version: string; vaultPath: string; model: string; zennConfigured: boolean }>(
+    request<{ ok: boolean; version: string; vaultPath: string; model: string; zennConfigured: boolean; localToken?: string }>(
       '/api/health',
     ),
+  setApiKey: (key: string) =>
+    request<{ ok: true }>('/api/config/api-key', { method: 'POST', body: JSON.stringify({ key }) }),
   tools: () => request<{ tools: Array<{ name: string; description: string; source: string }> }>('/api/tools'),
   vaultTree: () => request<{ tree: Array<{ path: string; type: 'file' | 'dir' }> }>('/api/vault/tree'),
   readFile: (p: string) =>

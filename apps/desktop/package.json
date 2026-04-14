@@ -37,7 +37,11 @@
     },
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "icon": "resources/icon.png"
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico"
     },
     "dmg": { "writeUpdateInfo": false }
   }

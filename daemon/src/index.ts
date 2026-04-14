@@ -1,10 +1,12 @@
 import crypto from 'node:crypto';
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createServer } from 'node:net';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { loadConfig, VAULT_ROOT } from './paths.js';
 import { ensureVault, readVaultFile, writeVaultFile, walkTree } from './vault.js';
 import { BUILTIN_TOOLS } from './tools.js';
@@ -56,8 +58,27 @@ async function main() {
       vaultPath: VAULT_ROOT,
       model: config.default_model,
       zennConfigured: Boolean(config.zenn_api_key),
+      localToken: LOCAL_TOKEN,
     }),
   );
+
+  app.post('/api/config/api-key', async (c) => {
+    const body = await c.req.json<{ key?: string }>();
+    const key = (body.key ?? '').trim();
+    if (!key.startsWith('ck_') || key.length < 10) {
+      return c.json({ error: 'invalid api key format' }, 400);
+    }
+    const cfgDir = path.join(VAULT_ROOT, '.bm');
+    await fs.mkdir(cfgDir, { recursive: true });
+    const cfgPath = path.join(cfgDir, 'config.toml');
+    let existing = '';
+    try { existing = await fs.readFile(cfgPath, 'utf-8'); } catch {}
+    const lines = existing.split('\n').filter((l) => !l.match(/^\s*zenn_api_key\s*=/));
+    lines.push(`zenn_api_key = "${key.replace(/"/g, '\\"')}"`);
+    await fs.writeFile(cfgPath, lines.join('\n').trim() + '\n', 'utf-8');
+    config.zenn_api_key = key;
+    return c.json({ ok: true });
+  });
 
   app.get('/api/tools', async (c) => {
     const mcp = await mcpServerList();
@@ -224,6 +245,14 @@ async function main() {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
     }
   });
+
+  // Serve the packaged static UI at `/` when present. In dev the Next.js
+  // server handles that on :3000 and we skip this branch.
+  const webRoot = process.env.BM_WEB_ROOT;
+  if (webRoot && fsSync.existsSync(webRoot)) {
+    app.use('/*', serveStatic({ root: webRoot }));
+    console.log(`[daemon] serving UI from ${webRoot}`);
+  }
 
   const port = await pickPort(config.daemon_port);
   serve({ fetch: app.fetch, hostname: '127.0.0.1', port });
