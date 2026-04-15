@@ -21,8 +21,10 @@ import {
   Bot,
   ChevronDown,
   FolderTree,
+  GitBranch,
   History,
   Inbox,
+  LayoutDashboard,
   Moon,
   Network,
   Plug,
@@ -109,7 +111,7 @@ export function Sidebar() {
   function startNewThread() {
     const id = newThreadId();
     localStorage.setItem('bm-last-thread', id);
-    router.push('/');
+    router.push('/chat');
   }
 
   return (
@@ -144,6 +146,8 @@ export function Sidebar() {
 
       <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 px-2 pb-3">
         <div className="flex flex-col gap-0.5">
+          <SidebarNavItem href="/" label="Home" icon={LayoutDashboard} exact />
+
           <button
             onClick={startNewThread}
             className="flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-ink/80 dark:text-[#E6E0D8]/80 hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 hover:text-ink dark:hover:text-[#F5F1EA] rounded-md transition-colors"
@@ -178,6 +182,7 @@ export function Sidebar() {
           <SidebarNavItem href="/companies" label="Companies" icon={Building2} />
           <SidebarNavItem href="/contacts" label="Contacts" icon={Users} />
           <SidebarNavItem href="/deals" label="Deals" icon={Briefcase} />
+          <SidebarNavItem href="/org" label="Org tree" icon={GitBranch} />
           <SidebarNavItem href="/ontology" label="Knowledge graph" icon={Network} />
           <SidebarNavItem href="/vault" label="Files" icon={FolderTree} />
         </SidebarSection>
