@@ -6,6 +6,14 @@ Local-first AI GTM engineer. Your context lives in `~/BlackMagic/` as plain mark
 
 **License**: MIT. Fork it, audit it, self-host it.
 
+## v0.2.0 highlights
+
+- **Sequences**: multi-touch outreach engine with a daily drip cron (see `apps/web/src/app/sequences`).
+- **Brand monitor + competitor/news presets**: one-click trigger recipes under `triggers/`.
+- **Wikilinks + backlinks**: `[[Company]]` resolution across the vault, with backlink panels on every note.
+- **Apify + EnrichLayer**: new integrations for scraping and contact enrichment.
+- **3D ontology**: Three.js knowledge graph at `/ontology` ported from apidog-team.
+
 ## Install
 
 ```bash
