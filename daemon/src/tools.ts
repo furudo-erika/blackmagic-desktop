@@ -7,6 +7,7 @@
 import { readVaultFile, writeVaultFile, editVaultFile, renameVaultFile, listDir, grepVault } from './vault.js';
 import type { Config } from './paths.js';
 import { McpRegistry } from './mcp.js';
+import { enrollContact } from './sequences.js';
 
 export interface ToolCtx {
   config: Config;
@@ -225,6 +226,21 @@ ${args.body}
   },
 };
 
+const enroll_contact_in_sequence: ToolDef = {
+  name: 'enroll_contact_in_sequence',
+  description:
+    'Enroll a contact in a multi-touch drip sequence. Writes sequence/sequence_step/sequence_enrolled_at into the contact frontmatter. The daily sequence cron fires each touch when its day offset elapses.',
+  parameters: {
+    type: 'object',
+    properties: {
+      contact_path: { type: 'string', description: 'e.g. contacts/acme-cloud/jane-doe.md' },
+      sequence_path: { type: 'string', description: 'e.g. sequences/cold-outbound-5-touch.md' },
+    },
+    required: ['contact_path', 'sequence_path'],
+  },
+  handler: async (args) => enrollContact(args.contact_path, args.sequence_path),
+};
+
 export const BUILTIN_TOOLS: ToolDef[] = [
   read_file,
   write_file,
@@ -237,6 +253,7 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   enrich_company,
   enrich_contact,
   draft_create,
+  enroll_contact_in_sequence,
 ];
 
 export function allTools(): ToolDef[] {

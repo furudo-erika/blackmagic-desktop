@@ -195,6 +195,38 @@ export const api = {
     request<{ ok: true; written: number; demo: string }>('/api/onboarding/demo', {
       method: 'POST',
     }),
+
+  // Sequences (multi-touch drip).
+  listSequences: () =>
+    request<{
+      sequences: Array<{
+        path: string;
+        name: string;
+        description?: string;
+        touches: Array<{ day: number; channel?: string; playbook?: string; prompt?: string }>;
+        body: string;
+        enrolled: { active: number; complete: number; total: number };
+      }>;
+      enrollments: Array<{
+        contactPath: string;
+        sequencePath: string;
+        step: number;
+        enrolledAt: string;
+        status: 'active' | 'complete' | 'stopped';
+      }>;
+    }>('/api/sequences'),
+  enrollInSequence: (contact_path: string, sequence_path: string) =>
+    request<{ ok: true; contactPath: string; sequencePath: string; touches: number }>(
+      '/api/sequences/enroll',
+      { method: 'POST', body: JSON.stringify({ contact_path, sequence_path }) },
+    ),
+  stopEnrollment: (contact_path: string) =>
+    request<{ ok: true }>('/api/sequences/stop', {
+      method: 'POST',
+      body: JSON.stringify({ contact_path }),
+    }),
+  walkSequences: () =>
+    request<{ enrollments: number; fired: number }>('/api/sequences/walk', { method: 'POST' }),
 };
 
 export type OntologyNode = {

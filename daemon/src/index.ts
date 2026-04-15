@@ -13,6 +13,8 @@ import { BUILTIN_TOOLS, allTools } from './tools.js';
 import { runAgent } from './agent.js';
 import { listPlaybooks, runPlaybook } from './playbooks.js';
 import { triggerList, fireTrigger, loadCronTriggers } from './triggers.js';
+import { listSequences, listEnrollments, enrollContact, stopEnrollment } from './sequences.js';
+import { startSequenceCron, walkSequencesOnce } from './sequence-cron.js';
 import { listDrafts, approveDraft, rejectDraft } from './drafts.js';
 import { mcpServerList, McpRegistry } from './mcp.js';
 import { buildOntology } from './ontology.js';
@@ -384,6 +386,56 @@ async function main() {
     await loadCronTriggers(config);
     pushTriggers(config).catch(() => {});
     return c.json({ ok: true });
+  });
+
+  // Sequences — multi-touch drip outreach. The list endpoint joins each
+  // sequence with the count of currently-enrolled contacts so the UI can
+  // render one row per sequence.
+  app.get('/api/sequences', async (c) => {
+    const [sequences, enrollments] = await Promise.all([listSequences(), listEnrollments()]);
+    const counts = new Map<string, { active: number; complete: number; total: number }>();
+    for (const e of enrollments) {
+      const b = counts.get(e.sequencePath) ?? { active: 0, complete: 0, total: 0 };
+      if (e.status === 'active') b.active += 1;
+      if (e.status === 'complete') b.complete += 1;
+      b.total += 1;
+      counts.set(e.sequencePath, b);
+    }
+    return c.json({
+      sequences: sequences.map((s) => ({
+        ...s,
+        enrolled: counts.get(s.path) ?? { active: 0, complete: 0, total: 0 },
+      })),
+      enrollments,
+    });
+  });
+  app.post('/api/sequences/enroll', async (c) => {
+    const body = await c.req.json<{ contact_path?: string; sequence_path?: string }>().catch(() => ({} as any));
+    if (!body.contact_path || !body.sequence_path) {
+      return c.json({ error: 'contact_path and sequence_path required' }, 400);
+    }
+    try {
+      return c.json(await enrollContact(body.contact_path, body.sequence_path));
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+  app.post('/api/sequences/stop', async (c) => {
+    const body = await c.req.json<{ contact_path?: string }>().catch(() => ({} as any));
+    if (!body.contact_path) return c.json({ error: 'contact_path required' }, 400);
+    try {
+      return c.json(await stopEnrollment(body.contact_path));
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+  // Manual kick for the daily walker — handy for testing.
+  app.post('/api/sequences/walk', async (c) => {
+    try {
+      return c.json(await walkSequencesOnce(config));
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
   });
 
   app.get('/api/drafts', async (c) => {
@@ -768,6 +820,7 @@ async function main() {
   console.log(`[daemon] model ${config.default_model}  zenn=${config.zenn_api_key ? 'set' : 'MISSING'}`);
 
   await loadCronTriggers(config).catch((err) => console.error('[triggers] load failed:', err));
+  startSequenceCron(config);
   pushTriggers(config).catch(() => {});
   pushDrafts(config).catch(() => {});
 }

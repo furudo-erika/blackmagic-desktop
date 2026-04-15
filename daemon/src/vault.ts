@@ -12,6 +12,7 @@ const SKELETON_DIRS = [
   'deals/closed-won',
   'deals/closed-lost',
   'playbooks',
+  'sequences',
   'triggers',
   'drafts',
   'runs',
@@ -1092,6 +1093,79 @@ linkedin_connect). Log intent to the contact file.
 `,
 };
 
+// Multi-touch drip sequences. A sequence is an ordered list of touches with
+// day offsets from the enrollment date. Per-contact state (sequence,
+// sequence_step, sequence_enrolled_at) lives in the contact's frontmatter.
+// sequence-cron.ts walks enrolled contacts once a day and advances steps
+// whose offset has elapsed.
+const DEFAULT_SEQUENCES: Record<string, string> = {
+  'cold-outbound-5-touch.md': `---
+kind: sequence
+name: cold-outbound-5-touch
+description: Classic five-touch cold outbound over three weeks.
+touches:
+  - day: 0
+    channel: email
+    playbook: outbound-draft
+    prompt: >-
+      Opening cold email to {{contact_path}}. Hypothesis-based, <=120 words,
+      one CTA. Reference one specific public signal if available.
+  - day: 3
+    channel: email
+    prompt: >-
+      Short bump on the day-0 thread for {{contact_path}}. <=40 words, no
+      new pitch, just float it back up.
+  - day: 7
+    channel: linkedin_connect
+    prompt: >-
+      LinkedIn connection request to {{contact_path}}. <=300 chars,
+      reference something specific from their profile.
+  - day: 12
+    channel: email
+    prompt: >-
+      Value-add touch to {{contact_path}}: share a case study, teardown, or
+      data point relevant to their role/industry. <=100 words.
+  - day: 18
+    channel: email
+    prompt: >-
+      Break-up email to {{contact_path}}. "No worries if timing isn't
+      right. Happy to reconnect whenever." <=40 words.
+---
+
+# Cold outbound — 5 touch
+
+Use for net-new accounts with no prior relationship. Enroll right after a
+contact is enriched.
+`,
+
+  'post-demo-follow-up.md': `---
+kind: sequence
+name: post-demo-follow-up
+description: Two-week nurture after a discovery/demo call.
+touches:
+  - day: 1
+    channel: email
+    prompt: >-
+      Recap email for {{contact_path}}: three bullets of what we discussed,
+      one next step, one question to keep the thread alive.
+  - day: 4
+    channel: email
+    prompt: >-
+      Send {{contact_path}} one asset tailored to their stated priority
+      (case study, ROI calc, or integration doc). One sentence of framing.
+  - day: 10
+    channel: email
+    prompt: >-
+      Check-in with {{contact_path}}: any internal discussion happened?
+      Offer to jump on a quick call with anyone else on their side.
+---
+
+# Post-demo follow-up
+
+Enroll a contact right after a discovery or demo call. Stops on reply.
+`,
+};
+
 export async function ensureVault(): Promise<{ created: boolean }> {
   let created = false;
   await fs.mkdir(VAULT_ROOT, { recursive: true });
@@ -1112,6 +1186,11 @@ export async function ensureVault(): Promise<{ created: boolean }> {
 
   for (const [name, body] of Object.entries(DEFAULT_PLAYBOOKS)) {
     const p = path.join(VAULT_ROOT, 'playbooks', name);
+    if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
+  }
+
+  for (const [name, body] of Object.entries(DEFAULT_SEQUENCES)) {
+    const p = path.join(VAULT_ROOT, 'sequences', name);
     if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
   }
 

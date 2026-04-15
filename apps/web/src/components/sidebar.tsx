@@ -23,6 +23,7 @@ import {
   Bot,
   BookOpen,
   Trash2,
+  Repeat,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useQueryClient } from '@tanstack/react-query';
@@ -37,6 +38,7 @@ import { api } from '../lib/api';
 const WORKFLOW = [
   { href: '/playbooks', label: 'Playbooks', icon: BookOpen },
   { href: '/outreach', label: 'Outreach', icon: Send },
+  { href: '/sequences', label: 'Sequences', icon: Repeat },
   { href: '/triggers', label: 'Triggers', icon: Zap },
   { href: '/runs', label: 'Runs', icon: History },
   { href: '/integrations', label: 'Integrations', icon: Plug },

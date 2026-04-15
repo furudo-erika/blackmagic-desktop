@@ -1,12 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { Repeat } from 'lucide-react';
 
 type Contact = { path: string; company: string; frontmatter: Record<string, unknown> };
 
 export default function ContactsPage() {
+  const qc = useQueryClient();
   const contacts = useQuery({
     queryKey: ['contacts'],
     queryFn: async (): Promise<Contact[]> => {
@@ -22,6 +25,22 @@ export default function ContactsPage() {
         }),
       );
       return results;
+    },
+  });
+
+  const sequences = useQuery({ queryKey: ['sequences'], queryFn: api.listSequences });
+
+  const [enrollFor, setEnrollFor] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string>('');
+
+  const enroll = useMutation({
+    mutationFn: ({ contact, sequence }: { contact: string; sequence: string }) =>
+      api.enrollInSequence(contact, sequence),
+    onSuccess: () => {
+      setEnrollFor(null);
+      setPicked('');
+      qc.invalidateQueries({ queryKey: ['contacts'] });
+      qc.invalidateQueries({ queryKey: ['sequences'] });
     },
   });
 
@@ -44,19 +63,60 @@ export default function ContactsPage() {
             <div key={company}>
               <div className="text-xs uppercase tracking-wide text-muted mb-2 font-mono">{company}</div>
               <div className="bg-white rounded-xl border border-line divide-y divide-line">
-                {list.map((c) => (
-                  <Link
-                    key={c.path}
-                    href={`/vault?path=${encodeURIComponent(c.path)}`}
-                    className="flex items-center justify-between px-4 py-3 hover:bg-cream-light"
-                  >
-                    <div>
-                      <div className="text-sm text-ink">{String(c.frontmatter.name ?? '')}</div>
-                      <div className="text-xs text-muted">{String(c.frontmatter.role ?? '')}</div>
+                {list.map((c) => {
+                  const activeSeq = c.frontmatter.sequence ? String(c.frontmatter.sequence) : null;
+                  const status = c.frontmatter.sequence_status ? String(c.frontmatter.sequence_status) : null;
+                  return (
+                    <div key={c.path} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <Link
+                          href={`/vault?path=${encodeURIComponent(c.path)}`}
+                          className="flex-1 min-w-0 hover:bg-cream-light -mx-2 px-2 py-1 rounded"
+                        >
+                          <div className="text-sm text-ink">{String(c.frontmatter.name ?? '')}</div>
+                          <div className="text-xs text-muted">{String(c.frontmatter.role ?? '')}</div>
+                        </Link>
+                        <div className="text-xs text-muted font-mono shrink-0">
+                          {String(c.frontmatter.email ?? '')}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEnrollFor(enrollFor === c.path ? null : c.path)}
+                          className="shrink-0 h-7 px-2 rounded-md border border-line text-[11px] hover:bg-cream-light flex items-center gap-1"
+                          title={activeSeq ? `Enrolled: ${activeSeq}` : 'Enroll in sequence'}
+                        >
+                          <Repeat className="w-3 h-3" />
+                          {activeSeq
+                            ? `${activeSeq.replace(/^sequences\//, '').replace(/\.md$/, '')}${status ? ` · ${status}` : ''}`
+                            : 'Enroll'}
+                        </button>
+                      </div>
+                      {enrollFor === c.path && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <select
+                            value={picked}
+                            onChange={(e) => setPicked(e.target.value)}
+                            className="flex-1 h-8 px-2 rounded-md border border-line bg-cream-light text-[12px]"
+                          >
+                            <option value="">— pick a sequence —</option>
+                            {sequences.data?.sequences.map((s) => (
+                              <option key={s.path} value={s.path}>
+                                {s.name} ({s.touches.length} touches)
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            disabled={!picked || enroll.isPending}
+                            onClick={() => enroll.mutate({ contact: c.path, sequence: picked })}
+                            className="h-8 px-3 rounded-md bg-flame text-white text-[12px] font-medium disabled:opacity-40 hover:opacity-90"
+                          >
+                            {enroll.isPending ? '…' : 'Enroll'}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-xs text-muted font-mono">{String(c.frontmatter.email ?? '')}</div>
-                  </Link>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
