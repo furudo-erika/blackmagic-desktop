@@ -39,6 +39,7 @@ async function ensureCodexConfig(config: Config): Promise<string> {
     `[model_providers.bm]`,
     `name = "Black Magic"`,
     `base_url = "${config.zenn_base_url}"`,
+    `env_key = "OPENAI_API_KEY"   # codex reads the bearer token from this env var`,
     `wire_api = "responses"`,
     ``,
     `[tools]`,
