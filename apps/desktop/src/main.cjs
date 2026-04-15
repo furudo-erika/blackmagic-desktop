@@ -26,8 +26,13 @@ process.title = APP_NAME;
 // Dev-mode Dock icon. Packaged builds get this via electron-builder's icon
 // config; in dev we inject it at runtime.
 if (process.platform === 'darwin' && app.dock) {
-  const iconSrc = fs.existsSync(ICON_ICNS) ? ICON_ICNS : ICON_PNG;
-  try { app.dock.setIcon(nativeImage.createFromPath(iconSrc)); } catch {}
+  try {
+    const img = nativeImage.createFromPath(ICON_PNG);
+    if (img.isEmpty()) console.error('[main] icon.png empty:', ICON_PNG);
+    else app.dock.setIcon(img);
+  } catch (err) {
+    console.error('[main] setIcon failed:', err);
+  }
 }
 
 // Menu bar: rewrite the application menu so even in dev the first item is
