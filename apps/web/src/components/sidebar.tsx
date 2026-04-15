@@ -28,6 +28,7 @@ import {
 import clsx from 'clsx';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { ProjectPicker } from './project-picker';
 
 // Chat is the primary surface. Everything else is management:
 //   - things the user needs to review (drafts / runs / integrations / settings)
@@ -97,6 +98,15 @@ export function Sidebar() {
     refetchInterval: 4_000,
   });
 
+  const projects = useQuery({
+    queryKey: ['projects'],
+    queryFn: api.listProjects,
+  });
+  const activeProject = projects.data?.projects.find(
+    (p) => p.id === projects.data?.active,
+  );
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+
   const onChatPage = pathname === '/';
 
   function startNewThread() {
@@ -141,6 +151,30 @@ export function Sidebar() {
           Black Magic
         </span>
       </div>
+
+      {/* Project switcher — shows active vault, click to open picker */}
+      <div className="px-3 pb-2">
+        <button
+          type="button"
+          onClick={() => setProjectPickerOpen(true)}
+          title={activeProject?.path || 'Switch project'}
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] hover:border-flame text-left"
+        >
+          <FolderTree className="w-3.5 h-3.5 text-flame shrink-0" />
+          <span className="flex-1 text-[12px] font-medium text-ink dark:text-[#F5F1EA] truncate">
+            {activeProject?.name ?? 'Default'}
+          </span>
+          <ChevronDown className="w-3 h-3 text-muted dark:text-[#6B625C] shrink-0" />
+        </button>
+      </div>
+
+      {projectPickerOpen && (
+        <ProjectPicker
+          mode="modal"
+          onClose={() => setProjectPickerOpen(false)}
+          onActivated={() => setProjectPickerOpen(false)}
+        />
+      )}
 
       {/* New chat */}
       <div className="px-3 pb-2">

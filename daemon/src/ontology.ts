@@ -11,7 +11,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { VAULT_ROOT } from './paths.js';
+import { getVaultRoot } from './paths.js';
 import { walkTree, slugFromDomain } from './vault.js';
 
 export interface OntoNode {
@@ -58,7 +58,7 @@ export async function buildOntology(): Promise<{ nodes: OntoNode[]; edges: OntoE
   const fmByPath = new Map<string, Record<string, any>>();
 
   for (const f of files) {
-    const abs = path.join(VAULT_ROOT, f.path);
+    const abs = path.join(getVaultRoot(), f.path);
     let raw = '';
     try {
       raw = await fs.readFile(abs, 'utf-8');

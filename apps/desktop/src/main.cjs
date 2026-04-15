@@ -5,7 +5,7 @@
 //     or the packaged static export (resources/web/index.html).
 //  4. Inject daemon port + local token into window.bmBridge.
 
-const { app, BrowserWindow, Menu, ipcMain, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, nativeImage, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -164,6 +164,19 @@ async function createWindow() {
     win.loadURL(`http://127.0.0.1:${discovery.port}/`);
   }
 }
+
+ipcMain.handle('bm:pick-folder', async () => {
+  try {
+    const res = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (res.canceled || !res.filePaths?.length) return null;
+    return res.filePaths[0];
+  } catch (err) {
+    console.error('[main] pickFolder failed:', err);
+    return null;
+  }
+});
 
 ipcMain.handle('bm:open-external', async (_event, url) => {
   if (typeof url !== 'string') return false;

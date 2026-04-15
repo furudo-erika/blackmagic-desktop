@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
 import { BUILTIN_TOOLS, toolsAsOpenAI, toolsByName, type ToolDef, type ToolCtx } from './tools.js';
-import { VAULT_ROOT, type Config } from './paths.js';
+import { getVaultRoot, type Config } from './paths.js';
 
 // Price table — must match doc/BILLING.md
 const PRICE: Record<string, { in: number; out: number }> = {
@@ -25,7 +25,7 @@ export interface AgentSpec {
 }
 
 export async function loadAgent(name: string): Promise<AgentSpec> {
-  const p = path.join(VAULT_ROOT, 'agents', `${name}.md`);
+  const p = path.join(getVaultRoot(), 'agents', `${name}.md`);
   const raw = await fs.readFile(p, 'utf-8');
   const m = matter(raw);
   const fm = m.data as any;
@@ -40,7 +40,7 @@ export async function loadAgent(name: string): Promise<AgentSpec> {
 
 export async function loadClaudeMd(): Promise<string> {
   try {
-    return await fs.readFile(path.join(VAULT_ROOT, 'CLAUDE.md'), 'utf-8');
+    return await fs.readFile(path.join(getVaultRoot(), 'CLAUDE.md'), 'utf-8');
   } catch {
     return '';
   }
@@ -103,7 +103,7 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
 
   // Prepare run dir
   const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${agent}`;
-  const runDir = path.join(VAULT_ROOT, 'runs', runId);
+  const runDir = path.join(getVaultRoot(), 'runs', runId);
   await fs.mkdir(runDir, { recursive: true });
 
   const systemPrompt =

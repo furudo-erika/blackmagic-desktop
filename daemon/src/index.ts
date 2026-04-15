@@ -7,7 +7,14 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { loadConfig, VAULT_ROOT } from './paths.js';
+import { loadConfig, getVaultRoot, homeVault } from './paths.js';
+import {
+  initProjectsRegistry,
+  getRegistry,
+  addProject,
+  activateProject,
+  deleteProject,
+} from './projects.js';
 import { ensureVault, readVaultFile, writeVaultFile, walkTree, installPresetTriggers } from './vault.js';
 import { findBacklinks } from './wikilinks.js';
 import { BUILTIN_TOOLS, allTools } from './tools.js';
@@ -110,6 +117,9 @@ async function pickPort(preferred?: number): Promise<number> {
 }
 
 async function main() {
+  // Initialise project registry first so getVaultRoot() reflects the active
+  // project before anything else reads it.
+  await initProjectsRegistry();
   const config = loadConfig();
   await ensureVault();
   await loadOAuthStates();
@@ -185,7 +195,7 @@ async function main() {
         400,
       );
     }
-    const cfgDir = path.join(VAULT_ROOT, '.bm');
+    const cfgDir = path.join(getVaultRoot(), '.bm');
     await fs.mkdir(cfgDir, { recursive: true });
     const cfgPath = path.join(cfgDir, 'config.toml');
     let existing = '';
@@ -207,7 +217,7 @@ async function main() {
     c.json({
       ok: true,
       version: '0.1.0',
-      vaultPath: VAULT_ROOT,
+      vaultPath: getVaultRoot(),
       model: config.default_model,
       zennConfigured: Boolean(config.zenn_api_key),
       engine: codexReady ? 'codex-cli' : 'builtin',
@@ -221,7 +231,7 @@ async function main() {
     if (!key.startsWith('ck_') || key.length < 10) {
       return c.json({ error: 'invalid api key format' }, 400);
     }
-    const cfgDir = path.join(VAULT_ROOT, '.bm');
+    const cfgDir = path.join(getVaultRoot(), '.bm');
     await fs.mkdir(cfgDir, { recursive: true });
     const cfgPath = path.join(cfgDir, 'config.toml');
     let existing = '';
@@ -246,7 +256,7 @@ async function main() {
   );
   app.post('/api/config/integration-keys', async (c) => {
     const body = await c.req.json<Partial<Record<IntegrationKey, string>>>();
-    const cfgDir = path.join(VAULT_ROOT, '.bm');
+    const cfgDir = path.join(getVaultRoot(), '.bm');
     await fs.mkdir(cfgDir, { recursive: true });
     const cfgPath = path.join(cfgDir, 'config.toml');
     let existing = '';
@@ -335,16 +345,16 @@ async function main() {
   // Onboarding state: considered complete once CLAUDE.md has been
   // user-customised (default seed marker is absent).
   app.get('/api/onboarding', async (c) => {
-    const claudePath = path.join(VAULT_ROOT, 'CLAUDE.md');
+    const claudePath = path.join(getVaultRoot(), 'CLAUDE.md');
     let claude = '';
     try { claude = await fs.readFile(claudePath, 'utf-8'); } catch {}
     const isDefault = claude.includes('_One paragraph: what you sell, to whom._');
-    const hasSelfCompany = await fs.access(path.join(VAULT_ROOT, 'me.md')).then(() => true).catch(() => false);
+    const hasSelfCompany = await fs.access(path.join(getVaultRoot(), 'me.md')).then(() => true).catch(() => false);
     return c.json({ needsOnboarding: isDefault && !hasSelfCompany, claudeDefault: isDefault, hasSelfCompany });
   });
 
   app.post('/api/onboarding/demo', async (c) => {
-    const { written } = await seedAcmeDemo(VAULT_ROOT);
+    const { written } = await seedAcmeDemo(getVaultRoot());
     return c.json({ ok: true, written, demo: 'acme-cloud' });
   });
 
@@ -385,7 +395,7 @@ async function main() {
       '- About us: `me.md`',
       '',
     ].join('\n');
-    await fs.writeFile(path.join(VAULT_ROOT, 'CLAUDE.md'), claude, 'utf-8');
+    await fs.writeFile(path.join(getVaultRoot(), 'CLAUDE.md'), claude, 'utf-8');
     return c.json({ ok: true });
   });
 
@@ -546,7 +556,7 @@ async function main() {
   app.get('/api/vault/backlinks', async (c) => {
     const p = c.req.query('path');
     if (!p) return c.json({ error: 'path required' }, 400);
-    const backlinks = await findBacklinks(VAULT_ROOT, p);
+    const backlinks = await findBacklinks(getVaultRoot(), p);
     return c.json({ backlinks });
   });
 
@@ -571,7 +581,7 @@ async function main() {
   });
 
   app.get('/api/agent/runs', async (c) => {
-    const runsDir = path.join(VAULT_ROOT, 'runs');
+    const runsDir = path.join(getVaultRoot(), 'runs');
     try {
       const entries = await fs.readdir(runsDir, { withFileTypes: true });
       const runs = await Promise.all(
@@ -597,7 +607,7 @@ async function main() {
 
   app.get('/api/agent/runs/:id', async (c) => {
     const id = c.req.param('id');
-    const runDir = path.join(VAULT_ROOT, 'runs', id);
+    const runDir = path.join(getVaultRoot(), 'runs', id);
     try {
       const [meta, prompt, finalMd, toolCalls] = await Promise.all([
         fs.readFile(path.join(runDir, 'meta.json'), 'utf-8').then(JSON.parse).catch(() => null),
@@ -635,7 +645,7 @@ async function main() {
     // incrementally.  Billing happens server-side in /api/v1/responses.
     if (codexReady) {
       const runId = `codex-${Date.now()}`;
-      const runDir = path.join(VAULT_ROOT, 'runs', runId);
+      const runDir = path.join(getVaultRoot(), 'runs', runId);
       await fs.mkdir(runDir, { recursive: true });
 
       const encoder = new TextEncoder();
@@ -728,7 +738,7 @@ async function main() {
               'utf-8',
             );
             if (body.threadId) {
-              const tp = path.join(VAULT_ROOT, 'chats', `${body.threadId}.json`);
+              const tp = path.join(getVaultRoot(), 'chats', `${body.threadId}.json`);
               await fs.mkdir(path.dirname(tp), { recursive: true });
               await fs.writeFile(
                 tp,
@@ -771,7 +781,7 @@ async function main() {
       });
       // Persist full thread so /runs and a future history UI can show it.
       if (body.threadId) {
-        const threadPath = path.join(VAULT_ROOT, 'chats', `${body.threadId}.json`);
+        const threadPath = path.join(getVaultRoot(), 'chats', `${body.threadId}.json`);
         await fs.mkdir(path.dirname(threadPath), { recursive: true });
         await fs.writeFile(
           threadPath,
@@ -803,7 +813,7 @@ async function main() {
 
   // List + read chat threads.
   app.get('/api/chats', async (c) => {
-    const dir = path.join(VAULT_ROOT, 'chats');
+    const dir = path.join(getVaultRoot(), 'chats');
     try {
       const entries = await fs.readdir(dir);
       const threads = await Promise.all(
@@ -832,7 +842,7 @@ async function main() {
     }
   });
   app.get('/api/chats/:id', async (c) => {
-    const p = path.join(VAULT_ROOT, 'chats', `${c.req.param('id')}.json`);
+    const p = path.join(getVaultRoot(), 'chats', `${c.req.param('id')}.json`);
     try {
       return c.json(JSON.parse(await fs.readFile(p, 'utf-8')));
     } catch {
@@ -843,12 +853,60 @@ async function main() {
     const id = c.req.param('id');
     // Basic path-safety — id should be a flat filename, no slashes / dots.
     if (!/^[A-Za-z0-9_-]+$/.test(id)) return c.json({ error: 'bad id' }, 400);
-    const p = path.join(VAULT_ROOT, 'chats', `${id}.json`);
+    const p = path.join(getVaultRoot(), 'chats', `${id}.json`);
     try {
       await fs.unlink(p);
       return c.json({ ok: true });
     } catch {
       return c.json({ ok: true }); // idempotent
+    }
+  });
+
+  // ---- Projects (multi-vault) -----------------------------------------
+  // The registry at <homeVault>/.bm/projects.json is the source of truth.
+  // Activating flips VAULT_ROOT in-memory; all path-joining uses
+  // getVaultRoot() so subsequent requests land in the new vault without a
+  // daemon restart. Long-running crons re-read the root on each tick.
+  app.get('/api/projects', async (c) => {
+    try {
+      const reg = await getRegistry();
+      return c.json(reg);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+
+  app.post('/api/projects', async (c) => {
+    try {
+      const body = await c.req.json<{ name?: string; path?: string }>();
+      const name = (body.name ?? '').trim();
+      if (!name) return c.json({ error: 'name is required' }, 400);
+      const { reg, project } = await addProject(name, body.path?.trim() || undefined);
+      return c.json({ ...reg, created: project });
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+
+  app.post('/api/projects/activate', async (c) => {
+    try {
+      const body = await c.req.json<{ id?: string }>();
+      if (!body.id) return c.json({ error: 'id is required' }, 400);
+      const reg = await activateProject(body.id);
+      // Re-seed the newly-active vault so expected folders exist.
+      await ensureVault().catch(() => {});
+      return c.json(reg);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    }
+  });
+
+  app.delete('/api/projects/:id', async (c) => {
+    try {
+      const reg = await deleteProject(c.req.param('id'));
+      return c.json(reg);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
     }
   });
 
@@ -863,8 +921,11 @@ async function main() {
   const port = await pickPort(config.daemon_port);
   serve({ fetch: app.fetch, hostname: '127.0.0.1', port });
 
-  // Write discovery file — Electron main reads this to pass port + token to the renderer.
-  const discoveryPath = path.join(VAULT_ROOT, '.bm', 'daemon.json');
+  // Write discovery file — Electron main reads this to pass port + token to
+  // the renderer. Kept at the home vault (NOT the active project's vault) so
+  // Electron has a stable location to look even after the user switches
+  // projects.
+  const discoveryPath = path.join(homeVault(), '.bm', 'daemon.json');
   await fs.mkdir(path.dirname(discoveryPath), { recursive: true });
   await fs.writeFile(
     discoveryPath,
@@ -873,7 +934,7 @@ async function main() {
   );
 
   console.log(`[daemon] http://127.0.0.1:${port}  token=${LOCAL_TOKEN.slice(0, 6)}…`);
-  console.log(`[daemon] vault ${VAULT_ROOT}`);
+  console.log(`[daemon] vault ${getVaultRoot()}`);
   console.log(`[daemon] model ${config.default_model}  zenn=${config.zenn_api_key ? 'set' : 'MISSING'}`);
 
   await loadCronTriggers(config).catch((err) => console.error('[triggers] load failed:', err));

@@ -243,7 +243,26 @@ export const api = {
     }),
   walkSequences: () =>
     request<{ enrollments: number; fired: number }>('/api/sequences/walk', { method: 'POST' }),
+
+  // Projects (multi-vault). See daemon/src/projects.ts.
+  listProjects: () =>
+    request<ProjectsRegistry>('/api/projects'),
+  addProject: (name: string, path?: string) =>
+    request<ProjectsRegistry & { created: Project }>('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name, path }),
+    }),
+  activateProject: (id: string) =>
+    request<ProjectsRegistry>('/api/projects/activate', {
+      method: 'POST',
+      body: JSON.stringify({ id }),
+    }),
+  deleteProject: (id: string) =>
+    request<ProjectsRegistry>(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
+
+export type Project = { id: string; name: string; path: string };
+export type ProjectsRegistry = { active: string; projects: Project[] };
 
 export type OntologyNode = {
   id: string;

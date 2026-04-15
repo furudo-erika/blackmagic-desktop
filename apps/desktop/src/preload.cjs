@@ -17,4 +17,5 @@ contextBridge.exposeInMainWorld('bmBridge', {
   vaultPath: arg('bm-vault-path'),
   platform: process.platform,
   openExternal: (url) => ipcRenderer.invoke('bm:open-external', String(url)),
+  pickFolder: () => ipcRenderer.invoke('bm:pick-folder'),
 });

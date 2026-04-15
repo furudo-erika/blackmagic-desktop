@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { getBridge, setBridge } from '../lib/bridge';
+import { ProjectPicker } from './project-picker';
 
 export function LoginGate({ children }: { children: React.ReactNode }) {
   const [bridgeReady, setBridgeReady] = useState(false);
@@ -15,12 +16,38 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
     setBridgeReady(b.daemonPort > 0 && !!b.daemonToken);
   }, []);
 
+  // Project picker: shown after bridge-ready the first time, or when the
+  // sidebar dispatches "bm:open-project-picker".
+  const [seenPicker, setSeenPicker] = useState(false);
+  const [forcePicker, setForcePicker] = useState(false);
+  useEffect(() => {
+    setSeenPicker(localStorage.getItem('bm-projects-seen') === '1');
+    const handler = () => setForcePicker(true);
+    window.addEventListener('bm:open-project-picker', handler);
+    return () => window.removeEventListener('bm:open-project-picker', handler);
+  }, []);
+  const projects = useQuery({
+    queryKey: ['projects'],
+    queryFn: api.listProjects,
+    enabled: bridgeReady,
+  });
+  const showPicker =
+    bridgeReady &&
+    (forcePicker ||
+      (!seenPicker && (projects.data?.projects?.length ?? 0) > 1));
+
   const health = useQuery({
     queryKey: ['health', bridgeReady],
     queryFn: api.health,
     enabled: bridgeReady,
     refetchInterval: (q) => (q.state.data?.zennConfigured ? false : 2000),
   });
+
+  useEffect(() => {
+    if (health.data?.zennConfigured) {
+      localStorage.setItem('bm-projects-seen', '1');
+    }
+  }, [health.data?.zennConfigured]);
 
   const [keyDraft, setKeyDraft] = useState('');
   const [saving, setSaving] = useState(false);
@@ -114,6 +141,19 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           </button>
         </form>
       </div>
+    );
+  }
+
+  if (showPicker) {
+    return (
+      <ProjectPicker
+        mode="page"
+        onActivated={() => {
+          localStorage.setItem('bm-projects-seen', '1');
+          setSeenPicker(true);
+          setForcePicker(false);
+        }}
+      />
     );
   }
 

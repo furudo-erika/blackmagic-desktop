@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { VAULT_ROOT } from './paths.js';
+import { getVaultRoot } from './paths.js';
 import { writeVaultFile } from './vault.js';
 import { McpRegistry } from './mcp.js';
 
@@ -18,7 +18,7 @@ export interface Draft {
 }
 
 export async function listDrafts(): Promise<Draft[]> {
-  const dir = path.join(VAULT_ROOT, 'drafts');
+  const dir = path.join(getVaultRoot(), 'drafts');
   try {
     const entries = await fs.readdir(dir);
     const out: Draft[] = [];
@@ -52,7 +52,7 @@ export async function readDraft(id: string): Promise<Draft | null> {
 }
 
 export async function setDraftStatus(id: string, status: Draft['status']) {
-  const dir = path.join(VAULT_ROOT, 'drafts');
+  const dir = path.join(getVaultRoot(), 'drafts');
   const fp = path.join(dir, `${id}.md`);
   const raw = await fs.readFile(fp, 'utf-8');
   const m = matter(raw);
@@ -61,7 +61,7 @@ export async function setDraftStatus(id: string, status: Draft['status']) {
 }
 
 async function setDraftFrontmatter(id: string, patch: Record<string, unknown>) {
-  const dir = path.join(VAULT_ROOT, 'drafts');
+  const dir = path.join(getVaultRoot(), 'drafts');
   const fp = path.join(dir, `${id}.md`);
   const raw = await fs.readFile(fp, 'utf-8');
   const m = matter(raw);

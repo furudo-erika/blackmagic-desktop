@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { ensureInsideVault, VAULT_ROOT } from './paths.js';
+import { ensureInsideVault, getVaultRoot } from './paths.js';
 
 const SKELETON_DIRS = [
   'agents',
@@ -1382,9 +1382,9 @@ export async function installPresetTriggers(): Promise<{
 }> {
   const created: string[] = [];
   const existing: string[] = [];
-  await fs.mkdir(path.join(VAULT_ROOT, 'triggers'), { recursive: true });
+  await fs.mkdir(path.join(getVaultRoot(), 'triggers'), { recursive: true });
   for (const [name, body] of Object.entries(PRESET_TRIGGERS)) {
-    const p = path.join(VAULT_ROOT, 'triggers', name);
+    const p = path.join(getVaultRoot(), 'triggers', name);
     if (fsSync.existsSync(p)) {
       existing.push(name);
       continue;
@@ -1397,41 +1397,41 @@ export async function installPresetTriggers(): Promise<{
 
 export async function ensureVault(): Promise<{ created: boolean }> {
   let created = false;
-  await fs.mkdir(VAULT_ROOT, { recursive: true });
+  await fs.mkdir(getVaultRoot(), { recursive: true });
   for (const dir of SKELETON_DIRS) {
-    await fs.mkdir(path.join(VAULT_ROOT, dir), { recursive: true });
+    await fs.mkdir(path.join(getVaultRoot(), dir), { recursive: true });
   }
 
-  const claudePath = path.join(VAULT_ROOT, 'CLAUDE.md');
+  const claudePath = path.join(getVaultRoot(), 'CLAUDE.md');
   if (!fsSync.existsSync(claudePath)) {
     await fs.writeFile(claudePath, DEFAULT_CLAUDE_MD, 'utf-8');
     created = true;
   }
 
   for (const [name, body] of Object.entries(DEFAULT_AGENTS)) {
-    const p = path.join(VAULT_ROOT, 'agents', name);
+    const p = path.join(getVaultRoot(), 'agents', name);
     if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
   }
 
   for (const [name, body] of Object.entries(DEFAULT_PLAYBOOKS)) {
-    const p = path.join(VAULT_ROOT, 'playbooks', name);
+    const p = path.join(getVaultRoot(), 'playbooks', name);
     if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
   }
 
   for (const [name, body] of Object.entries(DEFAULT_SEQUENCES)) {
-    const p = path.join(VAULT_ROOT, 'sequences', name);
+    const p = path.join(getVaultRoot(), 'sequences', name);
     if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
   }
 
   // Seed us/ templates — only write files that are missing so re-seeding
   // never clobbers user edits.
   for (const [rel, body] of Object.entries(US_TEMPLATES)) {
-    const p = path.join(VAULT_ROOT, 'us', rel);
+    const p = path.join(getVaultRoot(), 'us', rel);
     await fs.mkdir(path.dirname(p), { recursive: true });
     if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
   }
 
-  const mcpPath = path.join(VAULT_ROOT, '.bm', 'mcp.json');
+  const mcpPath = path.join(getVaultRoot(), '.bm', 'mcp.json');
   if (!fsSync.existsSync(mcpPath)) {
     await fs.writeFile(mcpPath, JSON.stringify({ servers: {} }, null, 2), 'utf-8');
   }

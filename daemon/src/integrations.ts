@@ -4,7 +4,7 @@
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
-import { VAULT_ROOT } from './paths.js';
+import { getVaultRoot } from './paths.js';
 
 export type IntegrationProvider =
   | 'hubspot'
@@ -28,7 +28,7 @@ export interface IntegrationRecord {
 
 type Store = Partial<Record<IntegrationProvider, IntegrationRecord>>;
 
-const FILE = () => path.join(VAULT_ROOT, '.bm', 'integrations.json');
+const FILE = () => path.join(getVaultRoot(), '.bm', 'integrations.json');
 
 async function load(): Promise<Store> {
   try {

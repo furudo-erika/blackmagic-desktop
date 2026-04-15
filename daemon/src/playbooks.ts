@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { VAULT_ROOT, type Config } from './paths.js';
+import { getVaultRoot, type Config } from './paths.js';
 import { runAgent } from './agent.js';
 
 interface PlaybookSpec {
@@ -12,7 +12,7 @@ interface PlaybookSpec {
 }
 
 export async function loadPlaybook(name: string): Promise<PlaybookSpec> {
-  const p = path.join(VAULT_ROOT, 'playbooks', `${name}.md`);
+  const p = path.join(getVaultRoot(), 'playbooks', `${name}.md`);
   const raw = await fs.readFile(p, 'utf-8');
   const m = matter(raw);
   const fm = m.data as any;
@@ -25,7 +25,7 @@ export async function loadPlaybook(name: string): Promise<PlaybookSpec> {
 }
 
 export async function listPlaybooks(): Promise<PlaybookSpec[]> {
-  const dir = path.join(VAULT_ROOT, 'playbooks');
+  const dir = path.join(getVaultRoot(), 'playbooks');
   try {
     const entries = await fs.readdir(dir);
     const out: PlaybookSpec[] = [];

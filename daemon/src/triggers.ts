@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
 import cron from 'node-cron';
-import { VAULT_ROOT, type Config } from './paths.js';
+import { getVaultRoot, type Config } from './paths.js';
 import { runAgent } from './agent.js';
 import { runPlaybook } from './playbooks.js';
 
@@ -18,7 +18,7 @@ interface TriggerSpec {
 const scheduled: Map<string, cron.ScheduledTask> = new Map();
 
 async function listTriggers(): Promise<TriggerSpec[]> {
-  const dir = path.join(VAULT_ROOT, 'triggers');
+  const dir = path.join(getVaultRoot(), 'triggers');
   try {
     const entries = await fs.readdir(dir);
     const specs: TriggerSpec[] = [];

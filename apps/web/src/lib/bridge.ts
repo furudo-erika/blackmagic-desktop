@@ -9,6 +9,7 @@ declare global {
       vaultPath: string;
       platform: string;
       openExternal?: (url: string) => void;
+      pickFolder?: () => Promise<string | null>;
     };
   }
 }

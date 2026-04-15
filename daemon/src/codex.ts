@@ -13,7 +13,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { VAULT_ROOT, type Config } from './paths.js';
+import { getVaultRoot, type Config } from './paths.js';
 
 export interface CodexResult {
   stdout: string;
@@ -29,7 +29,7 @@ export class CodexNotInstalled extends Error {
 }
 
 async function ensureCodexConfig(config: Config): Promise<string> {
-  const home = path.join(VAULT_ROOT, '.bm', 'codex');
+  const home = path.join(getVaultRoot(), '.bm', 'codex');
   await fs.mkdir(home, { recursive: true });
   const cfg = [
     `model = "${config.default_model}"`,
@@ -85,7 +85,7 @@ export async function runCodex(
 
   const args = [
     'exec',
-    '-C', VAULT_ROOT,
+    '-C', getVaultRoot(),
     '--skip-git-repo-check',
     '--full-auto',
     '--json',         // JSONL events to stdout — the daemon streams them out

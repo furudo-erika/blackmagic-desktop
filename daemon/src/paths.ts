@@ -18,8 +18,28 @@ function defaultVault(): string {
   return process.env.BM_VAULT_PATH ?? path.join(os.homedir(), 'BlackMagic');
 }
 
+// Root of the "home" vault (the folder that contains the projects registry).
+// This never changes — the registry lives here, even after switching to a
+// different project vault.
+export function homeVault(): string {
+  return defaultVault();
+}
+
+// Active vault. Mutable — the projects registry module updates this when the
+// user activates a different project. Every runtime code path reads live via
+// getVaultRoot() / ensureInsideVault().
+let activeVault: string = defaultVault();
+
+export function getVaultRoot(): string {
+  return activeVault;
+}
+
+export function setVaultRoot(p: string) {
+  activeVault = p;
+}
+
 export function loadConfig(): Config {
-  const vault = defaultVault();
+  const vault = getVaultRoot();
   const configPath = path.join(vault, '.bm', 'config.toml');
 
   // Daemon talks to our API proxy. The proxy holds the upstream keys and
@@ -56,11 +76,14 @@ export function loadConfig(): Config {
   return base;
 }
 
+// Legacy alias. Prefer getVaultRoot() — this only reflects the vault at
+// module-load time and will not track project switches.
 export const VAULT_ROOT = defaultVault();
 
 export function ensureInsideVault(p: string) {
-  const abs = path.resolve(VAULT_ROOT, p);
-  if (!abs.startsWith(path.resolve(VAULT_ROOT))) {
+  const root = getVaultRoot();
+  const abs = path.resolve(root, p);
+  if (!abs.startsWith(path.resolve(root))) {
     throw new Error(`path escapes vault: ${p}`);
   }
   return abs;
