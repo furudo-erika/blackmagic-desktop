@@ -38,7 +38,6 @@ export default function AgentsPage() {
             <thead className="bg-cream-light text-muted text-xs uppercase tracking-wide">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">Name</th>
-                <th className="text-left px-4 py-2 font-medium">Model</th>
                 <th className="text-left px-4 py-2 font-medium">Tools</th>
                 <th className="text-left px-4 py-2 font-medium">Temp</th>
                 <th className="px-4 py-2"></th>
@@ -51,7 +50,6 @@ export default function AgentsPage() {
                 return (
                   <tr key={a.path} className="border-t border-line">
                     <td className="px-4 py-3 font-medium">{String(fm.name ?? '')}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted">{String(fm.model ?? '')}</td>
                     <td className="px-4 py-3">{tools}</td>
                     <td className="px-4 py-3">{fm.temperature !== undefined ? String(fm.temperature) : ''}</td>
                     <td className="px-4 py-3 text-right">
