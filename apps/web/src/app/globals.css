@@ -11,6 +11,24 @@ body {
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
+/* macOS draggable title-bar strip — overlaid across the top of the
+   window so the user can drag from anywhere in the chrome area, not
+   just the small sidebar logo block. Buttons / inputs / links inside
+   it (or anywhere on the page) get the no-drag escape automatically. */
+.bm-titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  z-index: 60;
+  -webkit-app-region: drag;
+  pointer-events: none;
+}
+button, a, input, textarea, select, [role="button"] {
+  -webkit-app-region: no-drag;
+}
+
 html.dark body {
   background: #0F0D0A;
   color: #E6E0D8;

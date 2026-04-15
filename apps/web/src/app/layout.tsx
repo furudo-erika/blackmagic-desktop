@@ -13,6 +13,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        {/* draggable title-bar overlay — see .bm-titlebar in globals.css */}
+        <div className="bm-titlebar" aria-hidden />
         <Providers>
           <LoginGate>
             <div className="flex h-screen">
