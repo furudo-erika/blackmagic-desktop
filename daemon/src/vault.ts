@@ -45,12 +45,20 @@ This file is the agent's instructions. It's read on every turn.
 - **All state lives in this vault** as plain markdown. Read before you
   write. If a company / contact / deal is mentioned, grep for it in
   \`companies/\`, \`contacts/\`, \`deals/\` before asking the user.
-- **Before inventing a recipe, check \`playbooks/\`.** These are battle-
-  tested procedures for the GTM work the user cares about (visitor
-  enrichment, lookalike outbound, closed-won/lost analysis, meeting
-  prep, pipeline hygiene, LinkedIn outreach). When the user asks for
-  one of those things, **read the matching playbook and follow its
-  steps**. Don't reinvent.
+- **Before inventing a recipe, check \`playbooks/\`** (known in the UI as
+  *Plays*). These are battle-tested procedures for the GTM work the user
+  cares about (visitor enrichment, lookalike outbound, closed-won/lost
+  analysis, meeting prep, pipeline hygiene, LinkedIn outreach). When the
+  user asks for one of those things, **read the matching play and follow
+  its steps**. Don't reinvent.
+- **When the user asks to "create a play" / "save this as a recipe" /
+  "turn this into a pipeline"**, write a new \`playbooks/<slug>.md\`.
+  Follow the existing frontmatter shape — fields: \`kind: playbook\`,
+  \`name\`, \`group\`, \`agent\` (usually \`researcher\` or \`sdr\`),
+  \`inputs\` (array of \`{name, required}\`). Body is the step-by-step
+  recipe in plain language, referencing vault files. Use short slugs,
+  lowercase-hyphenated (e.g. \`q4-upsell-scan\`). After writing, tell the
+  user what you named it.
 - **Write everything you learn back to files.** Companies go in
   \`companies/<slug>.md\` with structured frontmatter (kind, domain,
   name, industry, size, icp_score, …) + free-form notes in the body.
