@@ -140,14 +140,8 @@ export default function ChatPage() {
 
   return (
     <div className="h-full flex flex-col">
-      <header className="px-6 py-4 border-b border-line dark:border-[#2A241D] flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-ink dark:text-[#F5F1EA]">Chat</h1>
-          <p className="text-xs text-muted dark:text-[#8C837C]">
-            {threadId && <>Thread <code className="text-[11px]">{threadId}</code> · </>}
-            Vault stays local. Only LLM prompts leave.
-          </p>
-        </div>
+      <header className="px-6 py-3 border-b border-line dark:border-[#2A241D] flex items-center">
+        <h1 className="text-base font-semibold text-ink dark:text-[#F5F1EA]">Chat</h1>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
