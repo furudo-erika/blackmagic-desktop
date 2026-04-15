@@ -34,6 +34,7 @@ import { api } from '../lib/api';
 // Power-user views (Vault / Ontology / Companies / Contacts / Deals / Agents /
 // Playbooks) sit behind a collapsed "Advanced" group.
 const PRIMARY_MANAGE = [
+  { href: '/playbooks', label: 'Plays', icon: BookOpen, desc: 'Reusable recipes' },
   { href: '/outreach', label: 'Outreach', icon: Send, desc: 'Draft queue' },
   { href: '/triggers', label: 'Triggers', icon: Zap, desc: 'Schedules' },
   { href: '/runs', label: 'Runs', icon: History, desc: 'History' },
@@ -48,7 +49,6 @@ const ADVANCED = [
   { href: '/contacts', label: 'Contacts', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
   { href: '/agents', label: 'Agents', icon: Bot },
-  { href: '/playbooks', label: 'Playbooks', icon: BookOpen },
 ];
 
 function newThreadId() {
