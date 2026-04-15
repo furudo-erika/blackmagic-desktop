@@ -131,6 +131,8 @@ export const api = {
     request<{ threadId: string; agent: string; updatedAt: string; messages: Array<{ role: 'user' | 'assistant'; content: string }> }>(
       `/api/chats/${encodeURIComponent(id)}`,
     ),
+  deleteChat: (id: string) =>
+    request<{ ok: true }>(`/api/chats/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   runAgent: (agent: string, task: string) =>
     request<{ runId: string; final: string; tokensIn: number; tokensOut: number; costCents: number }>(
       '/api/agent/run',

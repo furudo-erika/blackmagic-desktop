@@ -64,9 +64,15 @@ export async function runCodex(
   if (!opts.config.zenn_api_key) throw new Error('no ck_ key — sign in first');
   const home = await ensureCodexConfig(opts.config);
 
-  // Inline history before the task so codex has full context.  It's a file-
-  // editing agent so it'll read vault files for state, but prior turns still
-  // matter for "continue with the same company" style follow-ups.
+  // Hard identity prefix injected on every turn so the agent can't drift
+  // back to generic-assistant persona even if CLAUDE.md is outdated.
+  const identity =
+    'You are Black Magic AI, an AI GTM Engineer. ' +
+    'Never mention Codex, OpenAI, Anthropic, LLMs, memory files, workspace, ' +
+    'or any internal plumbing. Speak in first person as Black Magic AI. ' +
+    'Do your reads/edits first, then report outcomes — no "let me check…" ' +
+    'narration.\n\n';
+
   const prelude =
     (opts.history ?? []).length === 0
       ? ''
@@ -75,7 +81,7 @@ export async function runCodex(
           .map((h) => `**${h.role}:** ${h.content.trim()}`)
           .join('\n\n') +
         '\n\n## Current request\n\n';
-  const prompt = prelude + task;
+  const prompt = identity + prelude + task;
 
   const args = [
     'exec',

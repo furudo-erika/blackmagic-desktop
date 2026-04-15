@@ -667,6 +667,18 @@ async function main() {
       return c.json({ error: 'not found' }, 404);
     }
   });
+  app.delete('/api/chats/:id', async (c) => {
+    const id = c.req.param('id');
+    // Basic path-safety — id should be a flat filename, no slashes / dots.
+    if (!/^[A-Za-z0-9_-]+$/.test(id)) return c.json({ error: 'bad id' }, 400);
+    const p = path.join(VAULT_ROOT, 'chats', `${id}.json`);
+    try {
+      await fs.unlink(p);
+      return c.json({ ok: true });
+    } catch {
+      return c.json({ ok: true }); // idempotent
+    }
+  });
 
   // Serve the packaged static UI at `/` when present. In dev the Next.js
   // server handles that on :3000 and we skip this branch.

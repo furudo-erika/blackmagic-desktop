@@ -22,8 +22,10 @@ import {
   Briefcase,
   Bot,
   BookOpen,
+  Trash2,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 
 // Chat is the primary surface. Everything else is management:
@@ -58,6 +60,7 @@ function newThreadId() {
 export function Sidebar() {
   const pathname = usePathname() || '/';
   const router = useRouter();
+  const qc = useQueryClient();
 
   const [dark, setDark] = useState(false);
   useEffect(() => {
@@ -104,6 +107,22 @@ export function Sidebar() {
     router.push('/');
   }
 
+  async function deleteThread(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm('Delete this chat?')) return;
+    try {
+      await api.deleteChat(id);
+    } catch {}
+    // If we deleted the active thread, clear the pointer so the Chat page
+    // starts a new one.
+    if (activeThread === id) {
+      localStorage.removeItem('bm-last-thread');
+      setActiveThread('');
+    }
+    qc.invalidateQueries({ queryKey: ['sidebar-chats'] });
+    router.refresh();
+  }
+
   return (
     <aside className="w-[240px] shrink-0 bg-cream-light dark:bg-[#17140F] border-r border-line dark:border-[#2A241D] flex flex-col">
       {/* macOS traffic-light gutter — pt-10 leaves room, the whole band is
@@ -141,24 +160,31 @@ export function Sidebar() {
         {threads.data?.threads?.slice(0, 30).map((t) => {
           const active = onChatPage && activeThread === t.threadId;
           return (
-            <button
+            <div
               key={t.threadId}
-              type="button"
               onClick={() => openThread(t.threadId)}
               className={clsx(
-                'w-full text-left px-3 py-2 rounded-md transition-colors',
+                'group relative px-3 py-2 rounded-md transition-colors cursor-pointer',
                 active
                   ? 'bg-white dark:bg-[#1F1B15] text-ink dark:text-[#F5F1EA]'
                   : 'hover:bg-white dark:hover:bg-[#1F1B15] text-muted dark:text-[#8C837C]',
               )}
             >
-              <div className="text-[12px] truncate leading-tight">
+              <div className="text-[12px] truncate leading-tight pr-6">
                 {t.preview || '(empty)'}
               </div>
               <div className="text-[10px] font-mono opacity-60 mt-0.5">
-                {t.count} · {t.agent}
+                {t.count} msgs
               </div>
-            </button>
+              <button
+                type="button"
+                onClick={(e) => deleteThread(t.threadId, e)}
+                aria-label="Delete chat"
+                className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:text-flame hover:bg-[#E8523A]/10 transition-opacity"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
           );
         })}
       </div>

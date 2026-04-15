@@ -148,9 +148,6 @@ export default function ChatPage() {
             Vault stays local. Only LLM prompts leave.
           </p>
         </div>
-        <div className="text-[11px] font-mono text-muted dark:text-[#8C837C]">
-          gpt-5.3
-        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -181,8 +178,18 @@ export default function ChatPage() {
           ))}
           {sendMut.isPending && messages[messages.length - 1]?.content === '' && (
             <div className="flex justify-start">
-              <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-muted dark:text-[#8C837C]">
-                {streamingTools.length > 0 ? streamingTools.slice(-1)[0] : 'thinking…'}
+              <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-4 py-3 text-sm max-w-[85%] space-y-1.5">
+                <div className="flex items-center gap-2 text-muted dark:text-[#8C837C]">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-flame animate-pulse" />
+                  {streamingTools.length > 0 ? 'working…' : 'thinking…'}
+                </div>
+                {streamingTools.length > 0 && (
+                  <ul className="space-y-0.5 text-[11px] font-mono text-muted dark:text-[#8C837C]">
+                    {streamingTools.slice(-6).map((t, i) => (
+                      <li key={i} className="truncate">{t}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           )}
