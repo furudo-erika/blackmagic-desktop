@@ -491,11 +491,35 @@ async function main() {
             'utf-8',
           );
         }
+        // Extract the assistant's visible output from codex's stdout. Codex
+        // prints its session header + a `user\n...` block + the assistant
+        // reply. Strip the header so the UI shows only the answer.
+        const clean = (() => {
+          const lines = result.stdout.split('\n');
+          // Drop everything up to and including the last `--------` separator
+          // and the following `user` block.
+          let start = 0;
+          let sepCount = 0;
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i]!.trim() === '--------') sepCount++;
+            if (sepCount === 2) { start = i + 1; break; }
+          }
+          // After the 2nd separator we may have `user\n<prompt>\n\nassistant\n...`.
+          const rest = lines.slice(start).join('\n');
+          const idx = rest.indexOf('\nassistant\n');
+          return (idx >= 0 ? rest.slice(idx + '\nassistant\n'.length) : rest).trim();
+        })();
+
+        const contentOrError = clean
+          ? clean
+          : result.exitCode !== 0 && result.stderr
+            ? `Error (exit ${result.exitCode}):\n\n${result.stderr.trim()}`
+            : '(agent produced no output — check Runs for details)';
+
         return c.json({
           role: 'assistant',
-          content: result.stdout || '(codex produced no output)',
+          content: contentOrError,
           runId,
-          engine: 'codex-cli',
           costCents: 0, // server-side /api/agent/responses did the billing
           exitCode: result.exitCode,
         });

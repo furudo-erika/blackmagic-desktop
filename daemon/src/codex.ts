@@ -76,11 +76,21 @@ export async function runCodex(
         '\n\n## Current request\n\n';
   const prompt = prelude + task;
 
-  const args = ['exec', '--cd', VAULT_ROOT, '--skip-git-repo-check', prompt];
+  const args = ['exec', '-C', VAULT_ROOT, '--skip-git-repo-check', '--full-auto', prompt];
+
+  // Codex inherits env, and if the user has http_proxy / https_proxy set
+  // for their normal browsing, codex will try to route localhost traffic
+  // through it → 502. Scrub proxy vars and pin NO_PROXY to local hosts.
+  const cleanEnv: NodeJS.ProcessEnv = { ...process.env };
+  for (const k of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy']) {
+    delete cleanEnv[k];
+  }
   const env: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...cleanEnv,
     OPENAI_API_KEY: opts.config.zenn_api_key,
     CODEX_HOME: home,
+    NO_PROXY: '127.0.0.1,localhost',
+    no_proxy: '127.0.0.1,localhost',
   };
 
   const started = Date.now();

@@ -18,13 +18,36 @@ const SKELETON_DIRS = [
   '.bm',
 ];
 
-const DEFAULT_CLAUDE_MD = `# Black Magic — Your CLAUDE.md
+const DEFAULT_CLAUDE_MD = `# Your AI GTM engineer
 
-This file is read by every agent on every call. Keep it short and opinionated.
+This file is the agent's operating manual. It's read on every turn.
+
+## How to work
+
+- **All state lives in this vault** as plain markdown. Read before you
+  write. If a company / contact / deal is mentioned, grep for it in
+  \`companies/\`, \`contacts/\`, \`deals/\` before asking the user.
+- **Before inventing a recipe, check \`playbooks/\`.** These are battle-
+  tested procedures for the GTM work the user cares about (visitor
+  enrichment, lookalike outbound, closed-won/lost analysis, meeting
+  prep, pipeline hygiene, LinkedIn outreach). When the user asks for
+  one of those things, **read the matching playbook and follow its
+  steps**. Don't reinvent.
+- **Write everything you learn back to files.** Companies go in
+  \`companies/<slug>.md\` with structured frontmatter (kind, domain,
+  name, industry, size, icp_score, …) + free-form notes in the body.
+  Same pattern for contacts and deals.
+- **Outreach is approve-gated.** Never "send" anything. Write drafts
+  into \`drafts/\` with frontmatter (\`channel\`, \`to\`, \`subject\`,
+  \`tool: gmail.send_email\`, \`status: pending\`). A human clicks
+  Approve in the UI, which calls the MCP tool.
+- **Every claim cites a source** — a URL, a file path, or "(unknown)".
+  Never fabricate firmographics, headcounts, or quotes.
 
 ## Our Company
 
-_One paragraph: what you sell, to whom._
+_One paragraph: what you sell, to whom. The onboarding step fills this
+in from your domain. Edit freely._
 
 ## ICP (Ideal Customer Profile)
 
@@ -39,11 +62,14 @@ _One paragraph: what you sell, to whom._
 - Forbidden words: "unlock", "revolutionize", "streamline", "leverage", "unleash"
 - Email length cap: 90 words
 
-## Sources of Truth
+## Vault layout
 
-- Companies: \`companies/\`
-- Contacts: \`contacts/<company-slug>/\`
-- Deals: \`deals/\` (open/closed-won/closed-lost)
+- \`companies/<slug>.md\` — one per company
+- \`contacts/<company-slug>/<person-slug>.md\` — one per contact
+- \`deals/{open,closed-won,closed-lost}/<slug>.md\`
+- \`playbooks/<name>.md\` — named procedures (list them with \`ls playbooks/\`)
+- \`drafts/<ts>-<slug>.md\` — outbound drafts, human-approved before send
+- \`me.md\` — about us
 `;
 
 const DEFAULT_AGENTS: Record<string, string> = {

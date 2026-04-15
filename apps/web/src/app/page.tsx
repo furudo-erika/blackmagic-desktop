@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Markdown } from '../components/markdown';
-import { Send, MessageSquare, Cpu } from 'lucide-react';
+import { Send, MessageSquare } from 'lucide-react';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
@@ -19,11 +19,8 @@ export default function ChatPage() {
   const [threadId, setThreadId] = useState<string>('');
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
-  const [agent, setAgent] = useState('researcher');
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [lastMeta, setLastMeta] = useState<{ runId: string; costCents: number; tokensIn?: number; tokensOut?: number; engine?: string } | null>(null);
-
-  const health = useQuery({ queryKey: ['health'], queryFn: api.health });
+  const [lastMeta, setLastMeta] = useState<{ runId: string; costCents: number; tokensIn?: number; tokensOut?: number } | null>(null);
 
   // Sync thread with sidebar: read localStorage both on mount and on focus.
   useEffect(() => {
@@ -53,7 +50,6 @@ export default function ChatPage() {
       const data = await api.getChat(id);
       setThreadId(data.threadId);
       setMessages(data.messages as Msg[]);
-      setAgent(data.agent ?? 'researcher');
       setLastMeta(null);
     } catch {
       setThreadId(id);
@@ -63,7 +59,7 @@ export default function ChatPage() {
   }
 
   const sendMut = useMutation({
-    mutationFn: (msgs: Msg[]) => api.chat(msgs, agent, threadId),
+    mutationFn: (msgs: Msg[]) => api.chat(msgs, undefined, threadId),
     onSuccess: (data: any) => {
       setMessages((prev) => [...prev, { role: 'assistant', content: data.content || '(no response)' }]);
       setLastMeta({
@@ -71,7 +67,6 @@ export default function ChatPage() {
         costCents: data.costCents ?? 0,
         tokensIn: data.tokensIn,
         tokensOut: data.tokensOut,
-        engine: data.engine ?? 'builtin',
       });
       qc.invalidateQueries({ queryKey: ['sidebar-chats'] });
     },
@@ -93,13 +88,6 @@ export default function ChatPage() {
     sendMut.mutate(next);
   }
 
-  const engineLabel =
-    health.data?.engine === 'codex-cli'
-      ? 'Codex CLI'
-      : health.data?.engine === 'builtin'
-        ? 'Built-in'
-        : '…';
-
   return (
     <div className="h-full flex flex-col">
       <header className="px-6 py-4 border-b border-line dark:border-[#2A241D] flex items-center justify-between">
@@ -110,19 +98,8 @@ export default function ChatPage() {
             Vault stays local. Only LLM prompts leave.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[11px] font-mono text-muted dark:text-[#8C837C]">
-          <span className="inline-flex items-center gap-1 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-full px-2 py-0.5">
-            <Cpu className="w-3 h-3" /> {engineLabel}
-          </span>
-          <select
-            value={agent}
-            onChange={(e) => setAgent(e.target.value)}
-            className="text-xs bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md px-2 py-1 text-ink dark:text-[#E6E0D8]"
-          >
-            <option value="researcher">researcher</option>
-            <option value="sdr">sdr</option>
-            <option value="ae">ae</option>
-          </select>
+        <div className="text-[11px] font-mono text-muted dark:text-[#8C837C]">
+          gpt-5.3
         </div>
       </header>
 
@@ -167,7 +144,6 @@ export default function ChatPage() {
         {lastMeta && (
           <div className="max-w-3xl mx-auto mb-2 text-[10px] font-mono text-muted dark:text-[#6B625C] flex items-center gap-3">
             <span>run {lastMeta.runId}</span>
-            {lastMeta.engine && <span>engine {lastMeta.engine}</span>}
             {lastMeta.tokensIn != null && (
               <span>in {lastMeta.tokensIn} / out {lastMeta.tokensOut}</span>
             )}
