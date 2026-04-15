@@ -36,6 +36,11 @@ export default function SettingsPage() {
 
   const [apifyDraft, setApifyDraft] = useState('');
   const [enrichDraft, setEnrichDraft] = useState('');
+  const [hubspotDraft, setHubspotDraft] = useState('');
+  const [slackDraft, setSlackDraft] = useState('');
+  const [resendDraft, setResendDraft] = useState('');
+  const [fromEmailDraft, setFromEmailDraft] = useState('');
+  const [linkedinCookieDraft, setLinkedinCookieDraft] = useState('');
   const [keySaving, setKeySaving] = useState(false);
   const [keySaveMsg, setKeySaveMsg] = useState<string | null>(null);
   async function saveIntegrationKeys() {
@@ -45,12 +50,22 @@ export default function SettingsPage() {
       const body: Record<string, string> = {};
       if (apifyDraft.trim()) body.apify_api_key = apifyDraft.trim();
       if (enrichDraft.trim()) body.enrichlayer_api_key = enrichDraft.trim();
+      if (hubspotDraft.trim()) body.hubspot_api_key = hubspotDraft.trim();
+      if (slackDraft.trim()) body.slack_webhook_url = slackDraft.trim();
+      if (resendDraft.trim()) body.resend_api_key = resendDraft.trim();
+      if (fromEmailDraft.trim()) body.from_email = fromEmailDraft.trim();
+      if (linkedinCookieDraft.trim()) body.linkedin_cookie = linkedinCookieDraft.trim();
       if (Object.keys(body).length === 0) {
         setKeySaveMsg('nothing to save');
       } else {
         await api.setIntegrationKeys(body);
         setApifyDraft('');
         setEnrichDraft('');
+        setHubspotDraft('');
+        setSlackDraft('');
+        setResendDraft('');
+        setFromEmailDraft('');
+        setLinkedinCookieDraft('');
         setKeySaveMsg('saved');
         intKeys.refetch();
       }
@@ -148,8 +163,8 @@ export default function SettingsPage() {
 
           <Section icon={KeyRound} title="Integration keys">
             <p className="text-[11px] text-muted dark:text-[#8C837C]">
-              Bring-your-own keys for EnrichLayer (LinkedIn enrichment) and Apify
-              (generic scrapers). Stored locally in{' '}
+              Bring-your-own keys for EnrichLayer, Apify, HubSpot CRM, Slack,
+              Resend email and LinkedIn session cookie. Stored locally in{' '}
               <code className="text-[11px]">~/BlackMagic/.bm/config.toml</code> and
               read directly by the built-in tools.
             </p>
@@ -176,6 +191,66 @@ export default function SettingsPage() {
                   onChange={(e) => setApifyDraft(e.target.value)}
                   placeholder={intKeys.data?.apify_api_key ? '••• (saved)' : 'apify_api_… token'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  HubSpot
+                </label>
+                <input
+                  type="password"
+                  value={hubspotDraft}
+                  onChange={(e) => setHubspotDraft(e.target.value)}
+                  placeholder={intKeys.data?.hubspot_api_key ? '••• (saved)' : 'pat-… Private App token'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Slack webhook
+                </label>
+                <input
+                  type="password"
+                  value={slackDraft}
+                  onChange={(e) => setSlackDraft(e.target.value)}
+                  placeholder={intKeys.data?.slack_webhook_url ? '••• (saved)' : 'https://hooks.slack.com/services/…'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Resend
+                </label>
+                <input
+                  type="password"
+                  value={resendDraft}
+                  onChange={(e) => setResendDraft(e.target.value)}
+                  placeholder={intKeys.data?.resend_api_key ? '••• (saved)' : 're_… API key'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  From email
+                </label>
+                <input
+                  type="text"
+                  value={fromEmailDraft}
+                  onChange={(e) => setFromEmailDraft(e.target.value)}
+                  placeholder={intKeys.data?.from_email ? '••• (saved)' : 'Name <you@yourdomain.com>'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-start gap-2">
+                <label className="w-36 mt-1.5 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  LinkedIn cookie
+                </label>
+                <textarea
+                  value={linkedinCookieDraft}
+                  onChange={(e) => setLinkedinCookieDraft(e.target.value)}
+                  placeholder={intKeys.data?.linkedin_cookie ? '••• (saved) — paste new li_at=… to rotate' : 'li_at=…; JSESSIONID=…  (optional, required only for DM automation — ToS-grey-area)'}
+                  rows={2}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono resize-none"
                 />
               </div>
               <div className="flex items-center gap-2 justify-end">

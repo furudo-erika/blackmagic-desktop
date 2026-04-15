@@ -67,10 +67,24 @@ export const api = {
   backlinks: (p: string) =>
     request<{ backlinks: string[] }>(`/api/vault/backlinks?path=${encodeURIComponent(p)}`),
   integrationKeys: () =>
-    request<{ apify_api_key: boolean; enrichlayer_api_key: boolean }>(
-      '/api/config/integration-keys',
-    ),
-  setIntegrationKeys: (body: { apify_api_key?: string; enrichlayer_api_key?: string }) =>
+    request<{
+      apify_api_key: boolean;
+      enrichlayer_api_key: boolean;
+      hubspot_api_key: boolean;
+      slack_webhook_url: boolean;
+      resend_api_key: boolean;
+      from_email: boolean;
+      linkedin_cookie: boolean;
+    }>('/api/config/integration-keys'),
+  setIntegrationKeys: (body: {
+    apify_api_key?: string;
+    enrichlayer_api_key?: string;
+    hubspot_api_key?: string;
+    slack_webhook_url?: string;
+    resend_api_key?: string;
+    from_email?: string;
+    linkedin_cookie?: string;
+  }) =>
     request<{ ok: true }>('/api/config/integration-keys', {
       method: 'POST',
       body: JSON.stringify(body),

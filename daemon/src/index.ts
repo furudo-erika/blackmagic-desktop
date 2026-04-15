@@ -246,12 +246,25 @@ async function main() {
   // Update per-integration API keys (apify, enrichlayer). Writes into
   // ~/BlackMagic/.bm/config.toml so the daemon picks them up on reload and
   // surfaces them via ctx.config to the builtin tools.
-  const INTEGRATION_KEYS = ['apify_api_key', 'enrichlayer_api_key'] as const;
+  const INTEGRATION_KEYS = [
+    'apify_api_key',
+    'enrichlayer_api_key',
+    'hubspot_api_key',
+    'slack_webhook_url',
+    'resend_api_key',
+    'from_email',
+    'linkedin_cookie',
+  ] as const;
   type IntegrationKey = (typeof INTEGRATION_KEYS)[number];
   app.get('/api/config/integration-keys', (c) =>
     c.json({
       apify_api_key: Boolean(config.apify_api_key),
       enrichlayer_api_key: Boolean(config.enrichlayer_api_key),
+      hubspot_api_key: Boolean(config.hubspot_api_key),
+      slack_webhook_url: Boolean(config.slack_webhook_url),
+      resend_api_key: Boolean(config.resend_api_key),
+      from_email: Boolean(config.from_email),
+      linkedin_cookie: Boolean(config.linkedin_cookie),
     }),
   );
   app.post('/api/config/integration-keys', async (c) => {

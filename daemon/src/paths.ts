@@ -12,6 +12,11 @@ export interface Config {
   daemon_port?: number;
   apify_api_key?: string;
   enrichlayer_api_key?: string;
+  hubspot_api_key?: string;
+  slack_webhook_url?: string;
+  resend_api_key?: string;
+  from_email?: string;
+  linkedin_cookie?: string;
 }
 
 function defaultVault(): string {
@@ -62,6 +67,11 @@ export function loadConfig(): Config {
     daemon_port: process.env.BM_DAEMON_PORT ? Number(process.env.BM_DAEMON_PORT) : undefined,
     apify_api_key: process.env.APIFY_API_KEY,
     enrichlayer_api_key: process.env.ENRICHLAYER_API_KEY,
+    hubspot_api_key: process.env.HUBSPOT_API_KEY,
+    slack_webhook_url: process.env.SLACK_WEBHOOK_URL,
+    resend_api_key: process.env.RESEND_API_KEY,
+    from_email: process.env.BM_FROM_EMAIL,
+    linkedin_cookie: process.env.LINKEDIN_COOKIE,
   };
 
   if (fs.existsSync(configPath)) {

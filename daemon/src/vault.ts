@@ -1296,7 +1296,14 @@ Sweep anonymous visitor logs, de-anonymise to companies, score for ICP fit.
    pages_viewed, enriched_at\` and a one-paragraph body. Top 3 contacts per
    company go to \`contacts/<slug>-<name>.md\` with
    \`kind: contact, company, title, linkedin\`.
-6. Reply: top 5 companies by \`intent_score\` with one-line why.
+6. If \`hubspot_api_key\` is configured, also push each company via
+   \`hubspot_create_company({ domain, name, properties: { industry,
+   numberofemployees } })\` and each contact via
+   \`hubspot_create_contact({ email, properties: { company, jobtitle,
+   bm_intent_score, bm_source: 'visitor-id' } })\`. Call \`hubspot_search\`
+   first for dedup. On 409 / already-exists, call \`hubspot_update_contact\`
+   instead.
+7. Reply: top 5 companies by \`intent_score\` with one-line why.
 `,
 
   'signal-based-outbound.md': `---
@@ -1330,8 +1337,13 @@ Draft contextual outbound emails anchored on the latest signal per company.
         the email and write a TODO note to the company file instead.
 4. Write each draft to \`drafts/<slug>-<YYYY-MM-DD>.md\` with frontmatter
    \`kind: draft, channel: email, status: pending, signal_ref: <path>,
-   tool: gmail.send_email\` and the email body below.
-5. Reply with a bulleted list of drafts written + the signal each one
+   tool: send_email\` and the email body below. Approval in the UI is what
+   actually sends — the \`send_email\` tool (Resend) handles delivery when
+   \`resend_api_key\` + \`from_email\` are configured.
+5. If the input includes \`notify: true\` and \`slack_webhook_url\` is
+   configured, call \`slack_notify({ text: "N new signal-based drafts
+   ready for review: …" })\` with a one-line summary of the batch.
+6. Reply with a bulleted list of drafts written + the signal each one
    references.
 `,
 
@@ -1366,7 +1378,13 @@ Score a contact for ICP fit and label with a tier.
    \`qualification_reason\` (one line), \`qualified_at\` (iso).
 6. Append a \`## Qualification (YYYY-MM-DD)\` section to the body listing
    each criterion with PASS/FAIL/UNKNOWN + the evidence source.
-7. Reply with \`<name> — Tier <X> (<score>): <one-line reason>\`.
+7. If \`hubspot_api_key\` is configured and the contact has an \`email\`,
+   mirror the result to HubSpot via \`hubspot_update_contact\` (or
+   \`hubspot_create_contact\` if \`hubspot_search\` finds no match) with
+   custom properties \`bm_qualification_score\`, \`bm_qualification_tier\`,
+   \`bm_qualification_reason\`. Disqualified tier → also call
+   \`hubspot_create_note\` capturing the anti-signal reason.
+8. Reply with \`<name> — Tier <X> (<score>): <one-line reason>\`.
 `,
 
   'enrich-contact-deep.md': `---
@@ -1399,7 +1417,13 @@ Deep enrichment beyond a basic LinkedIn scrape.
    evidence for — leave the rest untouched.
 6. Append a \`## Enrichment (YYYY-MM-DD)\` section to the contact body
    with cited URLs for every factual claim.
-7. Reply with the 3 freshest data points you added.
+7. If \`hubspot_api_key\` is configured, mirror the new fields back to
+   HubSpot via \`hubspot_update_contact({ id_or_email: <email>, properties:
+   { jobtitle, bm_seniority, industry, bm_linkedin_summary,
+   bm_recent_news } })\`. If \`apify_api_key\` is set and the company lacks
+   a firmographic record, also call \`linkedin_enrich_company({
+   url_or_domain: <domain> })\` and merge into \`companies/<slug>.md\`.
+8. Reply with the 3 freshest data points you added.
 `,
 
   'icp-tune.md': `---
