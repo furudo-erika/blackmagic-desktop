@@ -17,6 +17,7 @@ import { listDrafts, approveDraft, rejectDraft } from './drafts.js';
 import { mcpServerList, McpRegistry } from './mcp.js';
 import { buildOntology } from './ontology.js';
 import { pushTriggers, pushDrafts } from './sync.js';
+import { runCodex, codexAvailable, CodexNotInstalled } from './codex.js';
 import {
   PROVIDERS,
   listIntegrations,
@@ -142,6 +143,7 @@ async function main() {
       vaultPath: VAULT_ROOT,
       model: config.default_model,
       zennConfigured: Boolean(config.zenn_api_key),
+      engine: codexReady ? 'codex-cli' : 'builtin',
       localToken: LOCAL_TOKEN,
     }),
   );
@@ -433,19 +435,154 @@ async function main() {
     }
   });
 
+  // Probe once on startup so /api/health can advertise which engine is live.
+  const codexReady = await codexAvailable();
+  console.log(`[daemon] codex ${codexReady ? 'available' : 'not installed — will use builtin Responses loop'}`);
+
   app.post('/api/chat', async (c) => {
-    const body = await c.req.json<{ messages: Array<{ role: string; content: string }>; agent?: string }>();
-    const lastUser = [...body.messages].reverse().find((m) => m.role === 'user');
-    if (!lastUser) return c.json({ error: 'no user message' }, 400);
+    const body = await c.req.json<{
+      messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+      agent?: string;
+      threadId?: string;
+    }>();
+    if (!body.messages || body.messages.length === 0) {
+      return c.json({ error: 'no messages' }, 400);
+    }
+    const last = body.messages[body.messages.length - 1]!;
+    if (last.role !== 'user') return c.json({ error: 'last message must be user' }, 400);
+    const history = body.messages.slice(0, -1).filter((m) => m.role === 'user' || m.role === 'assistant');
+
+    // Path B: delegate to the Codex CLI. It runs in the vault, reads
+    // CLAUDE.md + files, edits in place, and streams reasoning to stdout.
+    // Billing is still authoritative on the server side because codex hits
+    // our /api/agent/responses proxy using the user's ck_.
+    if (codexReady) {
+      try {
+        const result = await runCodex(last.content, { config, history });
+        const runId = `codex-${Date.now()}`;
+        const runDir = path.join(VAULT_ROOT, 'runs', runId);
+        await fs.mkdir(runDir, { recursive: true });
+        await fs.writeFile(path.join(runDir, 'stdout.log'), result.stdout, 'utf-8');
+        await fs.writeFile(path.join(runDir, 'stderr.log'), result.stderr, 'utf-8');
+        await fs.writeFile(
+          path.join(runDir, 'meta.json'),
+          JSON.stringify(
+            { runId, agent: 'codex', engine: 'codex-cli', exitCode: result.exitCode, durationMs: result.durationMs },
+            null,
+            2,
+          ),
+          'utf-8',
+        );
+        if (body.threadId) {
+          const tp = path.join(VAULT_ROOT, 'chats', `${body.threadId}.json`);
+          await fs.mkdir(path.dirname(tp), { recursive: true });
+          await fs.writeFile(
+            tp,
+            JSON.stringify(
+              {
+                threadId: body.threadId,
+                agent: 'codex',
+                updatedAt: new Date().toISOString(),
+                messages: [...body.messages, { role: 'assistant', content: result.stdout }],
+              },
+              null,
+              2,
+            ),
+            'utf-8',
+          );
+        }
+        return c.json({
+          role: 'assistant',
+          content: result.stdout || '(codex produced no output)',
+          runId,
+          engine: 'codex-cli',
+          costCents: 0, // server-side /api/agent/responses did the billing
+          exitCode: result.exitCode,
+        });
+      } catch (err) {
+        if (!(err instanceof CodexNotInstalled)) {
+          return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+        }
+        // fall through to built-in loop
+      }
+    }
+
+    // Fallback: our own Responses API loop.
     try {
       const result = await runAgent({
         agent: body.agent ?? 'researcher',
-        task: lastUser.content,
+        task: last.content,
+        history,
         config,
       });
-      return c.json({ role: 'assistant', content: result.final, runId: result.runId, costCents: result.costCents });
+      // Persist full thread so /runs and a future history UI can show it.
+      if (body.threadId) {
+        const threadPath = path.join(VAULT_ROOT, 'chats', `${body.threadId}.json`);
+        await fs.mkdir(path.dirname(threadPath), { recursive: true });
+        await fs.writeFile(
+          threadPath,
+          JSON.stringify(
+            {
+              threadId: body.threadId,
+              agent: body.agent ?? 'researcher',
+              updatedAt: new Date().toISOString(),
+              messages: [...body.messages, { role: 'assistant', content: result.final }],
+            },
+            null,
+            2,
+          ),
+          'utf-8',
+        );
+      }
+      return c.json({
+        role: 'assistant',
+        content: result.final,
+        runId: result.runId,
+        costCents: result.costCents,
+        tokensIn: result.tokensIn,
+        tokensOut: result.tokensOut,
+      });
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+
+  // List + read chat threads.
+  app.get('/api/chats', async (c) => {
+    const dir = path.join(VAULT_ROOT, 'chats');
+    try {
+      const entries = await fs.readdir(dir);
+      const threads = await Promise.all(
+        entries
+          .filter((f) => f.endsWith('.json'))
+          .map(async (f) => {
+            try {
+              const j = JSON.parse(await fs.readFile(path.join(dir, f), 'utf-8'));
+              const first = j.messages?.find((m: any) => m.role === 'user')?.content ?? '';
+              return {
+                threadId: j.threadId,
+                agent: j.agent,
+                updatedAt: j.updatedAt,
+                preview: String(first).slice(0, 80),
+                count: j.messages?.length ?? 0,
+              };
+            } catch {
+              return null;
+            }
+          }),
+      );
+      const out = threads.filter(Boolean).sort((a: any, b: any) => (a.updatedAt < b.updatedAt ? 1 : -1));
+      return c.json({ threads: out });
+    } catch {
+      return c.json({ threads: [] });
+    }
+  });
+  app.get('/api/chats/:id', async (c) => {
+    const p = path.join(VAULT_ROOT, 'chats', `${c.req.param('id')}.json`);
+    try {
+      return c.json(JSON.parse(await fs.readFile(p, 'utf-8')));
+    } catch {
+      return c.json({ error: 'not found' }, 404);
     }
   });
 

@@ -70,6 +70,8 @@ function priceCents(model: string, tokIn: number, tokOut: number): number {
 export interface RunOptions {
   agent: string;
   task: string;
+  /** Optional prior conversation (user + assistant turns). Prepended before `task`. */
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
   config: Config;
   onEvent?: (ev: RunEvent) => void;
   maxTurns?: number;
@@ -123,9 +125,11 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
     | { type: 'function_call'; call_id: string; name: string; arguments: string }
     | { type: 'function_call_output'; call_id: string; output: string };
 
-  const input: InputItem[] = [
-    { type: 'message', role: 'user', content: task },
-  ];
+  const input: InputItem[] = [];
+  for (const h of opts.history ?? []) {
+    input.push({ type: 'message', role: h.role, content: h.content });
+  }
+  input.push({ type: 'message', role: 'user', content: task });
 
   const toolsPayload = toolsAsOpenAI(enabledTools);
 

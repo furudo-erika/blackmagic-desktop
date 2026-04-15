@@ -44,9 +44,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () =>
-    request<{ ok: boolean; version: string; vaultPath: string; model: string; zennConfigured: boolean; localToken?: string }>(
-      '/api/health',
-    ),
+    request<{
+      ok: boolean;
+      version: string;
+      vaultPath: string;
+      model: string;
+      zennConfigured: boolean;
+      engine?: 'codex-cli' | 'builtin';
+      localToken?: string;
+    }>('/api/health'),
   setApiKey: (key: string) =>
     request<{ ok: true }>('/api/config/api-key', { method: 'POST', body: JSON.stringify({ key }) }),
   authStart: () => request<{ browserUrl: string; state: string }>('/api/auth/start'),
@@ -58,11 +64,23 @@ export const api = {
     ),
   writeFile: (path: string, content: string) =>
     request<{ ok: true }>('/api/vault/file', { method: 'PUT', body: JSON.stringify({ path, content }) }),
-  chat: (messages: Array<{ role: string; content: string }>, agent?: string) =>
-    request<{ role: 'assistant'; content: string; runId: string; costCents: number }>('/api/chat', {
-      method: 'POST',
-      body: JSON.stringify({ messages, agent }),
-    }),
+  chat: (
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+    agent?: string,
+    threadId?: string,
+  ) =>
+    request<{ role: 'assistant'; content: string; runId: string; costCents: number; tokensIn: number; tokensOut: number }>(
+      '/api/chat',
+      { method: 'POST', body: JSON.stringify({ messages, agent, threadId }) },
+    ),
+  listChats: () =>
+    request<{ threads: Array<{ threadId: string; agent: string; updatedAt: string; preview: string; count: number }> }>(
+      '/api/chats',
+    ),
+  getChat: (id: string) =>
+    request<{ threadId: string; agent: string; updatedAt: string; messages: Array<{ role: 'user' | 'assistant'; content: string }> }>(
+      `/api/chats/${encodeURIComponent(id)}`,
+    ),
   runAgent: (agent: string, task: string) =>
     request<{ runId: string; final: string; tokensIn: number; tokensOut: number; costCents: number }>(
       '/api/agent/run',
