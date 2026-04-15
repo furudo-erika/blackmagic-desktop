@@ -30,6 +30,7 @@ export async function pushTriggers(config: Config): Promise<void> {
         schedule: t.schedule ?? null,
         webhook: t.webhook === true,
         playbook: t.playbook ?? '',
+        shell: t.shell ?? null,
         enabled: t.enabled !== false,
         body: t.body ?? null,
         vaultPath: `triggers/${t.name}.md`,
