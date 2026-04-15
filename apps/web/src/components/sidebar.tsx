@@ -1,77 +1,66 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+/**
+ * Sidebar — paperclip-style sections + nav items with live state.
+ *
+ * Layout:
+ *   - Project switcher pill (dispatches bm:open-project-picker)
+ *   - New chat · Chat (collapsible recent threads) · Inbox (drafts badge)
+ *   - Work  : Playbooks · Sequences · Triggers · Runs (+ live count)
+ *   - Vault : Companies · Contacts · Deals · Knowledge graph · Files
+ *   - System: Integrations · Agent roles · Settings
+ *   - Footer: version + theme toggle. macOS drag region retained.
+ */
+
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Plus,
-  Send,
-  Zap,
-  History,
-  Plug,
-  Settings as SettingsIcon,
-  Sun,
-  Moon,
-  ChevronDown,
-  ChevronRight,
-  Network,
-  FolderTree,
-  Building2,
-  Users,
   Briefcase,
-  Bot,
+  Building2,
   BookOpen,
-  Trash2,
+  Bot,
+  ChevronDown,
+  FolderTree,
+  History,
+  Inbox,
+  Moon,
+  Network,
+  Plug,
   Repeat,
+  Search,
+  Settings as SettingsIcon,
+  SquarePen,
+  Sun,
+  Users,
+  Zap,
 } from 'lucide-react';
-import clsx from 'clsx';
-import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { ProjectPicker } from './project-picker';
+import { SidebarNavItem, SidebarSection } from './ui/sidebar-nav';
+import { SidebarChats, newThreadId } from './sidebar-chats';
+import { useRouter } from 'next/navigation';
 
-// Chat is the primary surface. Everything else is management:
-//   - things the user needs to review (drafts / runs / integrations / settings)
-//   - things they occasionally tune (triggers = remote crontab)
-// Power-user views (Vault / Ontology / Companies / Contacts / Deals / Agents /
-// Playbooks) sit behind a collapsed "Advanced" group.
-// "Workflow": things you actually do regularly
-const WORKFLOW = [
-  { href: '/playbooks', label: 'Playbooks', icon: BookOpen },
-  { href: '/outreach', label: 'Outreach', icon: Send },
-  { href: '/sequences', label: 'Sequences', icon: Repeat },
-  { href: '/triggers', label: 'Triggers', icon: Zap },
-  { href: '/runs', label: 'Runs', icon: History },
-  { href: '/integrations', label: 'Integrations', icon: Plug },
-  { href: '/settings', label: 'Settings', icon: SettingsIcon },
-];
-
-// "Vault": direct on-disk views — most users don't open these often;
-// the agent edits the same files via Chat.
-const VAULT_GROUP = [
-  { href: '/vault', label: 'Browse files', icon: FolderTree },
-  { href: '/companies', label: 'Companies', icon: Building2 },
-  { href: '/contacts', label: 'Contacts', icon: Users },
-  { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/agents', label: 'Agent roles', icon: Bot },
-  { href: '/ontology', label: 'Knowledge graph', icon: Network },
-];
-
-function newThreadId() {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+/** Parse run-started ms out of a runId. Mirrors runs/page.tsx. */
+function runStartedMs(runId: string): number | null {
+  if (runId.startsWith('codex-')) {
+    const ms = Number(runId.slice('codex-'.length));
+    return Number.isFinite(ms) ? ms : null;
+  }
+  const m = runId.match(/^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z/);
+  if (!m) return null;
+  const t = Date.parse(`${m[1]}:${m[2]}:${m[3]}.${m[4]}Z`);
+  return Number.isFinite(t) ? t : null;
 }
 
 export function Sidebar() {
-  const pathname = usePathname() || '/';
   const router = useRouter();
-  const qc = useQueryClient();
 
+  // Theme -----------------------------------------------------------------
   const [dark, setDark] = useState(false);
   useEffect(() => {
     const stored = localStorage.getItem('bm-theme');
-    const initial = stored === 'dark' || (stored == null && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const initial =
+      stored === 'dark' ||
+      (stored == null && window.matchMedia('(prefers-color-scheme: dark)').matches);
     setDark(initial);
     document.documentElement.classList.toggle('dark', initial);
   }, []);
@@ -82,68 +71,52 @@ export function Sidebar() {
     localStorage.setItem('bm-theme', next ? 'dark' : 'light');
   }
 
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [activeThread, setActiveThread] = useState<string>('');
-
-  useEffect(() => {
-    // Poll localStorage for the chat page's active thread so the sidebar
-    // can highlight it. Cheap enough; happens once per render cycle.
-    const t = localStorage.getItem('bm-last-thread') ?? '';
-    setActiveThread(t);
-  }, [pathname]);
-
-  const threads = useQuery({
-    queryKey: ['sidebar-chats'],
-    queryFn: api.listChats,
-    refetchInterval: 4_000,
-  });
-
-  const projects = useQuery({
-    queryKey: ['projects'],
-    queryFn: api.listProjects,
-  });
+  // Project switcher ------------------------------------------------------
+  const projects = useQuery({ queryKey: ['projects'], queryFn: api.listProjects });
   const activeProject = projects.data?.projects.find(
     (p) => p.id === projects.data?.active,
   );
-  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  function openProjectPicker() {
+    window.dispatchEvent(new Event('bm:open-project-picker'));
+  }
 
-  const onChatPage = pathname === '/';
+  // Live counts -----------------------------------------------------------
+  const drafts = useQuery({
+    queryKey: ['drafts'],
+    queryFn: api.listDrafts,
+    refetchInterval: 30_000,
+  });
+  const pendingDraftCount = useMemo(() => {
+    const list = drafts.data?.drafts ?? [];
+    return list.filter((d) => (d.status ?? 'pending') === 'pending').length;
+  }, [drafts.data]);
 
+  const runs = useQuery({
+    queryKey: ['runs'],
+    queryFn: api.listRuns,
+    refetchInterval: 10_000,
+  });
+  const liveRunCount = useMemo(() => {
+    const list = runs.data?.runs ?? [];
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    return list.filter((r) => {
+      const started = runStartedMs(r.runId);
+      return started != null && started >= fiveMinAgo;
+    }).length;
+  }, [runs.data]);
+
+  // Chat actions ----------------------------------------------------------
   function startNewThread() {
     const id = newThreadId();
     localStorage.setItem('bm-last-thread', id);
-    setActiveThread(id);
     router.push('/');
-  }
-
-  function openThread(id: string) {
-    localStorage.setItem('bm-last-thread', id);
-    setActiveThread(id);
-    router.push('/');
-  }
-
-  async function deleteThread(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!confirm('Delete this chat?')) return;
-    try {
-      await api.deleteChat(id);
-    } catch {}
-    // If we deleted the active thread, clear the pointer so the Chat page
-    // starts a new one.
-    if (activeThread === id) {
-      localStorage.removeItem('bm-last-thread');
-      setActiveThread('');
-    }
-    qc.invalidateQueries({ queryKey: ['sidebar-chats'] });
-    router.refresh();
   }
 
   return (
-    <aside className="w-[240px] shrink-0 bg-cream-light dark:bg-[#17140F] border-r border-line dark:border-[#2A241D] flex flex-col">
-      {/* macOS traffic-light gutter — pt-10 leaves room, the whole band is
-          a window-drag region. */}
+    <aside className="w-[240px] shrink-0 bg-cream-light dark:bg-[#17140F] border-r border-line dark:border-[#2A241D] flex flex-col min-h-0">
+      {/* macOS traffic-light gutter — whole band is window-drag. */}
       <div
-        className="pt-10 pb-3 pl-[84px] pr-4 flex items-center gap-2"
+        className="pt-10 pb-2 pl-[84px] pr-3 flex items-center gap-2 shrink-0"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         <img src="/logo.svg" alt="" className="w-5 h-5 shrink-0 dark:invert" />
@@ -152,141 +125,75 @@ export function Sidebar() {
         </span>
       </div>
 
-      {/* Project switcher — shows active vault, click to open picker */}
-      <div className="px-3 pb-2">
+      {/* Project switcher pill (paperclip CompanySwitcher equivalent) */}
+      <div className="px-3 pb-2 shrink-0">
         <button
           type="button"
-          onClick={() => setProjectPickerOpen(true)}
+          onClick={openProjectPicker}
           title={activeProject?.path || 'Switch project'}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] hover:border-flame text-left"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white dark:hover:bg-[#1F1B15] text-left group"
         >
-          <FolderTree className="w-3.5 h-3.5 text-flame shrink-0" />
-          <span className="flex-1 text-[12px] font-medium text-ink dark:text-[#F5F1EA] truncate">
-            {activeProject?.name ?? 'Default'}
+          <div className="w-4 h-4 rounded-sm bg-flame shrink-0" aria-hidden />
+          <span className="flex-1 text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">
+            {activeProject?.name ?? 'Select project'}
           </span>
-          <ChevronDown className="w-3 h-3 text-muted dark:text-[#6B625C] shrink-0" />
+          <Search className="w-3.5 h-3.5 text-muted/70 dark:text-[#6B625C] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <ChevronDown className="w-3 h-3 text-muted/70 dark:text-[#6B625C] shrink-0" />
         </button>
       </div>
 
-      {projectPickerOpen && (
-        <ProjectPicker
-          mode="modal"
-          onClose={() => setProjectPickerOpen(false)}
-          onActivated={() => setProjectPickerOpen(false)}
-        />
-      )}
+      <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 px-2 pb-3">
+        <div className="flex flex-col gap-0.5">
+          <button
+            onClick={startNewThread}
+            className="flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-ink/80 dark:text-[#E6E0D8]/80 hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 hover:text-ink dark:hover:text-[#F5F1EA] rounded-md transition-colors"
+          >
+            <SquarePen className="w-4 h-4 shrink-0" />
+            <span className="truncate">New chat</span>
+          </button>
 
-      {/* New chat */}
-      <div className="px-3 pb-2">
-        <button
-          onClick={startNewThread}
-          className="w-full h-9 rounded-md bg-flame text-white text-sm font-medium hover:opacity-90 flex items-center justify-center gap-1.5"
-        >
-          <Plus className="w-3.5 h-3.5" /> New chat
-        </button>
-      </div>
+          <SidebarChats />
 
-      {/* Chat threads (the core surface) */}
-      <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
-        <div className="px-2 py-1 text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#6B625C]">
-          Chats
+          <SidebarNavItem
+            href="/outreach"
+            label="Inbox"
+            icon={Inbox}
+            badge={pendingDraftCount}
+          />
         </div>
-        {threads.data?.threads?.length === 0 && (
-          <div className="px-3 py-6 text-[11px] text-muted dark:text-[#8C837C] text-center">
-            no chats yet — start one above
-          </div>
-        )}
-        {threads.data?.threads?.slice(0, 30).map((t) => {
-          const active = onChatPage && activeThread === t.threadId;
-          return (
-            <div
-              key={t.threadId}
-              onClick={() => openThread(t.threadId)}
-              className={clsx(
-                'group relative px-3 py-2 rounded-md transition-colors cursor-pointer',
-                active
-                  ? 'bg-white dark:bg-[#1F1B15] text-ink dark:text-[#F5F1EA]'
-                  : 'hover:bg-white dark:hover:bg-[#1F1B15] text-muted dark:text-[#8C837C]',
-              )}
-            >
-              <div className="text-[12px] truncate leading-tight pr-6">
-                {t.preview || '(empty)'}
-              </div>
-              <div className="text-[10px] font-mono opacity-60 mt-0.5">
-                {t.count} msgs
-              </div>
-              <button
-                type="button"
-                onClick={(e) => deleteThread(t.threadId, e)}
-                aria-label="Delete chat"
-                className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:text-flame hover:bg-[#E8523A]/10 transition-opacity"
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
-          );
-        })}
-      </div>
 
-      {/* Workflow group — primary management */}
-      <div className="border-t border-line dark:border-[#2A241D] py-2 px-2">
-        <div className="px-3 pb-1.5 text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#6B625C]">
-          Workflow
-        </div>
-        {WORKFLOW.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href || pathname.startsWith(item.href + '/');
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={clsx(
-                'flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] transition-colors',
-                active
-                  ? 'bg-white dark:bg-[#1F1B15] text-ink dark:text-[#F5F1EA] font-medium'
-                  : 'text-muted dark:text-[#8C837C] hover:bg-white dark:hover:bg-[#1F1B15] hover:text-ink dark:hover:text-[#F5F1EA]',
-              )}
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+        <SidebarSection label="Work">
+          <SidebarNavItem href="/playbooks" label="Playbooks" icon={BookOpen} />
+          <SidebarNavItem href="/sequences" label="Sequences" icon={Repeat} />
+          <SidebarNavItem href="/triggers" label="Triggers" icon={Zap} />
+          <SidebarNavItem
+            href="/runs"
+            label="Runs"
+            icon={History}
+            liveCount={liveRunCount}
+          />
+        </SidebarSection>
 
-        {/* Vault group — direct file views, collapsed by default */}
-        <button
-          type="button"
-          onClick={() => setShowAdvanced((v) => !v)}
-          className="mt-3 w-full flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#6B625C] hover:text-ink dark:hover:text-[#F5F1EA]"
-        >
-          {showAdvanced ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          Vault
-        </button>
-        {showAdvanced &&
-          VAULT_GROUP.map((item) => {
-            const Icon = item.icon;
-            const active = pathname === item.href || pathname.startsWith(item.href + '/');
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={clsx(
-                  'flex items-center gap-2.5 px-6 py-1.5 rounded-md text-[12px] transition-colors',
-                  active
-                    ? 'bg-white dark:bg-[#1F1B15] text-ink dark:text-[#F5F1EA]'
-                    : 'text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]',
-                )}
-              >
-                <Icon className="w-3 h-3 shrink-0 opacity-70" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-      </div>
+        <SidebarSection label="Vault">
+          <SidebarNavItem href="/companies" label="Companies" icon={Building2} />
+          <SidebarNavItem href="/contacts" label="Contacts" icon={Users} />
+          <SidebarNavItem href="/deals" label="Deals" icon={Briefcase} />
+          <SidebarNavItem href="/ontology" label="Knowledge graph" icon={Network} />
+          <SidebarNavItem href="/vault" label="Files" icon={FolderTree} />
+        </SidebarSection>
+
+        <SidebarSection label="System">
+          <SidebarNavItem href="/integrations" label="Integrations" icon={Plug} />
+          <SidebarNavItem href="/agents" label="Agent roles" icon={Bot} />
+          <SidebarNavItem href="/settings" label="Settings" icon={SettingsIcon} />
+        </SidebarSection>
+      </nav>
 
       {/* Footer */}
-      <div className="px-3 py-2 border-t border-line dark:border-[#2A241D] flex items-center justify-between">
-        <span className="text-[10px] text-muted dark:text-[#6B625C] font-mono">v0.1.0</span>
+      <div className="px-3 py-2 border-t border-line dark:border-[#2A241D] flex items-center justify-between shrink-0">
+        <span className="text-[10px] text-muted dark:text-[#6B625C] font-mono">
+          v0.2.0
+        </span>
         <button
           type="button"
           onClick={toggleTheme}
