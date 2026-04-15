@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Markdown } from '../components/markdown';
-import { Send, MessageSquare } from 'lucide-react';
+import { Send, MessageSquare, Globe, Trophy, XCircle, Calendar, Activity, Linkedin } from 'lucide-react';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 

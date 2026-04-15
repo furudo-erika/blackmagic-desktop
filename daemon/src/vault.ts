@@ -45,6 +45,14 @@ This file is the agent's instructions. It's read on every turn.
 - **All state lives in this vault** as plain markdown. Read before you
   write. If a company / contact / deal is mentioned, grep for it in
   \`companies/\`, \`contacts/\`, \`deals/\` before asking the user.
+- **Web tools, two flavours — pick the cheap one by default**:
+  - Quick factual lookups ("what's the weather", "latest news on X",
+    "what raised funding this week") → use the **built-in web_search**
+    (no tool call needed; it's native to the model). Cheap, seconds.
+  - Multi-hop research ("build me an account brief", "teardown a
+    competitor", "map their buying committee") → use the **\`deep_research\`
+    tool**. Spends a few minutes, costs ~40¢, returns a cited report.
+  - **Never** use \`deep_research\` for a one-fact answer.
 - **Before inventing a recipe, check \`playbooks/\`** (known in the UI as
   *Plays*). These are battle-tested procedures for the GTM work the user
   cares about (visitor enrichment, lookalike outbound, closed-won/lost
@@ -200,6 +208,36 @@ inputs: [{ name: contact_path, required: true }]
 Draft a first-touch email to the contact in \`{{contact_path}}\`.
 Reference one concrete signal from the company file. Max 90 words.
 No forbidden words from CLAUDE.md. Output via draft_create.
+`,
+
+  'deep-research-account.md': `---
+kind: playbook
+name: deep-research-account
+group: research
+agent: researcher
+inputs: [{ name: domain, required: true }]
+---
+
+Do a deep research pass on \`{{domain}}\`. Target 400-600 words, every
+factual claim cited inline. Call \`deep_research\` once with focus:"company"
+and this brief:
+
+  "Produce an account brief for {{domain}}:
+   1. Company one-liner, HQ, founded, employee count, stage (pre-seed → public)
+   2. Last 12 months: funding, product launches, exec hires, org changes
+   3. GTM motion — SMB / mid-market / enterprise; PLG / sales-led
+   4. Tech stack signals from job listings + public repos
+   5. Likely buying committee at the roles in CLAUDE.md ICP
+   6. Top 3 competitors they openly compare to
+   7. One concrete trigger event in the last 90 days we can open with
+   Every factual claim needs a URL. Unknown → say unknown."
+
+When the tool returns:
+- Read or create \`companies/<slug-of-{{domain}}>.md\`
+- Lift the 7 items into frontmatter fields + a body narrative, with the
+  returned References block appended at the bottom
+- Stamp \`updated_at: <iso>\` on frontmatter if the file existed
+- Reply with: (a) one-sentence TL;DR, (b) the trigger event, (c) the path written
 `,
 
   // === High-intent visitor (Swan visitor ID) ===

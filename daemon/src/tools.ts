@@ -138,16 +138,30 @@ async function proxyTool(toolName: string, args: Record<string, unknown>, ctx: T
   return data;
 }
 
-const web_search: ToolDef = {
-  name: 'web_search',
+// web_search is handled by OpenAI's built-in tool inside the Responses
+// API now, billed per search by the server-side proxy. No local tool
+// definition needed.
+
+const deep_research: ToolDef = {
+  name: 'deep_research',
   description:
-    'Live web search via Perplexity Sonar, proxied through blackmagic.run. Deducts credits per call. No local API key needed.',
+    'Multi-hop web research via Perplexity sonar-deep-research, proxied through blackmagic.run. Spends a few minutes, returns a structured report with inline citations. Use for account briefs, competitor teardowns, market scans — NOT for quick factual lookups (use the model\'s built-in web_search for those).',
   parameters: {
     type: 'object',
-    properties: { query: { type: 'string' } },
+    properties: {
+      query: {
+        type: 'string',
+        description: 'A detailed research brief. The longer and more specific, the better the report.',
+      },
+      focus: {
+        type: 'string',
+        enum: ['general', 'company', 'person', 'market', 'technical'],
+        default: 'general',
+      },
+    },
     required: ['query'],
   },
-  handler: async (args, ctx) => proxyTool('web_search', { query: args.query }, ctx),
+  handler: async (args, ctx) => proxyTool('deep_research', args, ctx),
 };
 
 const pdl_enrich: ToolDef = {
@@ -219,7 +233,7 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   list_dir,
   grep,
   web_fetch,
-  web_search,
+  deep_research,
   pdl_enrich,
   enrich_person,
   draft_create,

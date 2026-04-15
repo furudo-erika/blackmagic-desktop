@@ -43,7 +43,7 @@ async function ensureCodexConfig(config: Config): Promise<string> {
     `wire_api = "responses"`,
     ``,
     `[tools]`,
-    `web_search = false   # our own web_search MCP / tool is authoritative`,
+    `web_search = true   # use OpenAI's built-in web_search (billed by proxy)`,
     ``,
   ].join('\n');
   await fs.writeFile(path.join(home, 'config.toml'), cfg, 'utf-8');
