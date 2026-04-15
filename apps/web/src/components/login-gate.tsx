@@ -73,30 +73,43 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 
   if (!bridgeReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-cream-light p-6">
-        <form onSubmit={submitBridge} className="w-full max-w-md bg-white rounded-2xl border border-line p-8 shadow-sm">
-          <img src="/logo.svg" alt="" width={40} height={40} className="mb-4" />
-          <h1 className="text-xl font-semibold mb-1">Developer: connect to daemon</h1>
-          <p className="text-sm text-muted mb-6">
+      <div
+        className="min-h-screen flex items-center justify-center bg-cream-light p-6"
+        style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F1EA', padding: 24, position: 'relative', zIndex: 100 }}
+      >
+        <form
+          onSubmit={submitBridge}
+          className="w-full max-w-md bg-white rounded-2xl border border-line p-8 shadow-sm"
+          style={{ width: '100%', maxWidth: 440, background: '#fff', borderRadius: 16, border: '1px solid rgba(55,50,47,0.08)', padding: 32, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
+        >
+          <img src="/logo.svg" alt="" width={40} height={40} className="mb-4" style={{ marginBottom: 16 }} />
+          <h1 className="text-xl font-semibold mb-1" style={{ fontSize: 20, fontWeight: 600, marginBottom: 4, color: '#1A1614' }}>Developer: connect to daemon</h1>
+          <p className="text-sm text-muted mb-6" style={{ fontSize: 14, color: '#605A57', marginBottom: 24 }}>
             You're running the web UI outside Electron. Paste the port + token from
-            <code className="mx-1 text-[11px] bg-cream-light px-1 rounded">~/BlackMagic/.bm/daemon.json</code>.
+            <code className="mx-1 text-[11px] bg-cream-light px-1 rounded" style={{ margin: '0 4px', fontSize: 11, background: '#F5F1EA', padding: '1px 4px', borderRadius: 3 }}>~/BlackMagic/.bm/daemon.json</code>.
           </p>
-          <label className="block text-xs text-muted mb-1">Port</label>
+          <label className="block text-xs text-muted mb-1" style={{ display: 'block', fontSize: 12, color: '#605A57', marginBottom: 4 }}>Port</label>
           <input
             type="number"
             value={portDraft}
             onChange={(e) => setPortDraft(e.target.value)}
             placeholder="45781"
             className="w-full mb-3 bg-white border border-line rounded-md px-3 py-2 text-sm"
+            style={{ width: '100%', marginBottom: 12, background: '#fff', border: '1px solid rgba(55,50,47,0.12)', borderRadius: 6, padding: '8px 12px', fontSize: 14, boxSizing: 'border-box' }}
           />
-          <label className="block text-xs text-muted mb-1">Token</label>
+          <label className="block text-xs text-muted mb-1" style={{ display: 'block', fontSize: 12, color: '#605A57', marginBottom: 4 }}>Token</label>
           <input
             value={tokenDraft}
             onChange={(e) => setTokenDraft(e.target.value)}
             placeholder="base64-ish local token"
             className="w-full mb-4 bg-white border border-line rounded-md px-3 py-2 text-sm font-mono"
+            style={{ width: '100%', marginBottom: 16, background: '#fff', border: '1px solid rgba(55,50,47,0.12)', borderRadius: 6, padding: '8px 12px', fontSize: 14, fontFamily: 'ui-monospace, Menlo, monospace', boxSizing: 'border-box' }}
           />
-          <button type="submit" className="w-full h-10 rounded-md bg-flame text-white text-sm font-medium">
+          <button
+            type="submit"
+            className="w-full h-10 rounded-md bg-flame text-white text-sm font-medium"
+            style={{ width: '100%', height: 40, borderRadius: 6, background: '#E8523A', color: '#fff', fontSize: 14, fontWeight: 500, border: 'none', cursor: 'pointer' }}
+          >
             Connect
           </button>
         </form>
