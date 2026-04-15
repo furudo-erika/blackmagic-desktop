@@ -47,8 +47,8 @@ export default function OutreachPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Outreach"
-        subtitle="Drafts waiting for your approve/reject before the agent sends them."
+        title="Outreach Drafts"
+        subtitle="Drafts the agent wrote, waiting for your approve/reject. Approving sends; rejecting discards. Campaigns themselves live under Sequences."
         icon={Send}
       />
       <PageBody maxWidth="2xl">

@@ -157,7 +157,7 @@ export function Sidebar() {
 
           <SidebarNavItem
             href="/outreach"
-            label="Inbox"
+            label="Drafts"
             icon={Inbox}
             badge={pendingDraftCount}
           />
