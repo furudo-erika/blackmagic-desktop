@@ -133,7 +133,13 @@ async function main() {
     lines.push(`zenn_api_key = "${token.replace(/"/g, '\\"')}"`);
     await fs.writeFile(cfgPath, lines.join('\n').trim() + '\n', 'utf-8');
     config.zenn_api_key = token;
-    return c.html(callbackPage('Signed in', 'You can close this tab and return to Black Magic.', true));
+
+    // Belt-and-suspenders: 302 the browser back to the public site's
+    // "signed in" page. The user's browser tab ends up on blackmagic.run,
+    // not on 127.0.0.1 — less jarring, zero security cost (the key is
+    // already in config.toml before we redirect).
+    const billing = (config.billing_url ?? 'https://blackmagic.run').replace(/\/+$/, '');
+    return c.redirect(`${billing}/auth/cli/done`, 302);
   });
 
   app.get('/api/health', (c) =>
