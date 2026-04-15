@@ -15,8 +15,177 @@ const SKELETON_DIRS = [
   'triggers',
   'drafts',
   'runs',
+  // ── who WE are ─────────────────────────────────────────
+  // Borrowed from the apidog-team /org/ + /marketing/branding/ pattern.
+  // All user-supplied context about their own company lives here so every
+  // agent can read it the same way.
+  'us',
+  'us/competitors',
+  'us/customers',
+  'us/docs',
+  // ───────────────────────────────────────────────────────
   '.bm',
 ];
+
+const US_TEMPLATES: Record<string, string> = {
+  'company.md': `---
+kind: us.company
+name:
+domain:
+one_liner:
+stage:            # pre-seed | seed | A | B | C | growth | public
+founded:
+hq:
+employee_count:
+founders:
+website:
+blog:
+docs:
+linkedin:
+twitter:
+---
+
+# Us — company
+
+One paragraph about us. What we build, who we serve, why we exist.
+Replace this with your own. The agent reads this on every turn.
+`,
+
+  'product.md': `---
+kind: us.product
+---
+
+# What we sell
+
+## Offer
+What the product does, in one paragraph.
+
+## Pricing
+(Public plans here, or "custom" — either is fine.)
+
+## Core differentiators
+-
+-
+-
+
+## Common objections + our answer
+- **"Why not [competitor]?"** →
+- **"Why not build in-house?"** →
+`,
+
+  'icp.md': `---
+kind: us.icp
+---
+
+# ICP — who we sell to
+
+## Size
+- Employee range:
+- ARR range:
+
+## Industries
+-
+
+## Tech stack signals
+We fit best when the prospect already uses:
+-
+
+## Geos
+-
+
+## Pain indicators that mean "now is a good time"
+-
+-
+
+## Anti-signals (don't chase)
+-
+`,
+
+  'voice.md': `---
+kind: us.voice
+---
+
+# Brand voice
+
+## Tone
+One-sentence description of how we sound.
+
+## Always
+-
+
+## Never
+- Corporate filler ("leverage", "streamline", "robust", "cutting-edge")
+- Hashtag spam
+- Starting with "I hope this email finds you well"
+
+## Length caps
+- Email first-touch: 90 words
+- LinkedIn DM: 60 words
+- Tweet: 270 chars
+`,
+
+  'positioning.md': `---
+kind: us.positioning
+---
+
+# Market positioning
+
+## Category
+What category are we in? What do we tell analysts / the press?
+
+## Positioning statement
+For **<who>** who **<struggle>**, **<product>** is a **<category>** that **<benefit>**.
+Unlike **<alternative>**, we **<key differentiator>**.
+
+## Messaging by audience
+- **Champion (hands-on user):**
+- **Economic buyer:**
+- **IT / Security:**
+`,
+
+  'competitors/landscape.md': `---
+kind: us.competitors.landscape
+---
+
+# Competitive landscape
+
+One row per named competitor. Add files under \`us/competitors/<name>.md\`
+for deep teardowns.
+
+| Competitor | Angle they lead with | What they do better | What we do better | Migration hook |
+|---|---|---|---|---|
+|  |  |  |  |  |
+`,
+
+  'customers/top.md': `---
+kind: us.customers.top
+---
+
+# Top customers
+
+Reference-worthy accounts. One-line case-study per row. Link to
+\`us/customers/<slug>.md\` for longer teardowns.
+
+| Customer | Industry | Size | Why we won | Reference-approved? |
+|---|---|---|---|---|
+|  |  |  |  |  |
+`,
+
+  'decisions.md': `---
+kind: us.decisions
+---
+
+# Decisions log
+
+Dated entries on why we built/chose what we did. Useful context for the
+agent when it's drafting messaging or deciding next-steps.
+
+## 2026-xx-xx — <title>
+Decision:
+Reasoning:
+Alternatives considered:
+`,
+};
 
 const DEFAULT_CLAUDE_MD = `# Identity — read this before every answer
 
@@ -45,6 +214,13 @@ This file is the agent's instructions. It's read on every turn.
 - **All state lives in this vault** as plain markdown. Read before you
   write. If a company / contact / deal is mentioned, grep for it in
   \`companies/\`, \`contacts/\`, \`deals/\` before asking the user.
+- **Before anything customer-facing, read \`us/\`** —
+  \`us/company.md\`, \`us/product.md\`, \`us/icp.md\`, \`us/voice.md\`,
+  \`us/positioning.md\`, \`us/competitors/landscape.md\`,
+  \`us/customers/top.md\`. Every outbound draft, qualification call,
+  and research brief should reflect the \`us/\` context. If \`us/\` is
+  empty, run the \`bootstrap-self\` playbook before producing user-
+  facing content.
 - **Web tools, two flavours — pick the cheap one by default**:
   - Quick factual lookups ("what's the weather", "latest news on X",
     "what raised funding this week") → use the **built-in web_search**
@@ -98,12 +274,22 @@ in from your domain. Edit freely._
 
 ## Vault layout
 
-- \`companies/<slug>.md\` — one per company
+- \`us/\` — **everything about our own company** (read before you draft
+  anything customer-facing)
+  - \`us/company.md\` — who we are, HQ, stage, founders
+  - \`us/product.md\` — what we sell, pricing, differentiators, objections
+  - \`us/icp.md\` — target customer profile
+  - \`us/voice.md\` — brand voice, forbidden words, length caps
+  - \`us/positioning.md\` — category + messaging by audience
+  - \`us/competitors/landscape.md\` (+ per-competitor teardowns)
+  - \`us/customers/top.md\` (+ per-customer case studies)
+  - \`us/decisions.md\` — why we built/chose what we did
+  - \`us/docs/\` — extracted product docs snippets
+- \`companies/<slug>.md\` — one per prospect company
 - \`contacts/<company-slug>/<person-slug>.md\` — one per contact
 - \`deals/{open,closed-won,closed-lost}/<slug>.md\`
 - \`playbooks/<name>.md\` — named procedures (list them with \`ls playbooks/\`)
 - \`drafts/<ts>-<slug>.md\` — outbound drafts, human-approved before send
-- \`me.md\` — about us
 `;
 
 const DEFAULT_AGENTS: Record<string, string> = {
@@ -208,6 +394,76 @@ inputs: [{ name: contact_path, required: true }]
 Draft a first-touch email to the contact in \`{{contact_path}}\`.
 Reference one concrete signal from the company file. Max 90 words.
 No forbidden words from CLAUDE.md. Output via draft_create.
+`,
+
+  'bootstrap-self.md': `---
+kind: playbook
+name: bootstrap-self
+group: setup
+agent: researcher
+inputs:
+  - { name: domain, required: true }
+  - { name: docs_url, required: false }
+  - { name: extra_urls, required: false }
+---
+
+Build the user's own company knowledge pack from their website.
+
+## Steps
+
+1. Fetch the domain's home page via \`web_fetch({{domain}})\`. If the user
+   provided \`{{docs_url}}\` or \`{{extra_urls}}\` (comma-separated), fetch
+   those too. Also \`web_search\` for "{{domain}} funding", "{{domain}}
+   competitors", "{{domain}} pricing", "{{domain}} customers" to fill gaps.
+2. If \`{{docs_url}}\` was provided, run \`deep_research\` once with focus
+   "technical" against it to extract a product feature map.
+3. Populate the following files (overwrite existing only if empty or
+   still at the seed template):
+     - \`us/company.md\` — frontmatter (name, domain, stage, founded, hq,
+       employee_count, founders) + one-paragraph narrative
+     - \`us/product.md\` — offer, pricing (if public), 3 differentiators,
+       common objections
+     - \`us/icp.md\` — inferred from customer logos + case studies +
+       testimonials; call out unknowns explicitly
+     - \`us/voice.md\` — tone, sample phrases from blog + marketing copy,
+       forbidden words
+     - \`us/positioning.md\` — category + positioning statement + per-
+       audience messaging
+     - \`us/competitors/landscape.md\` — top 3-5 competitors as a row table
+     - \`us/customers/top.md\` — 5-10 named customers (if public) with
+       industry + one-line case context
+     - \`us/decisions.md\` — skip unless the user supplied extra context
+4. Cite sources inline (URLs) for every factual claim. Where the site
+   doesn't say, write \`unknown\` — never invent.
+5. Reply to the user with: a 3-bullet summary of what's filled in, and
+   the single biggest gap they should fill by hand.
+`,
+
+  'import-legacy-org.md': `---
+kind: playbook
+name: import-legacy-org
+group: setup
+agent: researcher
+inputs: [{ name: source_dir, required: true }]
+---
+
+Port a legacy apidog-team-style /org/ + /marketing/branding/ directory
+into this vault's \`us/\` structure.
+
+## Steps
+
+1. Read every \`.md\` under \`{{source_dir}}\` with \`list_dir\` + \`read_file\`.
+2. Map content into the \`us/\` schema:
+     - marketing-strategy.md → \`us/positioning.md\` + \`us/icp.md\`
+     - competitive-landscape.md + competitors.json → \`us/competitors/\`
+     - top-customers.md → \`us/customers/top.md\`
+     - brand-voice.md → \`us/voice.md\`
+     - decisions-log.md → \`us/decisions.md\`
+     - (anything else) → summarise into \`us/decisions.md\` as a dated note
+3. Preserve source attribution as a small footer in each migrated file:
+   \`> Imported from <source path> on <iso>\`.
+4. After writing, diff-report: for each file you wrote, one line on what
+   you pulled from which source.
 `,
 
   'deep-research-account.md': `---
@@ -632,6 +888,14 @@ export async function ensureVault(): Promise<{ created: boolean }> {
 
   for (const [name, body] of Object.entries(DEFAULT_PLAYBOOKS)) {
     const p = path.join(VAULT_ROOT, 'playbooks', name);
+    if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
+  }
+
+  // Seed us/ templates — only write files that are missing so re-seeding
+  // never clobbers user edits.
+  for (const [rel, body] of Object.entries(US_TEMPLATES)) {
+    const p = path.join(VAULT_ROOT, 'us', rel);
+    await fs.mkdir(path.dirname(p), { recursive: true });
     if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
   }
 
