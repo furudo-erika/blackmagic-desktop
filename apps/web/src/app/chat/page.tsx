@@ -243,15 +243,7 @@ export default function ChatPage() {
       </div>
 
       <div className="border-t border-line dark:border-[#2A241D] px-6 py-3 bg-cream-light dark:bg-[#17140F]">
-        {lastMeta && (
-          <div className="max-w-3xl mx-auto mb-2 text-[10px] font-mono text-muted dark:text-[#6B625C] flex items-center gap-3">
-            <span>run {lastMeta.runId}</span>
-            {lastMeta.tokensIn != null && (
-              <span>in {lastMeta.tokensIn} / out {lastMeta.tokensOut}</span>
-            )}
-            <span>{(lastMeta.costCents / 100).toFixed(2)} USD</span>
-          </div>
-        )}
+        {/* Run id + cost meta intentionally hidden — surfaced in /runs instead. */}
         <div className="max-w-3xl mx-auto flex items-end gap-2">
           <textarea
             ref={(el) => {
