@@ -20,16 +20,17 @@ export function loadConfig(): Config {
   const vault = defaultVault();
   const configPath = path.join(vault, '.bm', 'config.toml');
 
-  // Daemon talks to our API proxy. The proxy holds the only real upstream
-  // key and never exposes it to the client. User auths with their own ck_.
+  // Daemon talks to our API proxy. The proxy holds the upstream keys and
+  // never exposes them. Client only auths with its own ck_.
   //
-  // Two URLs on purpose:
-  //   billing_url  — the site (dashboard, auth/cli, token-events): blackmagic.run
-  //   zenn_base_url — the API subdomain that hosts /responses + /agent-tools.
-  // In dev both point at one Next.js server on :3001.
+  // Two URLs:
+  //   billing_url    — blackmagic.run (dashboard, /auth/cli, /api/token-events, /api/sync/*)
+  //   zenn_base_url  — api.blackmagic.run/api/v1 (OpenAI-shape proxy: /responses etc.)
+  //                    Codex appends /responses to whatever this is. Do not include trailing slash.
+  // In dev both resolve to localhost:3001.
   const billingUrl = process.env.BM_BILLING_URL ?? 'https://blackmagic.run';
   const apiUrl = process.env.BM_API_URL ?? billingUrl.replace('blackmagic.run', 'api.blackmagic.run');
-  const defaultZennBase = `${apiUrl.replace(/\/+$/, '')}/api/agent`;
+  const defaultZennBase = `${apiUrl.replace(/\/+$/, '')}/api/v1`;
   const base: Config = {
     vault_path: vault,
     default_model: process.env.BM_DEFAULT_MODEL ?? 'gpt-5.3-codex',
