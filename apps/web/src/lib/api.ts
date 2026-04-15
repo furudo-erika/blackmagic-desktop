@@ -156,6 +156,32 @@ export const api = {
     request<{ browserUrl: string }>(`/api/integrations/${provider}/oauth/start`),
   ontology: () =>
     request<{ nodes: OntologyNode[]; edges: OntologyEdge[] }>('/api/ontology'),
+
+  // Drafts
+  listDrafts: () =>
+    request<{ drafts: Array<{ id: string; path: string; channel: string; to: string; subject?: string; body: string; tool: string; status: string; created_at?: string }> }>(
+      '/api/drafts',
+    ),
+  approveDraft: (id: string) =>
+    request<{ ok: boolean; messageId?: string; note?: string; error?: string }>(
+      `/api/drafts/${encodeURIComponent(id)}/approve`,
+      { method: 'POST' },
+    ),
+  rejectDraft: (id: string) =>
+    request<{ ok: boolean }>(`/api/drafts/${encodeURIComponent(id)}/reject`, { method: 'POST' }),
+
+  // Triggers
+  listTriggers: () =>
+    request<{ triggers: Array<{ name: string; schedule?: string; webhook?: boolean; playbook: string; enabled: boolean; body: string }> }>(
+      '/api/triggers',
+    ),
+  fireTrigger: (name: string, input: Record<string, unknown> = {}) =>
+    request<{ runId?: string; final?: string; error?: string }>(
+      `/api/triggers/${encodeURIComponent(name)}/fire`,
+      { method: 'POST', body: JSON.stringify({ input }) },
+    ),
+  reloadTriggers: () =>
+    request<{ ok: true }>('/api/triggers/reload', { method: 'POST' }),
   onboardingState: () =>
     request<{ needsOnboarding: boolean; claudeDefault: boolean; hasSelfCompany: boolean }>(
       '/api/onboarding',

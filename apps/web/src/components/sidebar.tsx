@@ -33,22 +33,25 @@ import { api } from '../lib/api';
 //   - things they occasionally tune (triggers = remote crontab)
 // Power-user views (Vault / Ontology / Companies / Contacts / Deals / Agents /
 // Playbooks) sit behind a collapsed "Advanced" group.
-const PRIMARY_MANAGE = [
-  { href: '/playbooks', label: 'Playbooks', icon: BookOpen, desc: 'Reusable recipes' },
-  { href: '/outreach', label: 'Outreach', icon: Send, desc: 'Draft queue' },
-  { href: '/triggers', label: 'Triggers', icon: Zap, desc: 'Schedules' },
-  { href: '/runs', label: 'Runs', icon: History, desc: 'History' },
-  { href: '/integrations', label: 'Integrations', icon: Plug, desc: 'Connect tools' },
+// "Workflow": things you actually do regularly
+const WORKFLOW = [
+  { href: '/playbooks', label: 'Playbooks', icon: BookOpen },
+  { href: '/outreach', label: 'Outreach', icon: Send },
+  { href: '/triggers', label: 'Triggers', icon: Zap },
+  { href: '/runs', label: 'Runs', icon: History },
+  { href: '/integrations', label: 'Integrations', icon: Plug },
   { href: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-const ADVANCED = [
-  { href: '/vault', label: 'Vault', icon: FolderTree },
-  { href: '/ontology', label: 'Ontology', icon: Network },
+// "Vault": direct on-disk views — most users don't open these often;
+// the agent edits the same files via Chat.
+const VAULT_GROUP = [
+  { href: '/vault', label: 'Browse files', icon: FolderTree },
   { href: '/companies', label: 'Companies', icon: Building2 },
   { href: '/contacts', label: 'Contacts', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
   { href: '/agents', label: 'Agent roles', icon: Bot },
+  { href: '/ontology', label: 'Knowledge graph', icon: Network },
 ];
 
 function newThreadId() {
@@ -189,9 +192,12 @@ export function Sidebar() {
         })}
       </div>
 
-      {/* Manage strip */}
+      {/* Workflow group — primary management */}
       <div className="border-t border-line dark:border-[#2A241D] py-2 px-2">
-        {PRIMARY_MANAGE.map((item) => {
+        <div className="px-3 pb-1.5 text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#6B625C]">
+          Workflow
+        </div>
+        {WORKFLOW.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
@@ -211,17 +217,17 @@ export function Sidebar() {
           );
         })}
 
-        {/* Advanced toggle */}
+        {/* Vault group — direct file views, collapsed by default */}
         <button
           type="button"
           onClick={() => setShowAdvanced((v) => !v)}
-          className="mt-1 w-full flex items-center gap-2 px-3 py-1 text-[11px] uppercase tracking-widest font-mono text-muted dark:text-[#6B625C] hover:text-ink dark:hover:text-[#F5F1EA]"
+          className="mt-3 w-full flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#6B625C] hover:text-ink dark:hover:text-[#F5F1EA]"
         >
           {showAdvanced ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          Advanced
+          Vault
         </button>
         {showAdvanced &&
-          ADVANCED.map((item) => {
+          VAULT_GROUP.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname.startsWith(item.href + '/');
             return (

@@ -4,107 +4,175 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { getBridge, setBridge } from '../../lib/bridge';
+import { ExternalLink, FolderOpen, Cpu, KeyRound, Settings as SettingsIcon, Plug, Sun, Moon } from 'lucide-react';
+
+function Section({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
+  return (
+    <section className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Icon className="w-4 h-4 text-muted dark:text-[#8C837C]" />
+        <h2 className="text-sm font-semibold text-ink dark:text-[#F5F1EA]">{title}</h2>
+      </div>
+      <div className="space-y-3 text-[13px] text-muted dark:text-[#8C837C]">{children}</div>
+    </section>
+  );
+}
+
+function KV({ k, v, mono = false }: { k: string; v: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <span className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">{k}</span>
+      <span className={'text-right text-ink dark:text-[#E6E0D8] truncate ' + (mono ? 'font-mono text-[12px]' : '')}>{v}</span>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
-  const health = useQuery({ queryKey: ['health'], queryFn: () => api.health() });
-  const [port, setPort] = useState('');
-  const [token, setToken] = useState('');
-  const [bridge, setBridgeState] = useState({ daemonPort: 0, daemonToken: '', vaultPath: '' });
+  const health = useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 5_000 });
+  const integrations = useQuery({ queryKey: ['integrations'], queryFn: api.listIntegrations });
+  const bridge = getBridge();
 
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   useEffect(() => {
-    const b = getBridge();
-    setBridgeState({ daemonPort: b.daemonPort, daemonToken: b.daemonToken, vaultPath: b.vaultPath });
-    setPort(String(b.daemonPort || ''));
-    setToken(b.daemonToken || '');
+    setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
   }, []);
-
-  function save() {
-    setBridge(Number(port), token);
-    setBridgeState({ ...bridge, daemonPort: Number(port), daemonToken: token });
+  function toggleTheme() {
+    const next: 'light' | 'dark' = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.classList.toggle('dark', next === 'dark');
+    localStorage.setItem('bm-theme', next);
+    setTheme(next);
   }
 
-  const tokenPreview = bridge.daemonToken
-    ? `${bridge.daemonToken.slice(0, 4)}…${bridge.daemonToken.slice(-4)}`
-    : '';
+  const [portDraft, setPortDraft] = useState('');
+  const [tokenDraft, setTokenDraft] = useState('');
+  function saveBridge() {
+    const port = Number(portDraft);
+    if (!port || !tokenDraft.trim()) return;
+    setBridge(port, tokenDraft.trim());
+    location.reload();
+  }
+
+  const connected = (integrations.data?.integrations ?? []).filter((i) => i.status === 'connected');
 
   return (
-    <div className="h-full flex flex-col">
-      <header className="px-6 py-4 border-b border-line">
-        <h1 className="text-lg font-semibold">Settings</h1>
-        <p className="text-xs text-muted">Local daemon connection and developer overrides.</p>
+    <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A]">
+      <header className="px-6 py-3 border-b border-line dark:border-[#2A241D]">
+        <h1 className="text-base font-semibold text-ink dark:text-[#F5F1EA]">Settings</h1>
       </header>
-      <div className="h-full overflow-y-auto px-6 py-6 space-y-6 max-w-2xl">
-        <section className="bg-white rounded-xl border border-line p-4">
-          <div className="text-xs uppercase tracking-wide text-muted mb-3">Daemon</div>
-          {health.isLoading && <div className="text-sm text-muted">checking…</div>}
-          {health.error && <div className="text-sm text-flame">{(health.error as Error).message}</div>}
-          {health.data && (
-            <dl className="text-sm space-y-2">
-              <div className="flex justify-between"><dt className="text-muted">vaultPath</dt><dd className="font-mono text-xs">{health.data.vaultPath}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted">model</dt><dd className="font-mono text-xs">{health.data.model}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted">zennConfigured</dt><dd>{health.data.zennConfigured ? 'yes' : 'no'}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted">version</dt><dd className="font-mono text-xs">{health.data.version}</dd></div>
-            </dl>
-          )}
-        </section>
+      <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="max-w-2xl mx-auto space-y-4">
 
-        <section className="bg-white rounded-xl border border-line p-4">
-          <div className="text-xs uppercase tracking-wide text-muted mb-3">Connection</div>
-          <dl className="text-sm space-y-2">
-            <div className="flex justify-between"><dt className="text-muted">daemonPort</dt><dd className="font-mono text-xs">{bridge.daemonPort || '(none)'}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted">daemonToken</dt><dd className="font-mono text-xs">{tokenPreview || '(none)'}</dd></div>
-          </dl>
-        </section>
-
-        <section className="bg-white rounded-xl border border-line p-4">
-          <div className="text-xs uppercase tracking-wide text-muted mb-3">Dev override</div>
-          <div className="space-y-2">
-            <div>
-              <label className="text-xs text-muted">port</label>
-              <input
-                value={port}
-                onChange={(e) => setPort(e.target.value)}
-                className="mt-1 w-full bg-cream border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-flame"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted">token</label>
-              <input
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                className="mt-1 w-full bg-cream border border-line rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-flame"
-              />
-            </div>
+          <Section icon={FolderOpen} title="Vault">
+            <KV k="Vault path" v={health.data?.vaultPath ?? '—'} mono />
             <button
-              onClick={save}
-              className="h-9 px-4 rounded-lg bg-flame text-white text-sm font-medium hover:opacity-90"
-            >
-              Save
-            </button>
-          </div>
-        </section>
-
-        <section className="bg-white rounded-xl border border-line p-4">
-          <div className="text-xs uppercase tracking-wide text-muted mb-3">Links</div>
-          <div className="flex flex-col gap-2 text-sm">
-            <button
+              type="button"
               onClick={() => {
-                if (health.data?.vaultPath) window.open(`file://${health.data.vaultPath}`);
+                if (health.data?.vaultPath) {
+                  window.open('file://' + health.data.vaultPath, '_blank');
+                }
               }}
-              className="text-flame hover:underline text-left"
+              className="text-flame text-[12px] hover:underline flex items-center gap-1"
             >
-              Open vault in Finder
+              <ExternalLink className="w-3 h-3" /> Open in Finder
             </button>
-            <a
-              href="https://blackmagic.run/docs"
-              target="_blank"
-              rel="noreferrer"
-              className="text-flame hover:underline"
+          </Section>
+
+          <Section icon={Cpu} title="Engine">
+            <KV k="Default model" v={health.data?.model ?? '—'} mono />
+            <KV
+              k="Engine"
+              v={
+                health.data?.engine === 'codex-cli'
+                  ? <span className="text-[#7E8C67]">Codex CLI ✓</span>
+                  : <span>built-in</span>
+              }
+            />
+            <p className="text-[11px] text-muted dark:text-[#8C837C]">
+              Model can be changed by editing <code className="text-[11px]">~/BlackMagic/.bm/config.toml</code>:
+              {' '}<code className="text-[11px]">default_model = "gpt-5.3-codex"</code>
+            </p>
+          </Section>
+
+          <Section icon={KeyRound} title="Account">
+            <KV k="Signed in" v={health.data?.zennConfigured ? <span className="text-[#7E8C67]">yes</span> : <span className="text-flame">no</span>} />
+            <KV k="Key" v={<code className="text-[11px]">~/BlackMagic/.bm/config.toml</code>} mono />
+            <p className="text-[11px] text-muted dark:text-[#8C837C]">
+              Manage all keys at{' '}
+              <a
+                href="https://blackmagic.run/dashboard/api-keys"
+                onClick={(e) => {
+                  if (window.bmBridge?.openExternal) {
+                    e.preventDefault();
+                    window.bmBridge.openExternal('https://blackmagic.run/dashboard/api-keys');
+                  }
+                }}
+                target="_blank"
+                rel="noreferrer"
+                className="text-flame underline"
+              >
+                blackmagic.run/dashboard/api-keys
+              </a>. Revoke this key to sign out.
+            </p>
+          </Section>
+
+          <Section icon={Plug} title="Integrations">
+            {connected.length === 0 ? (
+              <p className="text-[12px]">No integrations connected yet. Visit <a href="/integrations" className="text-flame underline">Integrations</a> to connect HubSpot / Gmail / Slack / etc.</p>
+            ) : (
+              <ul className="space-y-1">
+                {connected.map((i) => (
+                  <li key={i.provider} className="flex items-center justify-between text-[12px]">
+                    <span className="text-ink dark:text-[#E6E0D8] capitalize">{i.provider}</span>
+                    <span className="text-[11px] text-muted dark:text-[#8C837C] truncate">{i.connectedAs ?? 'connected'}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          <Section icon={SettingsIcon} title="Theme">
+            <button
+              onClick={toggleTheme}
+              className="h-9 px-4 rounded-md border border-line dark:border-[#2A241D] hover:border-flame text-[12px] text-ink dark:text-[#E6E0D8] flex items-center gap-2"
             >
-              Docs
-            </a>
-          </div>
-        </section>
+              {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+              Switch to {theme === 'dark' ? 'light' : 'dark'}
+            </button>
+          </Section>
+
+          <details className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl">
+            <summary className="cursor-pointer p-5 text-sm font-semibold text-ink dark:text-[#F5F1EA]">
+              Developer
+            </summary>
+            <div className="px-5 pb-5 space-y-3 text-[12px]">
+              <KV k="Daemon port" v={String(bridge.daemonPort)} mono />
+              <KV k="Local token" v={bridge.daemonToken ? bridge.daemonToken.slice(0, 8) + '…' : '—'} mono />
+              <p className="text-[11px] text-muted dark:text-[#8C837C]">
+                Override port/token (when running renderer outside Electron):
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={portDraft}
+                  onChange={(e) => setPortDraft(e.target.value)}
+                  placeholder="port"
+                  className="w-24 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+                <input
+                  value={tokenDraft}
+                  onChange={(e) => setTokenDraft(e.target.value)}
+                  placeholder="token"
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+                <button onClick={saveBridge} className="h-8 px-3 rounded-md bg-flame text-white text-[12px]">Save & reload</button>
+              </div>
+            </div>
+          </details>
+
+          <p className="text-[11px] text-muted dark:text-[#6B625C] text-center pt-4">
+            v{health.data?.version ?? '0.1.0'} · open source · MIT
+          </p>
+        </div>
       </div>
     </div>
   );
