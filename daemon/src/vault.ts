@@ -119,7 +119,7 @@ tools:
   - grep
   - web_fetch
   - web_search
-  - pdl_enrich
+  - enrich_company
 temperature: 0.2
 ---
 
@@ -128,7 +128,7 @@ companies/<slug>.md with rich frontmatter (name, domain, industry,
 size, revenue, hq, icp_score, icp_reasons, enriched_at) and a 150-word
 body covering what they do, recent news, and best-guess buying committee.
 
-Use \`pdl_enrich\` first for firmographics, then \`web_search\` for news.
+Use \`enrich_company\` first for firmographics, then \`web_search\` for news.
 Never fabricate fields — write \`null\` if unknown.
 `,
   'sdr.md': `---
@@ -183,7 +183,7 @@ Enrich the company at \`{{domain}}\`. Produce a full
 \`companies/<slug>.md\` with frontmatter (domain, name, industry, size,
 revenue, hq, icp_score, icp_reasons, enriched_at) and a 150-word body
 covering what they do, recent news, and best-guess buying committee.
-Use pdl_enrich first, then web_search for news.
+Use enrich_company first, then web_search for news.
 `,
   'qualify-icp.md': `---
 kind: playbook
@@ -325,7 +325,7 @@ inputs: [{ name: reference_company, required: true }]
 
 Find 25 companies that look like {{reference_company}} (industry,
 size, tech, stage, growth). For each: write a companies/<slug>.md
-stub with pdl_enrich + a 'lookalike_of: {{reference_company}}' field.
+stub with enrich_company + a 'lookalike_of: {{reference_company}}' field.
 `,
   'won-buying-committee.md': `---
 kind: playbook
@@ -570,7 +570,7 @@ agent: researcher
 inputs: [{ name: linkedin_url, required: true }]
 ---
 
-Enrich {{linkedin_url}} using enrich_person. Write/update
+Enrich {{linkedin_url}} using enrich_contact. Write/update
 contacts/<company>/<person>.md with role, reporting line, recent
 themes, likely KPIs, best outreach angle.
 `,

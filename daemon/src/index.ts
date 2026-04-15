@@ -255,7 +255,7 @@ async function main() {
     // Kick off researcher agent to enrich the user's own company.
     runAgent({
       agent: 'researcher',
-      task: `Enrich the user's own company at ${body.domain} and save to me.md (not companies/). Focus: what we sell, target customer, tone. Use pdl_enrich + web_search.`,
+      task: `Enrich the user's own company at ${body.domain} and save to me.md (not companies/). Focus: what we sell, target customer, tone. Use enrich_company + web_search.`,
       config,
     }).catch((err) => console.error('[onboarding] enrich failed:', err));
 

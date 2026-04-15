@@ -152,14 +152,72 @@ export default function ChatPage() {
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {messages.length === 0 && (
-          <div className="max-w-xl mx-auto text-center py-16 text-muted dark:text-[#8C837C] text-sm">
-            <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-40" />
-            <p className="mb-2">Ask the agent to do something in your vault.</p>
-            <ul className="space-y-1 text-xs">
-              <li>&ldquo;Enrich acme.com and save to companies/.&rdquo;</li>
-              <li>&ldquo;List all open deals and flag the stalest.&rdquo;</li>
-              <li>&ldquo;Draft a first-touch email to contacts/acme/jane-doe.md.&rdquo;</li>
-            </ul>
+          <div className="max-w-3xl mx-auto py-10">
+            <div className="text-center mb-6">
+              <MessageSquare className="w-8 h-8 mx-auto mb-3 text-muted dark:text-[#8C837C] opacity-50" />
+              <p className="text-sm text-muted dark:text-[#8C837C]">
+                Click a scenario to pre-fill the prompt, edit the bracketed bits for your use, then send.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[
+                {
+                  title: 'High-intent visitor',
+                  body: 'high-intent-visitor',
+                  prompt: 'A visitor from [acme.com] just hit our pricing page twice. Deanonymize the company, qualify against our ICP (from CLAUDE.md), research recent news, and draft a first-touch email to the most likely champion. Save everything under companies/, contacts/, drafts/.',
+                },
+                {
+                  title: 'Lookalike outbound',
+                  body: 'deal-won',
+                  prompt: 'We just closed-won [acme.com] at $[48000] ACV. Find 25 lookalike companies (industry, size, stack), identify a likely buying committee at each, and draft an outbound sequence that anchors on the Acme outcome. Save to companies/, contacts/, drafts/.',
+                },
+                {
+                  title: 'Closed-lost analysis',
+                  body: 'deal-lost',
+                  prompt: 'The deal at [deals/closed-lost/beta-corp.md] just moved to lost. Pull the full history, analyze why (compare against our last 20 losses), extract any competitor intel, and propose 3 concrete process changes with owners. Append findings to the deal file and draft a Slack-style team post in drafts/.',
+                },
+                {
+                  title: 'Meeting prep',
+                  body: 'meeting-prep',
+                  prompt: 'I have a meeting with [jane@acme.com] in 2 hours. Pull everything we know about her + Acme, surface the 3-5 freshest news items, review her engagement with us, and write me a <150-word pre-call brief with agenda, 3 discovery questions, and the trap to avoid. Save to drafts/.',
+                },
+                {
+                  title: 'Pipeline health scan',
+                  body: 'pipeline-health',
+                  prompt: 'Scan deals/open/ for stale deals (no activity in [7] days), missing next-steps in proposal+ stages, and at-risk late-stage deals (close date pushed twice+, silent champion, competitor resurfacing). Rank by ARR at risk and propose one concrete recovery action per deal. Notify the owner via a drafts/ Slack DM.',
+                },
+                {
+                  title: 'LinkedIn intent',
+                  body: 'linkedin-intent',
+                  prompt: 'Someone at [acme.com] just commented on my latest LinkedIn post about [topic]. Enrich the person + company, research what might be driving their engagement, and draft a <=60-word LinkedIn DM that references their comment without being creepy. Save to drafts/.',
+                },
+                {
+                  title: 'Deep research an account',
+                  body: 'deep-research',
+                  prompt: 'Deep research [acme.com]. Use the deep_research tool to build a 7-section account brief: one-liner + firmographics, last-12mo events, GTM motion, tech stack, likely buying committee, top 3 competitors, and one trigger we can anchor outreach on. Every fact cited with a URL. Save to companies/acme-com.md.',
+                },
+                {
+                  title: 'Create a Playbook',
+                  body: 'create-play',
+                  prompt: 'Create a new Playbook called [weekly-competitor-scan] that: lists our 5 key competitors from CLAUDE.md, runs deep_research on each for last-7-day activity (launches, hires, pricing changes, reviews), and saves a consolidated weekly-<date>.md to knowledge/ with callouts for anything we should respond to.',
+                },
+              ].map((s) => (
+                <button
+                  key={s.title}
+                  type="button"
+                  onClick={() => setInput(s.prompt)}
+                  className="text-left p-4 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl hover:border-flame hover:shadow-sm transition-all"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-flame" />
+                    <span className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA]">{s.title}</span>
+                  </div>
+                  <div className="text-[11px] text-muted dark:text-[#8C837C] line-clamp-2">
+                    {s.prompt.slice(0, 110)}…
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
         <div className="max-w-3xl mx-auto space-y-4">

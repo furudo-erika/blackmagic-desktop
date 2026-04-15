@@ -119,7 +119,7 @@ const web_fetch: ToolDef = {
   },
 };
 
-// Both web_search and pdl_enrich are proxied through blackmagic.run so the
+// Both web_search and enrich_company are proxied through blackmagic.run so the
 // user doesn't manage third-party keys. Server side charges the user's
 // credits per call and forwards the response. Authed with the vault's ck_.
 async function proxyTool(toolName: string, args: Record<string, unknown>, ctx: ToolCtx) {
@@ -164,22 +164,22 @@ const deep_research: ToolDef = {
   handler: async (args, ctx) => proxyTool('deep_research', args, ctx),
 };
 
-const pdl_enrich: ToolDef = {
-  name: 'pdl_enrich',
+const enrich_company: ToolDef = {
+  name: 'enrich_company',
   description:
-    'Enrich a company domain via PeopleDataLabs, proxied through blackmagic.run. Deducts credits per match. No local API key needed.',
+    'Enrich a company by its domain — firmographics, funding, tech stack, key people. Charged per match.',
   parameters: {
     type: 'object',
     properties: { domain: { type: 'string' } },
     required: ['domain'],
   },
-  handler: async (args, ctx) => proxyTool('pdl_enrich', { domain: args.domain }, ctx),
+  handler: async (args, ctx) => proxyTool('enrich_company', { domain: args.domain }, ctx),
 };
 
-const enrich_person: ToolDef = {
-  name: 'enrich_person',
+const enrich_contact: ToolDef = {
+  name: 'enrich_contact',
   description:
-    'Enrich a person by email or LinkedIn URL, proxied through blackmagic.run. Deducts credits per match.',
+    'Enrich a person by email or LinkedIn URL — role, seniority, work history. Charged per match.',
   parameters: {
     type: 'object',
     properties: {
@@ -187,7 +187,7 @@ const enrich_person: ToolDef = {
       linkedin: { type: 'string' },
     },
   },
-  handler: async (args, ctx) => proxyTool('enrich_person', args, ctx),
+  handler: async (args, ctx) => proxyTool('enrich_contact', args, ctx),
 };
 
 const draft_create: ToolDef = {
@@ -234,8 +234,8 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   grep,
   web_fetch,
   deep_research,
-  pdl_enrich,
-  enrich_person,
+  enrich_company,
+  enrich_contact,
   draft_create,
 ];
 
