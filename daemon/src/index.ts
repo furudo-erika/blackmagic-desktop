@@ -9,6 +9,7 @@ import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { loadConfig, VAULT_ROOT } from './paths.js';
 import { ensureVault, readVaultFile, writeVaultFile, walkTree, installPresetTriggers } from './vault.js';
+import { findBacklinks } from './wikilinks.js';
 import { BUILTIN_TOOLS, allTools } from './tools.js';
 import { runAgent } from './agent.js';
 import { listPlaybooks, runPlaybook } from './playbooks.js';
@@ -229,6 +230,40 @@ async function main() {
     lines.push(`zenn_api_key = "${key.replace(/"/g, '\\"')}"`);
     await fs.writeFile(cfgPath, lines.join('\n').trim() + '\n', 'utf-8');
     config.zenn_api_key = key;
+    return c.json({ ok: true });
+  });
+
+  // Update per-integration API keys (apify, enrichlayer). Writes into
+  // ~/BlackMagic/.bm/config.toml so the daemon picks them up on reload and
+  // surfaces them via ctx.config to the builtin tools.
+  const INTEGRATION_KEYS = ['apify_api_key', 'enrichlayer_api_key'] as const;
+  type IntegrationKey = (typeof INTEGRATION_KEYS)[number];
+  app.get('/api/config/integration-keys', (c) =>
+    c.json({
+      apify_api_key: Boolean(config.apify_api_key),
+      enrichlayer_api_key: Boolean(config.enrichlayer_api_key),
+    }),
+  );
+  app.post('/api/config/integration-keys', async (c) => {
+    const body = await c.req.json<Partial<Record<IntegrationKey, string>>>();
+    const cfgDir = path.join(VAULT_ROOT, '.bm');
+    await fs.mkdir(cfgDir, { recursive: true });
+    const cfgPath = path.join(cfgDir, 'config.toml');
+    let existing = '';
+    try { existing = await fs.readFile(cfgPath, 'utf-8'); } catch {}
+    let lines = existing.split('\n');
+    for (const k of INTEGRATION_KEYS) {
+      const val = body[k];
+      if (val === undefined) continue;
+      lines = lines.filter((l) => !new RegExp(`^\\s*${k}\\s*=`).test(l));
+      if (val) {
+        lines.push(`${k} = "${String(val).replace(/"/g, '\\"')}"`);
+        (config as any)[k] = val;
+      } else {
+        (config as any)[k] = undefined;
+      }
+    }
+    await fs.writeFile(cfgPath, lines.join('\n').trim() + '\n', 'utf-8');
     return c.json({ ok: true });
   });
 
@@ -506,6 +541,13 @@ async function main() {
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 404);
     }
+  });
+
+  app.get('/api/vault/backlinks', async (c) => {
+    const p = c.req.query('path');
+    if (!p) return c.json({ error: 'path required' }, 400);
+    const backlinks = await findBacklinks(VAULT_ROOT, p);
+    return c.json({ backlinks });
   });
 
   app.put('/api/vault/file', async (c) => {

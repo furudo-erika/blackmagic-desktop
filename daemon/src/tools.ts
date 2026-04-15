@@ -226,6 +226,68 @@ ${args.body}
   },
 };
 
+const enrich_contact_linkedin: ToolDef = {
+  name: 'enrich_contact_linkedin',
+  description:
+    "Enrich a person via EnrichLayer (proxycurl-compatible) using their LinkedIn profile URL. Returns structured profile fields (title, company, location, summary, experience). Uses the user's own ENRICHLAYER_API_KEY — not the proxy.",
+  parameters: {
+    type: 'object',
+    properties: {
+      linkedinUrl: { type: 'string', description: 'Full LinkedIn profile URL, e.g. https://www.linkedin.com/in/jane-doe/' },
+    },
+    required: ['linkedinUrl'],
+  },
+  handler: async (args, ctx) => {
+    const key = ctx.config.enrichlayer_api_key;
+    if (!key) {
+      return { error: 'No ENRICHLAYER_API_KEY configured. Set it in Settings → Integrations, or add enrichlayer_api_key to ~/BlackMagic/.bm/config.toml.' };
+    }
+    const url = new URL('https://enrichlayer.com/api/v2/linkedin');
+    url.searchParams.set('url', args.linkedinUrl);
+    url.searchParams.set('use_cache', 'if-present');
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    const text = await res.text();
+    let data: unknown;
+    try { data = JSON.parse(text); } catch { data = text; }
+    if (!res.ok) return { error: `enrichlayer ${res.status}: ${String(text).slice(0, 300)}` };
+    return data;
+  },
+};
+
+const scrape_apify_actor: ToolDef = {
+  name: 'scrape_apify_actor',
+  description:
+    'Run any Apify actor synchronously and return the dataset items. Useful for company crawlers, LinkedIn scrapers, Google Maps harvesters, etc. Pass the actor id (e.g. "apify/google-search-scraper") and an input object matching that actor\'s schema.',
+  parameters: {
+    type: 'object',
+    properties: {
+      actorId: { type: 'string', description: 'Apify actor id, e.g. "apify/google-search-scraper" or "user~my-actor".' },
+      input: { type: 'object', description: 'Actor input object per its schema.' },
+    },
+    required: ['actorId', 'input'],
+  },
+  handler: async (args, ctx) => {
+    const key = ctx.config.apify_api_key;
+    if (!key) {
+      return { error: 'No APIFY_API_KEY configured. Set it in Settings → Integrations, or add apify_api_key to ~/BlackMagic/.bm/config.toml.' };
+    }
+    const actor = encodeURIComponent(args.actorId).replace(/%2F/g, '~');
+    const url = `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(key)}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(args.input ?? {}),
+    });
+    const text = await res.text();
+    let data: unknown;
+    try { data = JSON.parse(text); } catch { data = text; }
+    if (!res.ok) return { error: `apify ${res.status}: ${String(text).slice(0, 300)}` };
+    return { items: data };
+  },
+};
+
 const enroll_contact_in_sequence: ToolDef = {
   name: 'enroll_contact_in_sequence',
   description:
@@ -252,6 +314,8 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   deep_research,
   enrich_company,
   enrich_contact,
+  enrich_contact_linkedin,
+  scrape_apify_actor,
   draft_create,
   enroll_contact_in_sequence,
 ];

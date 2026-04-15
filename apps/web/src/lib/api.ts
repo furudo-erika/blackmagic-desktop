@@ -64,6 +64,17 @@ export const api = {
     ),
   writeFile: (path: string, content: string) =>
     request<{ ok: true }>('/api/vault/file', { method: 'PUT', body: JSON.stringify({ path, content }) }),
+  backlinks: (p: string) =>
+    request<{ backlinks: string[] }>(`/api/vault/backlinks?path=${encodeURIComponent(p)}`),
+  integrationKeys: () =>
+    request<{ apify_api_key: boolean; enrichlayer_api_key: boolean }>(
+      '/api/config/integration-keys',
+    ),
+  setIntegrationKeys: (body: { apify_api_key?: string; enrichlayer_api_key?: string }) =>
+    request<{ ok: true }>('/api/config/integration-keys', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   chat: (
     messages: Array<{ role: 'user' | 'assistant'; content: string }>,
     agent?: string,

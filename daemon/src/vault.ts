@@ -597,6 +597,34 @@ revenue, hq, icp_score, icp_reasons, enriched_at) and a 150-word body
 covering what they do, recent news, and best-guess buying committee.
 Use enrich_company first, then web_search for news.
 `,
+  'enrich-contact.md': `---
+kind: playbook
+name: enrich-contact
+group: building-blocks
+agent: researcher
+inputs:
+  - { name: contact_path, required: true }
+---
+
+Enrich the contact at \`{{contact_path}}\` using EnrichLayer.
+
+## Steps
+
+1. Read the contact file. Pull the \`linkedin\` URL from its frontmatter. If it
+   is missing, stop and tell the user: "no linkedin url on this contact —
+   add one to frontmatter first".
+2. Call \`enrich_contact_linkedin({ linkedinUrl: <url> })\`. If the tool
+   returns an \`error\` mentioning ENRICHLAYER_API_KEY, surface that
+   verbatim — the user has to paste their key in Settings → Integration keys
+   before this playbook works.
+3. Map the returned profile into frontmatter fields and write them back with
+   \`edit_file\`. Specifically set (only if present in the response):
+   - \`title\`         = occupation or current role headline
+   - \`company\`       = current employer name
+   - \`location\`      = "city, country"
+   - \`linkedin_summary\` = a one-paragraph summary (strip newlines)
+4. Summarise what changed in one sentence. Do not create drafts.
+`,
   'qualify-icp.md': `---
 kind: playbook
 name: qualify-icp

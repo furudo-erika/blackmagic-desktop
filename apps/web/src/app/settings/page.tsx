@@ -30,7 +30,35 @@ function KV({ k, v, mono = false }: { k: string; v: React.ReactNode; mono?: bool
 export default function SettingsPage() {
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 5_000 });
   const integrations = useQuery({ queryKey: ['integrations'], queryFn: api.listIntegrations });
+  const intKeys = useQuery({ queryKey: ['integration-keys'], queryFn: api.integrationKeys });
   const bridge = getBridge();
+
+  const [apifyDraft, setApifyDraft] = useState('');
+  const [enrichDraft, setEnrichDraft] = useState('');
+  const [keySaving, setKeySaving] = useState(false);
+  const [keySaveMsg, setKeySaveMsg] = useState<string | null>(null);
+  async function saveIntegrationKeys() {
+    setKeySaving(true);
+    setKeySaveMsg(null);
+    try {
+      const body: Record<string, string> = {};
+      if (apifyDraft.trim()) body.apify_api_key = apifyDraft.trim();
+      if (enrichDraft.trim()) body.enrichlayer_api_key = enrichDraft.trim();
+      if (Object.keys(body).length === 0) {
+        setKeySaveMsg('nothing to save');
+      } else {
+        await api.setIntegrationKeys(body);
+        setApifyDraft('');
+        setEnrichDraft('');
+        setKeySaveMsg('saved');
+        intKeys.refetch();
+      }
+    } catch (err) {
+      setKeySaveMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setKeySaving(false);
+    }
+  }
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   useEffect(() => {
@@ -113,6 +141,53 @@ export default function SettingsPage() {
                 blackmagic.run/dashboard/api-keys
               </a>. Revoke this key to sign out.
             </p>
+          </Section>
+
+          <Section icon={KeyRound} title="Integration keys">
+            <p className="text-[11px] text-muted dark:text-[#8C837C]">
+              Bring-your-own keys for EnrichLayer (LinkedIn enrichment) and Apify
+              (generic scrapers). Stored locally in{' '}
+              <code className="text-[11px]">~/BlackMagic/.bm/config.toml</code> and
+              read directly by the built-in tools.
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  EnrichLayer
+                </label>
+                <input
+                  type="password"
+                  value={enrichDraft}
+                  onChange={(e) => setEnrichDraft(e.target.value)}
+                  placeholder={intKeys.data?.enrichlayer_api_key ? '••• (saved)' : 'proxycurl-compatible key'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Apify
+                </label>
+                <input
+                  type="password"
+                  value={apifyDraft}
+                  onChange={(e) => setApifyDraft(e.target.value)}
+                  placeholder={intKeys.data?.apify_api_key ? '••• (saved)' : 'apify_api_… token'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2 justify-end">
+                {keySaveMsg && (
+                  <span className="text-[11px] text-muted dark:text-[#8C837C]">{keySaveMsg}</span>
+                )}
+                <button
+                  onClick={saveIntegrationKeys}
+                  disabled={keySaving}
+                  className="h-8 px-3 rounded-md bg-flame text-white text-[12px] disabled:opacity-50"
+                >
+                  {keySaving ? 'Saving…' : 'Save keys'}
+                </button>
+              </div>
+            </div>
           </Section>
 
           <Section icon={Plug} title="Integrations">

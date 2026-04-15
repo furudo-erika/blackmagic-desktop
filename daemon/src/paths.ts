@@ -10,6 +10,8 @@ export interface Config {
   zenn_api_key?: string;
   billing_url?: string;
   daemon_port?: number;
+  apify_api_key?: string;
+  enrichlayer_api_key?: string;
 }
 
 function defaultVault(): string {
@@ -38,6 +40,8 @@ export function loadConfig(): Config {
     zenn_api_key: process.env.ZENN_API_KEY,
     billing_url: billingUrl,
     daemon_port: process.env.BM_DAEMON_PORT ? Number(process.env.BM_DAEMON_PORT) : undefined,
+    apify_api_key: process.env.APIFY_API_KEY,
+    enrichlayer_api_key: process.env.ENRICHLAYER_API_KEY,
   };
 
   if (fs.existsSync(configPath)) {

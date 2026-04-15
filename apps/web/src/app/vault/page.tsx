@@ -65,6 +65,13 @@ function VaultContent() {
     enabled: !!selected,
   });
 
+  const backlinks = useQuery({
+    queryKey: ['vault-backlinks', selected],
+    queryFn: () => (selected ? api.backlinks(selected) : Promise.resolve({ backlinks: [] })),
+    enabled: !!selected,
+    staleTime: 10_000,
+  });
+
   useEffect(() => {
     if (file.data) {
       setDraftBody(file.data.body);
@@ -262,6 +269,27 @@ function VaultContent() {
               ) : (
                 <div className="mt-2 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl px-6 py-5">
                   <Markdown source={file.data.body} />
+                </div>
+              )}
+
+              {(backlinks.data?.backlinks?.length ?? 0) > 0 && (
+                <div className="mt-6">
+                  <div className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C] mb-2">
+                    Backlinks ({backlinks.data!.backlinks.length})
+                  </div>
+                  <ul className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl divide-y divide-line dark:divide-[#2A241D]">
+                    {backlinks.data!.backlinks.map((p) => (
+                      <li key={p}>
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/vault?path=${encodeURIComponent(p)}`)}
+                          className="w-full text-left px-4 py-2 text-[13px] font-mono text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA] hover:bg-cream-light dark:hover:bg-[#17140F]"
+                        >
+                          {p}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </article>
