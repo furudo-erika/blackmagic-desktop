@@ -1,5 +1,29 @@
 import { getBridge } from './bridge';
 
+export type IntegrationProvider =
+  | 'hubspot'
+  | 'attio'
+  | 'salesforce'
+  | 'gong'
+  | 'unipile'
+  | 'slack'
+  | 'gmail';
+
+export type Integration = {
+  provider: IntegrationProvider;
+  status: 'connected' | 'disconnected';
+  connectedAs?: string | null;
+  connectedAt?: string | null;
+};
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const { daemonPort, daemonToken } = getBridge();
   if (!daemonPort) throw new Error('daemon not connected');
@@ -13,7 +37,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`${res.status} ${text.slice(0, 300)}`);
+    throw new ApiError(res.status, `${res.status} ${text.slice(0, 300)}`);
   }
   return res.json() as Promise<T>;
 }
@@ -25,6 +49,7 @@ export const api = {
     ),
   setApiKey: (key: string) =>
     request<{ ok: true }>('/api/config/api-key', { method: 'POST', body: JSON.stringify({ key }) }),
+  authStart: () => request<{ browserUrl: string; state: string }>('/api/auth/start'),
   tools: () => request<{ tools: Array<{ name: string; description: string; source: string }> }>('/api/tools'),
   vaultTree: () => request<{ tree: Array<{ path: string; type: 'file' | 'dir' }> }>('/api/vault/tree'),
   readFile: (p: string) =>
@@ -49,4 +74,40 @@ export const api = {
     ),
   getRun: (id: string) =>
     request<{ meta: any; prompt: string; final: string; toolCalls: any[] }>(`/api/agent/runs/${encodeURIComponent(id)}`),
+  listIntegrations: () => request<{ integrations: Integration[] }>('/api/integrations'),
+  saveIntegrationToken: (provider: IntegrationProvider, credentials: Record<string, string>) =>
+    request<{ ok: true }>(`/api/integrations/${provider}`, {
+      method: 'PUT',
+      body: JSON.stringify({ credentials }),
+    }),
+  disconnectIntegration: (provider: IntegrationProvider) =>
+    request<{ ok: true }>(`/api/integrations/${provider}`, { method: 'DELETE' }),
+  oauthStart: (provider: IntegrationProvider) =>
+    request<{ browserUrl: string }>(`/api/integrations/${provider}/oauth/start`),
+  ontology: () =>
+    request<{ nodes: OntologyNode[]; edges: OntologyEdge[] }>('/api/ontology'),
+  onboardingState: () =>
+    request<{ needsOnboarding: boolean; claudeDefault: boolean; hasSelfCompany: boolean }>(
+      '/api/onboarding',
+    ),
+  completeOnboarding: (body: { domain: string; what_you_sell?: string; icp?: string; tone?: string }) =>
+    request<{ ok: true }>('/api/onboarding/complete', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+};
+
+export type OntologyNode = {
+  id: string;
+  kind: 'company' | 'contact' | 'deal' | 'draft' | 'agent' | 'playbook' | 'trigger' | 'memory' | 'knowledge' | 'other';
+  label: string;
+  path: string;
+  mtime: number;
+  size: number;
+};
+
+export type OntologyEdge = {
+  source: string;
+  target: string;
+  label?: string;
 };

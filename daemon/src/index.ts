@@ -15,8 +15,23 @@ import { listPlaybooks, runPlaybook } from './playbooks.js';
 import { triggerList, fireTrigger, loadCronTriggers } from './triggers.js';
 import { listDrafts, approveDraft, rejectDraft } from './drafts.js';
 import { mcpServerList } from './mcp.js';
+import { buildOntology } from './ontology.js';
 
 const LOCAL_TOKEN = process.env.BM_LOCAL_TOKEN ?? crypto.randomBytes(24).toString('base64url');
+
+// In-memory pending OAuth states. Each entry expires after 10 minutes.
+const pendingOAuthStates = new Map<string, number>();
+function issueOAuthState(): string {
+  const s = crypto.randomBytes(16).toString('base64url');
+  pendingOAuthStates.set(s, Date.now());
+  return s;
+}
+function consumeOAuthState(s: string): boolean {
+  const t = pendingOAuthStates.get(s);
+  if (!t) return false;
+  pendingOAuthStates.delete(s);
+  return Date.now() - t < 10 * 60 * 1000;
+}
 
 async function pickPort(preferred?: number): Promise<number> {
   if (preferred) return preferred;
@@ -41,14 +56,65 @@ async function main() {
   const app = new Hono();
   app.use('*', cors({ origin: (o) => o ?? '*', credentials: false }));
 
-  // Local auth middleware. Webhooks authenticate via ?token=... (checked inline).
+  // Local auth middleware. Webhooks + /auth/callback use their own auth.
   app.use('/api/*', async (c, next) => {
-    if (c.req.path === '/api/health') return next();
+    if (c.req.path === '/api/health' || c.req.path === '/api/auth/start') return next();
     const auth = c.req.header('authorization') ?? '';
     if (!auth.startsWith('Bearer ') || auth.slice(7) !== LOCAL_TOKEN) {
       return c.json({ error: 'unauthorized' }, 401);
     }
     return next();
+  });
+
+  // OAuth-like handshake: renderer calls /api/auth/start to mint a state and
+  // get the browser URL to open. User signs in on blackmagic.run and gets
+  // redirected to /auth/callback?token=ck_...&state=... — callback persists
+  // the key to config.toml and shows a success page.
+  app.get('/api/auth/start', (c) => {
+    const state = issueOAuthState();
+    const billingUrl = (config.billing_url ?? 'https://blackmagic.run').replace(/\/+$/, '');
+    // blackmagic-ai already has /auth/cli that handles login + authorize +
+    // redirect-to-callback. We embed our state into the callback URL so the
+    // site echoes it back untouched.
+    const callback = `http://127.0.0.1:${port}/auth/callback?state=${encodeURIComponent(state)}`;
+    const browserUrl = `${billingUrl}/auth/cli?callback=${encodeURIComponent(callback)}`;
+    return c.json({ browserUrl, state });
+  });
+
+  function callbackPage(title: string, body: string, ok: boolean) {
+    return `<!doctype html>
+<html><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  body{font-family:-apple-system,system-ui,sans-serif;background:#FBFAF8;color:#1A1614;padding:48px 32px;display:flex;flex-direction:column;align-items:center;gap:16px}
+  h1{font-size:22px;margin:0}
+  p{color:#605A57;font-size:14px;max-width:420px;text-align:center}
+  .accent{color:${ok ? '#37322F' : '#E8523A'};font-size:40px}
+</style></head><body>
+<div class="accent">${ok ? '◉' : '◉'}</div>
+<h1>${title}</h1>
+<p>${body}</p>
+</body></html>`;
+  }
+
+  app.get('/auth/callback', async (c) => {
+    const token = (c.req.query('token') ?? '').trim();
+    const state = (c.req.query('state') ?? '').trim();
+    if (!token.startsWith('ck_') || token.length < 10) {
+      return c.html(callbackPage('Invalid key', 'The key returned by blackmagic.run was malformed.', false), 400);
+    }
+    if (!consumeOAuthState(state)) {
+      return c.html(callbackPage('Expired or unknown state', 'Please retry the sign-in from the app.', false), 400);
+    }
+    const cfgDir = path.join(VAULT_ROOT, '.bm');
+    await fs.mkdir(cfgDir, { recursive: true });
+    const cfgPath = path.join(cfgDir, 'config.toml');
+    let existing = '';
+    try { existing = await fs.readFile(cfgPath, 'utf-8'); } catch {}
+    const lines = existing.split('\n').filter((l) => !l.match(/^\s*zenn_api_key\s*=/));
+    lines.push(`zenn_api_key = "${token.replace(/"/g, '\\"')}"`);
+    await fs.writeFile(cfgPath, lines.join('\n').trim() + '\n', 'utf-8');
+    config.zenn_api_key = token;
+    return c.html(callbackPage('Signed in', 'You can close this tab and return to Black Magic.', true));
   });
 
   app.get('/api/health', (c) =>
@@ -88,6 +154,60 @@ async function main() {
         ...mcp.map((s) => ({ name: s.name, description: `MCP: ${s.command} ${s.args.join(' ')}`, source: 'mcp' })),
       ],
     });
+  });
+
+  app.get('/api/ontology', async (c) => c.json(await buildOntology()));
+
+  // Onboarding state: considered complete once CLAUDE.md has been
+  // user-customised (default seed marker is absent).
+  app.get('/api/onboarding', async (c) => {
+    const claudePath = path.join(VAULT_ROOT, 'CLAUDE.md');
+    let claude = '';
+    try { claude = await fs.readFile(claudePath, 'utf-8'); } catch {}
+    const isDefault = claude.includes('_One paragraph: what you sell, to whom._');
+    const hasSelfCompany = await fs.access(path.join(VAULT_ROOT, 'me.md')).then(() => true).catch(() => false);
+    return c.json({ needsOnboarding: isDefault && !hasSelfCompany, claudeDefault: isDefault, hasSelfCompany });
+  });
+
+  app.post('/api/onboarding/complete', async (c) => {
+    const body = await c.req.json<{ domain: string; what_you_sell?: string; icp?: string; tone?: string }>();
+    if (!body.domain) return c.json({ error: 'domain required' }, 400);
+
+    // Kick off researcher agent to enrich the user's own company.
+    runAgent({
+      agent: 'researcher',
+      task: `Enrich the user's own company at ${body.domain} and save to me.md (not companies/). Focus: what we sell, target customer, tone. Use pdl_enrich + web_search.`,
+      config,
+    }).catch((err) => console.error('[onboarding] enrich failed:', err));
+
+    // Write the user-supplied CLAUDE.md right away so the first chat has
+    // some context even before the agent run finishes.
+    const claude = [
+      '# Black Magic — Your CLAUDE.md',
+      '',
+      '## Our Company',
+      '',
+      body.what_you_sell ?? `We operate at ${body.domain}.`,
+      '',
+      '## ICP',
+      '',
+      body.icp ?? '- (to be filled in by the onboarding enrichment)',
+      '',
+      '## Tone',
+      '',
+      body.tone ?? '- Concise, specific, no marketing jargon',
+      '- Forbidden words: "unlock", "revolutionize", "streamline", "leverage", "unleash"',
+      '',
+      '## Sources of Truth',
+      '',
+      '- Companies: `companies/`',
+      '- Contacts: `contacts/<company-slug>/`',
+      '- Deals: `deals/` (open/closed-won/closed-lost)',
+      '- About us: `me.md`',
+      '',
+    ].join('\n');
+    await fs.writeFile(path.join(VAULT_ROOT, 'CLAUDE.md'), claude, 'utf-8');
+    return c.json({ ok: true });
   });
 
   app.get('/api/playbooks', async (c) => c.json({ playbooks: await listPlaybooks() }));

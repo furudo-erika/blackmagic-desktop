@@ -20,12 +20,18 @@ export function loadConfig(): Config {
   const vault = defaultVault();
   const configPath = path.join(vault, '.bm', 'config.toml');
 
+  // By default the daemon talks to OUR proxy at blackmagic.run/api/agent
+  // instead of zenn directly. This lets the user's `ck_` (minted by our
+  // OAuth) authenticate, and our server does the zenn call + credit debit
+  // in one step. Override with ZENN_BASE_URL to bypass the proxy.
+  const billingUrl = process.env.BM_BILLING_URL ?? 'https://blackmagic.run';
+  const defaultZennBase = `${billingUrl.replace(/\/+$/, '')}/api/agent`;
   const base: Config = {
     vault_path: vault,
     default_model: process.env.BM_DEFAULT_MODEL ?? 'gpt-5.3-codex',
-    zenn_base_url: process.env.ZENN_BASE_URL ?? 'https://zenn.engineering/api/v1',
+    zenn_base_url: process.env.ZENN_BASE_URL ?? defaultZennBase,
     zenn_api_key: process.env.ZENN_API_KEY,
-    billing_url: process.env.BM_BILLING_URL,
+    billing_url: billingUrl,
     daemon_port: process.env.BM_DAEMON_PORT ? Number(process.env.BM_DAEMON_PORT) : undefined,
   };
 

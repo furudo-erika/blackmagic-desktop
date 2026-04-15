@@ -8,6 +8,7 @@ declare global {
       daemonToken: string;
       vaultPath: string;
       platform: string;
+      openExternal?: (url: string) => void;
     };
   }
 }

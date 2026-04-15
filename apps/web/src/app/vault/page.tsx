@@ -1,151 +1,272 @@
 'use client';
 
-import { useMemo, useState, useEffect, Suspense } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
+import { Markdown } from '../../components/markdown';
+import { Search, Save, Pencil, Eye, FileText } from 'lucide-react';
+
+type FileEntry = { path: string; type: 'file' | 'dir' };
+
+const KIND_LABEL: Record<string, string> = {
+  companies: 'Company',
+  contacts: 'Contact',
+  deals: 'Deal',
+  drafts: 'Draft',
+  agents: 'Agent',
+  playbooks: 'Playbook',
+  triggers: 'Trigger',
+  memory: 'Memory',
+  knowledge: 'Knowledge',
+};
+const KIND_COLOR: Record<string, string> = {
+  companies: '#E8523A',
+  contacts: '#D4A65A',
+  deals: '#7E8C67',
+  drafts: '#8899BB',
+  agents: '#B06AB3',
+  playbooks: '#66A8A8',
+  triggers: '#C97660',
+  memory: '#9A8C6E',
+  knowledge: '#9A8C6E',
+};
+
+const topFolder = (p: string) => p.split('/')[0] ?? 'root';
 
 function serialize(frontmatter: Record<string, unknown>, body: string): string {
   const keys = Object.keys(frontmatter);
   if (keys.length === 0) return body;
-  const yaml = keys
-    .map((k) => {
-      const v = frontmatter[k];
-      if (v === null || v === undefined) return `${k}: null`;
-      if (Array.isArray(v)) return `${k}:\n${v.map((x) => `  - ${JSON.stringify(x)}`).join('\n')}`;
-      if (typeof v === 'object') return `${k}: ${JSON.stringify(v)}`;
-      if (typeof v === 'string' && /[:#\n]/.test(v)) return `${k}: ${JSON.stringify(v)}`;
-      return `${k}: ${v}`;
-    })
-    .join('\n');
-  return `---\n${yaml}\n---\n\n${body}`;
+  const lines = ['---'];
+  for (const k of keys) {
+    const v = frontmatter[k];
+    if (v == null) lines.push(`${k}:`);
+    else if (typeof v === 'string') lines.push(`${k}: ${JSON.stringify(v)}`);
+    else lines.push(`${k}: ${JSON.stringify(v)}`);
+  }
+  lines.push('---', '');
+  return lines.join('\n') + body;
 }
 
-function VaultInner() {
-  const searchParams = useSearchParams();
+function VaultContent() {
+  const params = useSearchParams();
   const router = useRouter();
   const qc = useQueryClient();
-  const initialPath = searchParams.get('path') || '';
-  const [selected, setSelected] = useState<string>(initialPath);
-  const [body, setBody] = useState('');
+  const selected = params.get('path') ?? '';
+  const [query, setQuery] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [draftBody, setDraftBody] = useState('');
 
-  const tree = useQuery({ queryKey: ['vaultTree'], queryFn: () => api.vaultTree() });
+  const tree = useQuery({ queryKey: ['vault-tree'], queryFn: api.vaultTree, staleTime: 5_000 });
+
   const file = useQuery({
-    queryKey: ['vaultFile', selected],
-    queryFn: () => api.readFile(selected),
+    queryKey: ['vault-file', selected],
+    queryFn: () => (selected ? api.readFile(selected) : Promise.resolve(null)),
     enabled: !!selected,
   });
 
   useEffect(() => {
-    if (file.data) setBody(file.data.body);
+    if (file.data) {
+      setDraftBody(file.data.body);
+      setEditing(false);
+    }
   }, [file.data]);
 
-  useEffect(() => {
-    const p = searchParams.get('path') || '';
-    if (p && p !== selected) setSelected(p);
-  }, [searchParams, selected]);
+  const byFolder = useMemo(() => {
+    const map = new Map<string, FileEntry[]>();
+    for (const entry of tree.data?.tree ?? []) {
+      if (entry.type !== 'file') continue;
+      if (!/\.md$/i.test(entry.path)) continue;
+      const top = topFolder(entry.path);
+      if (query && !entry.path.toLowerCase().includes(query.toLowerCase())) continue;
+      const arr = map.get(top) ?? [];
+      arr.push(entry);
+      map.set(top, arr);
+    }
+    for (const a of map.values()) a.sort((x, y) => x.path.localeCompare(y.path));
+    return map;
+  }, [tree.data, query]);
 
-  const save = useMutation({
-    mutationFn: () => {
-      const content = serialize(file.data?.frontmatter ?? {}, body);
-      return api.writeFile(selected, content);
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['vaultFile', selected] }),
-  });
+  const orderedFolders = ['companies', 'contacts', 'deals', 'drafts', 'agents', 'playbooks', 'triggers', 'memory', 'knowledge'];
+  const folders = [
+    ...orderedFolders.filter((k) => byFolder.has(k)),
+    ...[...byFolder.keys()].filter((k) => !orderedFolders.includes(k)),
+  ];
 
-  const files = useMemo(() => {
-    const items = tree.data?.tree ?? [];
-    return [...items].sort((a, b) => a.path.localeCompare(b.path));
-  }, [tree.data]);
-
-  function pick(p: string) {
-    setSelected(p);
-    router.replace(`/vault?path=${encodeURIComponent(p)}`);
+  async function save() {
+    if (!selected || !file.data) return;
+    const full = serialize(file.data.frontmatter, draftBody);
+    await api.writeFile(selected, full);
+    setEditing(false);
+    qc.invalidateQueries({ queryKey: ['vault-file', selected] });
+    qc.invalidateQueries({ queryKey: ['vault-tree'] });
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <header className="px-6 py-4 border-b border-line">
-        <h1 className="text-lg font-semibold">Vault</h1>
-        <p className="text-xs text-muted">Browse and edit files in ~/BlackMagic/.</p>
-      </header>
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-[300px] shrink-0 border-r border-line overflow-y-auto px-3 py-4 bg-cream-light">
-          {tree.isLoading && <div className="text-xs text-muted px-2">loading…</div>}
-          {tree.error && <div className="text-xs text-flame px-2">{(tree.error as Error).message}</div>}
-          <ul className="text-sm">
-            {files.map((f) => {
-              const depth = f.path.split('/').length - 1;
-              const name = f.path.split('/').pop() || f.path;
-              const active = f.path === selected;
-              return (
-                <li key={f.path}>
-                  {f.type === 'file' ? (
-                    <button
-                      onClick={() => pick(f.path)}
-                      className={`w-full text-left px-2 py-1 rounded hover:bg-white truncate ${
-                        active ? 'bg-white text-ink font-medium' : 'text-muted'
-                      }`}
-                      style={{ paddingLeft: 8 + depth * 12 }}
-                    >
-                      {name}
-                    </button>
-                  ) : (
-                    <div
-                      className="px-2 py-1 text-xs uppercase tracking-wide text-muted"
-                      style={{ paddingLeft: 8 + depth * 12 }}
-                    >
-                      {name}/
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+    <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A]">
+      <header className="px-6 py-4 border-b border-line dark:border-[#2A241D] flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-semibold text-ink dark:text-[#F5F1EA]">Vault</h1>
+          <p className="text-xs text-muted dark:text-[#8C837C]">
+            Everything on disk at <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1.5 py-0.5 rounded">~/BlackMagic/</code>
+          </p>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          {!selected && <div className="text-sm text-muted">Select a file from the tree.</div>}
-          {selected && file.isLoading && <div className="text-sm text-muted">loading…</div>}
-          {selected && file.data && (
-            <div className="max-w-3xl space-y-4">
-              <div className="text-xs font-mono text-muted">{selected}</div>
-              {Object.keys(file.data.frontmatter).length > 0 && (
-                <div className="bg-white rounded-xl border border-line p-4">
-                  <div className="text-xs uppercase tracking-wide text-muted mb-2">frontmatter</div>
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {Object.entries(file.data.frontmatter).map(([k, v]) => (
-                        <tr key={k} className="border-t border-line first:border-t-0">
-                          <td className="py-1.5 pr-4 font-mono text-xs text-muted align-top w-40">{k}</td>
-                          <td className="py-1.5 text-sm break-all">
-                            {typeof v === 'string' ? v : JSON.stringify(v)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+        <div className="relative w-64">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-muted dark:text-[#8C837C]" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter by path…"
+            className="w-full bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md pl-7 pr-3 py-1.5 text-xs font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+          />
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-hidden grid" style={{ gridTemplateColumns: 'minmax(280px, 340px) 1fr' }}>
+        <aside className="border-r border-line dark:border-[#2A241D] overflow-y-auto">
+          {folders.map((folder) => {
+            const entries = byFolder.get(folder) ?? [];
+            if (entries.length === 0) return null;
+            const color = KIND_COLOR[folder] ?? '#605A57';
+            return (
+              <section key={folder} className="py-3">
+                <div className="px-5 pb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+                  <span className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C]">
+                    {folder}
+                  </span>
+                  <span className="text-[10px] font-mono text-muted dark:text-[#6B625C]">{entries.length}</span>
                 </div>
-              )}
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={20}
-                className="w-full bg-white border border-line rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-flame"
-              />
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => save.mutate()}
-                  disabled={save.isPending}
-                  className="h-9 px-4 rounded-lg bg-flame text-white text-sm font-medium hover:opacity-90 disabled:opacity-40"
-                >
-                  {save.isPending ? 'saving…' : 'Save'}
-                </button>
-                {save.isSuccess && <span className="text-xs text-muted">saved</span>}
-                {save.error && <span className="text-xs text-flame">{(save.error as Error).message}</span>}
+                <ul>
+                  {entries.map((e) => {
+                    const slug = e.path.split('/').slice(1).join('/').replace(/\.md$/, '');
+                    const active = selected === e.path;
+                    return (
+                      <li key={e.path}>
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/vault?path=${encodeURIComponent(e.path)}`)}
+                          className={
+                            'w-full text-left px-5 py-1.5 text-sm font-mono truncate hover:bg-cream-light dark:hover:bg-[#17140F] ' +
+                            (active
+                              ? 'bg-white dark:bg-[#1F1B15] border-l-2 border-flame text-ink dark:text-[#F5F1EA]'
+                              : 'text-muted dark:text-[#8C837C] border-l-2 border-transparent')
+                          }
+                        >
+                          {slug || e.path}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
+          {folders.length === 0 && (
+            <div className="p-6 text-xs text-muted dark:text-[#8C837C]">
+              Empty vault. Ask Chat to do something and files will appear here.
+            </div>
+          )}
+        </aside>
+
+        <section className="overflow-y-auto">
+          {!selected && (
+            <div className="h-full flex items-center justify-center text-sm text-muted dark:text-[#8C837C]">
+              <div className="text-center max-w-md">
+                <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p>Select a file to view or edit.</p>
+                <p className="mt-1 text-[11px] opacity-70">
+                  The agent edits these same files — changes here round-trip back to the LLM.
+                </p>
               </div>
             </div>
           )}
-        </div>
+          {selected && file.isLoading && (
+            <div className="p-6 text-sm text-muted dark:text-[#8C837C]">loading…</div>
+          )}
+          {selected && file.data && (
+            <article className="max-w-3xl mx-auto px-8 py-6">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C]">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: KIND_COLOR[topFolder(selected)] ?? '#605A57' }}
+                />
+                {KIND_LABEL[topFolder(selected)] ?? topFolder(selected)}
+              </div>
+              <h2 className="mt-1 text-2xl font-semibold text-ink dark:text-[#F5F1EA] break-words">
+                {(file.data.frontmatter as any)?.name ||
+                  (file.data.frontmatter as any)?.subject ||
+                  selected.split('/').pop()?.replace(/\.md$/, '')}
+              </h2>
+              <div className="mt-1 text-[11px] font-mono text-muted dark:text-[#8C837C]">{selected}</div>
+
+              {Object.keys(file.data.frontmatter).length > 0 && (
+                <div className="mt-5 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4">
+                  <div className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C] mb-2">
+                    Frontmatter
+                  </div>
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+                    {Object.entries(file.data.frontmatter).map(([k, v]) => (
+                      <div key={k} className="contents">
+                        <dt className="font-mono text-muted dark:text-[#8C837C]">{k}</dt>
+                        <dd className="font-mono text-ink dark:text-[#E6E0D8] break-words">
+                          {typeof v === 'string' ? v : JSON.stringify(v)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
+
+              <div className="mt-6 flex items-center justify-between">
+                <div className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C]">
+                  Body
+                </div>
+                <div className="flex items-center gap-1">
+                  {!editing && (
+                    <button
+                      onClick={() => setEditing(true)}
+                      className="text-[12px] px-2.5 py-1 rounded-md text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA] hover:bg-white dark:hover:bg-[#1F1B15] flex items-center gap-1"
+                    >
+                      <Pencil className="w-3 h-3" /> Edit
+                    </button>
+                  )}
+                  {editing && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setDraftBody(file.data?.body ?? '');
+                          setEditing(false);
+                        }}
+                        className="text-[12px] px-2.5 py-1 rounded-md text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA] flex items-center gap-1"
+                      >
+                        <Eye className="w-3 h-3" /> Cancel
+                      </button>
+                      <button
+                        onClick={save}
+                        className="text-[12px] px-2.5 py-1 rounded-md bg-flame text-white flex items-center gap-1"
+                      >
+                        <Save className="w-3 h-3" /> Save
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {editing ? (
+                <textarea
+                  value={draftBody}
+                  onChange={(e) => setDraftBody(e.target.value)}
+                  className="w-full mt-2 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl px-4 py-3 text-sm font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame min-h-[320px]"
+                />
+              ) : (
+                <div className="mt-2 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl px-6 py-5">
+                  <Markdown source={file.data.body} />
+                </div>
+              )}
+            </article>
+          )}
+        </section>
       </div>
     </div>
   );
@@ -153,8 +274,8 @@ function VaultInner() {
 
 export default function VaultPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-muted">loading…</div>}>
-      <VaultInner />
+    <Suspense fallback={<div className="p-6 text-sm text-muted dark:text-[#8C837C]">loading…</div>}>
+      <VaultContent />
     </Suspense>
   );
 }

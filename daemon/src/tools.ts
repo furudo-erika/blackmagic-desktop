@@ -118,45 +118,61 @@ const web_fetch: ToolDef = {
   },
 };
 
+// Both web_search and pdl_enrich are proxied through blackmagic.run so the
+// user doesn't manage third-party keys. Server side charges the user's
+// credits per call and forwards the response. Authed with the vault's ck_.
+async function proxyTool(toolName: string, args: Record<string, unknown>, ctx: ToolCtx) {
+  const key = ctx.config.zenn_api_key;
+  const base = (ctx.config.billing_url ?? 'https://blackmagic.run').replace(/\/+$/, '');
+  if (!key) return { error: 'not signed in; no ck_ key available' };
+  const res = await fetch(`${base}/api/agent-tools/${toolName}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify(args),
+  });
+  const text = await res.text();
+  let data: unknown;
+  try { data = JSON.parse(text); } catch { data = text; }
+  if (!res.ok) return { error: `${res.status} ${text.slice(0, 300)}` };
+  return data;
+}
+
 const web_search: ToolDef = {
   name: 'web_search',
-  description: 'Live web search via Perplexity Sonar. Returns answer + citations. Requires PPLX_API_KEY.',
+  description:
+    'Live web search via Perplexity Sonar, proxied through blackmagic.run. Deducts credits per call. No local API key needed.',
   parameters: {
     type: 'object',
     properties: { query: { type: 'string' } },
     required: ['query'],
   },
-  handler: async (args) => {
-    const key = process.env.PPLX_API_KEY;
-    if (!key) return { error: 'PPLX_API_KEY not set' };
-    const res = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'sonar',
-        messages: [{ role: 'user', content: args.query }],
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    return { status: res.status, data };
-  },
+  handler: async (args, ctx) => proxyTool('web_search', { query: args.query }, ctx),
 };
 
 const pdl_enrich: ToolDef = {
   name: 'pdl_enrich',
-  description: 'Enrich a company domain via PeopleDataLabs. Requires PDL_API_KEY.',
+  description:
+    'Enrich a company domain via PeopleDataLabs, proxied through blackmagic.run. Deducts credits per match. No local API key needed.',
   parameters: {
     type: 'object',
     properties: { domain: { type: 'string' } },
     required: ['domain'],
   },
-  handler: async (args) => {
-    const key = process.env.PDL_API_KEY;
-    if (!key) return { error: 'PDL_API_KEY not set' };
-    const url = `https://api.peopledatalabs.com/v5/company/enrich?website=${encodeURIComponent(args.domain)}&api_key=${key}`;
-    const res = await fetch(url);
-    return { status: res.status, data: await res.json().catch(() => null) };
+  handler: async (args, ctx) => proxyTool('pdl_enrich', { domain: args.domain }, ctx),
+};
+
+const enrich_person: ToolDef = {
+  name: 'enrich_person',
+  description:
+    'Enrich a person by email or LinkedIn URL, proxied through blackmagic.run. Deducts credits per match.',
+  parameters: {
+    type: 'object',
+    properties: {
+      email: { type: 'string' },
+      linkedin: { type: 'string' },
+    },
   },
+  handler: async (args, ctx) => proxyTool('enrich_person', args, ctx),
 };
 
 const draft_create: ToolDef = {
@@ -204,6 +220,7 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   web_fetch,
   web_search,
   pdl_enrich,
+  enrich_person,
   draft_create,
 ];
 

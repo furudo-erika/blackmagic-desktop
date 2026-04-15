@@ -303,30 +303,9 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
     'utf-8',
   );
 
-  // Post token event to billing backend (best-effort)
-  if (config.billing_url && config.zenn_api_key) {
-    try {
-      await fetch(`${config.billing_url.replace(/\/+$/, '')}/api/token-events`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.zenn_api_key}`,
-        },
-        body: JSON.stringify({
-          model: spec.model,
-          input_tokens: tokensIn,
-          output_tokens: tokensOut,
-          cost_cents: costCents,
-          agent,
-          run_id: runId,
-          client: 'desktop',
-          client_version: '0.1.0',
-        }),
-      });
-    } catch {
-      // non-fatal
-    }
-  }
+  // NOTE: billing is now handled server-side by /api/agent/responses, which
+  // meters tokens from the zenn stream it forwards. We no longer post here
+  // to avoid double-charging.
 
   onEvent({ type: 'done', data: { runId, tokensIn, tokensOut, costCents } });
 

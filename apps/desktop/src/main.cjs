@@ -5,11 +5,68 @@
 //     or the packaged static export (resources/web/index.html).
 //  4. Inject daemon port + local token into window.bmBridge.
 
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, nativeImage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
+
+const APP_NAME = 'Black Magic';
+const RESOURCES = path.join(__dirname, '..', 'resources');
+const ICON_PNG = path.join(RESOURCES, 'icon.png');
+const ICON_ICNS = path.join(RESOURCES, 'icon.icns');
+
+// Force the app name before app.whenReady(). In dev, macOS still reads
+// CFBundleName from Electron.app/Contents/Info.plist (= "Electron") for the
+// menu bar, but app.setName controls the Dock tooltip, notifications, and
+// user-data dir.
+app.setName(APP_NAME);
+process.title = APP_NAME;
+
+// Dev-mode Dock icon. Packaged builds get this via electron-builder's icon
+// config; in dev we inject it at runtime.
+if (process.platform === 'darwin' && app.dock) {
+  const iconSrc = fs.existsSync(ICON_ICNS) ? ICON_ICNS : ICON_PNG;
+  try { app.dock.setIcon(nativeImage.createFromPath(iconSrc)); } catch {}
+}
+
+// Menu bar: rewrite the application menu so even in dev the first item is
+// "Black Magic" instead of "Electron".
+function buildAppMenu() {
+  const isMac = process.platform === 'darwin';
+  const template = [];
+  if (isMac) {
+    template.push({
+      label: APP_NAME,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    });
+  }
+  template.push(
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+    {
+      role: 'help',
+      submenu: [
+        {
+          label: 'Open vault folder',
+          click: () => shell.openPath(process.env.BM_VAULT_PATH || path.join(os.homedir(), 'BlackMagic')),
+        },
+      ],
+    },
+  );
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 const VAULT_PATH = process.env.BM_VAULT_PATH || path.join(os.homedir(), 'BlackMagic');
 const DISCOVERY_PATH = path.join(VAULT_PATH, '.bm', 'daemon.json');
@@ -73,6 +130,7 @@ async function createWindow() {
     height: 820,
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#FBFAF8',
+    icon: fs.existsSync(ICON_PNG) ? ICON_PNG : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -92,6 +150,9 @@ async function createWindow() {
 
   if (!app.isPackaged && process.env.BM_DEV) {
     win.loadURL('http://localhost:3000');
+    if (process.env.BM_DEVTOOLS === '1') {
+      win.webContents.openDevTools({ mode: 'detach' });
+    }
   } else {
     // The packaged daemon serves the static UI at /. Same-origin with the
     // REST API — no CORS, no file:// asset-path weirdness.
@@ -99,7 +160,23 @@ async function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow);
+ipcMain.handle('bm:open-external', async (_event, url) => {
+  if (typeof url !== 'string') return false;
+  // Allow http/https only.
+  if (!/^https?:\/\//i.test(url)) return false;
+  try {
+    await shell.openExternal(url);
+    return true;
+  } catch (err) {
+    console.error('[main] openExternal failed:', err);
+    return false;
+  }
+});
+
+app.whenReady().then(() => {
+  buildAppMenu();
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (daemonProcess) {
