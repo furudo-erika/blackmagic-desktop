@@ -232,17 +232,52 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function seedDemo() {
+    setSaving(true);
+    setErr(null);
+    try {
+      await api.seedDemo();
+      // Also mark onboarding complete so the gate lifts.
+      await api.completeOnboarding({
+        domain: 'acmecloud.example',
+        what_you_sell: 'Schema-first observability for serverless teams.',
+        icp: '50–500 people; B2B SaaS / fintech API / dev tools; AWS or GCP; 10–80 engineers; no dedicated SRE yet',
+        tone: 'Technically precise, a little dry, never breathless',
+      });
+      await state.refetch();
+    } catch (e: any) {
+      setErr(e?.message || 'failed to load demo');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (state.isLoading) return <>{children}</>;
   if (!state.data?.needsOnboarding) return <>{children}</>;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-cream-light dark:bg-[#17140F] p-6">
       <form onSubmit={submit} className="w-full max-w-xl bg-white dark:bg-[#1F1B15] rounded-2xl border border-line dark:border-[#2A241D] p-8 shadow-sm">
-        <img src="/logo.svg" alt="" width={40} height={40} className="mb-4" />
+        <img src="/logo.svg" alt="" width={40} height={40} className="mb-4 dark:invert" />
         <h1 className="text-xl font-semibold text-ink dark:text-[#F5F1EA] mb-1">Tell us about your company</h1>
-        <p className="text-sm text-muted dark:text-[#8C837C] mb-6">
-          Just your domain is enough — we'll enrich the rest. You can edit anything in <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1 rounded">CLAUDE.md</code> or <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1 rounded">me.md</code> later.
+        <p className="text-sm text-muted dark:text-[#8C837C] mb-4">
+          Just your domain is enough — Black Magic AI will crawl your site and docs to fill in <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1 rounded">us/company.md</code>, <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1 rounded">product/</code>, <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1 rounded">market/</code>, <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1 rounded">brand/</code>, etc. You can edit anything by hand later.
         </p>
+
+        {/* Demo shortcut */}
+        <div className="mb-5 p-3 rounded-lg border border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] flex items-center justify-between gap-3">
+          <div className="text-[12px] text-muted dark:text-[#8C837C]">
+            Just want to poke around? Load the fictional <strong className="text-ink dark:text-[#F5F1EA]">Acme Cloud</strong> demo vault (populated <code className="text-[11px]">us/</code> + one sample prospect + deal).
+          </div>
+          <button
+            type="button"
+            onClick={seedDemo}
+            disabled={saving}
+            className="shrink-0 h-8 px-3 rounded-md border border-flame text-flame text-[12px] font-medium hover:bg-flame hover:text-white transition-colors disabled:opacity-40"
+          >
+            Try demo
+          </button>
+        </div>
 
         <label className="block text-xs text-muted dark:text-[#8C837C] mb-1">Your company domain *</label>
         <input

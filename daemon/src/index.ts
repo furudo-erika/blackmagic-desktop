@@ -18,6 +18,7 @@ import { mcpServerList, McpRegistry } from './mcp.js';
 import { buildOntology } from './ontology.js';
 import { pushTriggers, pushDrafts } from './sync.js';
 import { runCodex, codexAvailable, CodexNotInstalled } from './codex.js';
+import { seedAcmeDemo } from './us-demo.js';
 import {
   PROVIDERS,
   listIntegrations,
@@ -246,6 +247,11 @@ async function main() {
     const isDefault = claude.includes('_One paragraph: what you sell, to whom._');
     const hasSelfCompany = await fs.access(path.join(VAULT_ROOT, 'me.md')).then(() => true).catch(() => false);
     return c.json({ needsOnboarding: isDefault && !hasSelfCompany, claudeDefault: isDefault, hasSelfCompany });
+  });
+
+  app.post('/api/onboarding/demo', async (c) => {
+    const { written } = await seedAcmeDemo(VAULT_ROOT);
+    return c.json({ ok: true, written, demo: 'acme-cloud' });
   });
 
   app.post('/api/onboarding/complete', async (c) => {

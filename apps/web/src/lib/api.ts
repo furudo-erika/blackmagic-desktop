@@ -165,6 +165,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  seedDemo: () =>
+    request<{ ok: true; written: number; demo: string }>('/api/onboarding/demo', {
+      method: 'POST',
+    }),
 };
 
 export type OntologyNode = {

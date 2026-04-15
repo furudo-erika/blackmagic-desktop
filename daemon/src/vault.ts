@@ -17,16 +17,25 @@ const SKELETON_DIRS = [
   'runs',
   // ── who WE are ─────────────────────────────────────────
   // Borrowed from the apidog-team /org/ + /marketing/branding/ pattern.
-  // All user-supplied context about their own company lives here so every
-  // agent can read it the same way.
+  // Each subdirectory is one facet so the agent can page in only what it
+  // needs — e.g. an outbound draft reads brand/ + customers/, but
+  // qualification reads market/.
   'us',
+  'us/product',
+  'us/market',
+  'us/brand',
   'us/competitors',
   'us/customers',
-  'us/docs',
+  'us/team',
+  'us/strategy',
+  'us/sources',   // raw imports from existing repos; agent doesn't edit
   // ───────────────────────────────────────────────────────
   '.bm',
 ];
 
+// One file per concern. Subfolders keep each facet small enough that an
+// agent can fetch just what it needs (brand/ for a draft, market/ for
+// qualification) without loading the whole "about us" dump.
 const US_TEMPLATES: Record<string, string> = {
   'company.md': `---
 kind: us.company
@@ -49,10 +58,20 @@ twitter:
 
 One paragraph about us. What we build, who we serve, why we exist.
 Replace this with your own. The agent reads this on every turn.
+
+## Sub-topics
+- \`us/product/\` — what we sell
+- \`us/market/\` — who we sell to
+- \`us/brand/\` — how we sound
+- \`us/competitors/\` — who we compete against
+- \`us/customers/\` — who buys from us
+- \`us/team/\` — who we are
+- \`us/strategy/\` — where we're going
 `,
 
-  'product.md': `---
-kind: us.product
+  // ── product ────────────────────────────────────────────────
+  'product/overview.md': `---
+kind: us.product.overview
 ---
 
 # What we sell
@@ -60,21 +79,70 @@ kind: us.product
 ## Offer
 What the product does, in one paragraph.
 
-## Pricing
-(Public plans here, or "custom" — either is fine.)
-
 ## Core differentiators
 -
 -
 -
+`,
+  'product/pricing.md': `---
+kind: us.product.pricing
+---
 
-## Common objections + our answer
-- **"Why not [competitor]?"** →
-- **"Why not build in-house?"** →
+# Pricing
+
+## Public plans
+| Plan | Monthly | What's included |
+|---|---|---|
+|  |  |  |
+
+## Notes
+- Annual discount:
+- Usage-based add-ons:
+- Anchor prospects typically pay:
+`,
+  'product/features.md': `---
+kind: us.product.features
+---
+
+# Feature map
+
+Top-level capability areas. One line each, deepest first.
+
+## Area 1
+-
+
+## Area 2
+-
+`,
+  'product/integrations.md': `---
+kind: us.product.integrations
+---
+
+# Integrations
+
+| Category | Tool | Status | Depth |
+|---|---|---|---|
+|  |  |  |  |
+`,
+  'product/roadmap.md': `---
+kind: us.product.roadmap
+---
+
+# Roadmap (shipping public)
+
+## Now
+-
+
+## Next
+-
+
+## Later
+-
 `,
 
-  'icp.md': `---
-kind: us.icp
+  // ── market ─────────────────────────────────────────────────
+  'market/icp.md': `---
+kind: us.market.icp
 ---
 
 # ICP — who we sell to
@@ -95,20 +163,55 @@ We fit best when the prospect already uses:
 
 ## Pain indicators that mean "now is a good time"
 -
--
 
 ## Anti-signals (don't chase)
 -
 `,
+  'market/segments.md': `---
+kind: us.market.segments
+---
 
-  'voice.md': `---
-kind: us.voice
+# Market segments
+
+| Segment | Typical buyer | Typical ACV | Sales motion |
+|---|---|---|---|
+|  |  |  |  |
+`,
+  'market/positioning.md': `---
+kind: us.market.positioning
+---
+
+# Positioning
+
+## Category
+What category are we in?
+
+## Positioning statement
+For **<who>** who **<struggle>**, **<product>** is a **<category>** that **<benefit>**.
+Unlike **<alternative>**, we **<key differentiator>**.
+`,
+  'market/objections.md': `---
+kind: us.market.objections
+---
+
+# Common objections + answers
+
+- **"Why not [competitor]?"** →
+- **"Why not build in-house?"** →
+- **"We already have [incumbent tool]."** →
+- **"Too expensive."** →
+- **"Security / compliance."** →
+`,
+
+  // ── brand ──────────────────────────────────────────────────
+  'brand/voice.md': `---
+kind: us.brand.voice
 ---
 
 # Brand voice
 
 ## Tone
-One-sentence description of how we sound.
+One-sentence description.
 
 ## Always
 -
@@ -116,33 +219,60 @@ One-sentence description of how we sound.
 ## Never
 - Corporate filler ("leverage", "streamline", "robust", "cutting-edge")
 - Hashtag spam
-- Starting with "I hope this email finds you well"
+- "I hope this email finds you well"
 
 ## Length caps
 - Email first-touch: 90 words
 - LinkedIn DM: 60 words
 - Tweet: 270 chars
 `,
-
-  'positioning.md': `---
-kind: us.positioning
+  'brand/messaging.md': `---
+kind: us.brand.messaging
 ---
 
-# Market positioning
+# Messaging by audience
 
-## Category
-What category are we in? What do we tell analysts / the press?
+## Champion (hands-on user)
+-
 
-## Positioning statement
-For **<who>** who **<struggle>**, **<product>** is a **<category>** that **<benefit>**.
-Unlike **<alternative>**, we **<key differentiator>**.
+## Economic buyer
+-
 
-## Messaging by audience
-- **Champion (hands-on user):**
-- **Economic buyer:**
-- **IT / Security:**
+## IT / Security
+-
+
+## Executive sponsor
+-
+`,
+  'brand/visual.md': `---
+kind: us.brand.visual
+---
+
+# Visual identity
+
+- Primary color:
+- Accent color:
+- Typeface:
+- Logo mark (file path / URL):
+- Canonical tagline:
+`,
+  'brand/press.md': `---
+kind: us.brand.press
+---
+
+# Press & social proof
+
+## Published
+-
+
+## Awards / rankings
+-
+
+## Quotable customer lines (approved)
+-
 `,
 
+  // ── competitors ────────────────────────────────────────────
   'competitors/landscape.md': `---
 kind: us.competitors.landscape
 ---
@@ -157,33 +287,106 @@ for deep teardowns.
 |  |  |  |  |  |
 `,
 
+  // ── customers ──────────────────────────────────────────────
   'customers/top.md': `---
 kind: us.customers.top
 ---
 
 # Top customers
 
-Reference-worthy accounts. One-line case-study per row. Link to
-\`us/customers/<slug>.md\` for longer teardowns.
+Reference-worthy accounts. Link to \`us/customers/<slug>.md\` for teardowns.
 
 | Customer | Industry | Size | Why we won | Reference-approved? |
 |---|---|---|---|---|
 |  |  |  |  |  |
 `,
 
-  'decisions.md': `---
-kind: us.decisions
+  // ── team ───────────────────────────────────────────────────
+  'team/roster.md': `---
+kind: us.team.roster
+---
+
+# Team roster
+
+| Name | Role | Joined | LinkedIn | Notes |
+|---|---|---|---|---|
+|  |  |  |  |  |
+`,
+  'team/hiring.md': `---
+kind: us.team.hiring
+---
+
+# Hiring
+
+## Open roles
+-
+
+## Interview signal we bias toward
+-
+`,
+
+  // ── strategy ───────────────────────────────────────────────
+  'strategy/north-star.md': `---
+kind: us.strategy.north-star
+---
+
+# North star
+
+## One sentence
+If we win in 3 years, what is true?
+
+## Strategic pillars
+1.
+2.
+3.
+`,
+  'strategy/goals.md': `---
+kind: us.strategy.goals
+year: 2026
+---
+
+# Goals — 2026
+
+## Revenue
+-
+
+## Product
+-
+
+## Team
+-
+`,
+  'strategy/decisions.md': `---
+kind: us.strategy.decisions
 ---
 
 # Decisions log
 
-Dated entries on why we built/chose what we did. Useful context for the
-agent when it's drafting messaging or deciding next-steps.
+Dated entries on why we built/chose what we did.
 
 ## 2026-xx-xx — <title>
 Decision:
 Reasoning:
 Alternatives considered:
+`,
+
+  // ── sources ────────────────────────────────────────────────
+  'sources/README.md': `# sources/
+
+Drop raw imports here before the agent cleans them up:
+
+- existing Notion / Confluence / Markdown exports
+- scraped website + docs dumps
+- transcripts of founder interviews
+- old internal decks
+
+The agent reads files here to extract \`us/*\` content, but does NOT
+edit them directly — they stay as provenance. Once extracted, move
+originals to \`sources/_archived/<date>/\` or delete.
+
+Run the \`import-legacy-org\` Playbook to pull from an external
+directory; run \`bootstrap-self\` to build \`us/\` from your domain +
+docs URL.
 `,
 };
 
@@ -413,30 +616,38 @@ Build the user's own company knowledge pack from their website.
 
 1. Fetch the domain's home page via \`web_fetch({{domain}})\`. If the user
    provided \`{{docs_url}}\` or \`{{extra_urls}}\` (comma-separated), fetch
-   those too. Also \`web_search\` for "{{domain}} funding", "{{domain}}
-   competitors", "{{domain}} pricing", "{{domain}} customers" to fill gaps.
-2. If \`{{docs_url}}\` was provided, run \`deep_research\` once with focus
-   "technical" against it to extract a product feature map.
-3. Populate the following files (overwrite existing only if empty or
-   still at the seed template):
-     - \`us/company.md\` — frontmatter (name, domain, stage, founded, hq,
-       employee_count, founders) + one-paragraph narrative
-     - \`us/product.md\` — offer, pricing (if public), 3 differentiators,
-       common objections
-     - \`us/icp.md\` — inferred from customer logos + case studies +
-       testimonials; call out unknowns explicitly
-     - \`us/voice.md\` — tone, sample phrases from blog + marketing copy,
-       forbidden words
-     - \`us/positioning.md\` — category + positioning statement + per-
-       audience messaging
-     - \`us/competitors/landscape.md\` — top 3-5 competitors as a row table
-     - \`us/customers/top.md\` — 5-10 named customers (if public) with
-       industry + one-line case context
-     - \`us/decisions.md\` — skip unless the user supplied extra context
+   those too. Also use built-in web_search for "{{domain}} funding",
+   "{{domain}} competitors", "{{domain}} pricing", "{{domain}} customers"
+   to fill gaps.
+2. If \`{{docs_url}}\` was provided, run \`deep_research\` once with
+   focus "technical" against it to extract a product feature map.
+3. Populate the following files (overwrite only if still at the seed
+   template — never clobber user edits):
+     - \`us/company.md\` — frontmatter (name, domain, one_liner, stage,
+       founded, hq, employee_count, founders, website, blog, docs,
+       linkedin, twitter) + one-paragraph narrative
+     - \`us/product/overview.md\` — offer + 3 differentiators
+     - \`us/product/pricing.md\` — public plan table (if listed)
+     - \`us/product/features.md\` — capability areas (from /features or
+       from the docs if provided)
+     - \`us/product/integrations.md\` — tools they list
+     - \`us/market/icp.md\` — inferred from customer logos + case
+       studies + testimonials; call out unknowns explicitly
+     - \`us/market/segments.md\` — SMB vs mid-market vs enterprise if
+       pricing tiers suggest segmentation
+     - \`us/market/positioning.md\` — category + positioning statement
+     - \`us/market/objections.md\` — pull from FAQ / comparison pages
+     - \`us/brand/voice.md\` — tone, sample phrases from blog + marketing
+       copy, forbidden words
+     - \`us/brand/messaging.md\` — per-audience lines
+     - \`us/competitors/landscape.md\` — top 3-5 with a row table
+     - \`us/customers/top.md\` — 5-10 named customers (if public)
+     - \`us/team/roster.md\` — founders + execs from /about
+     - \`us/strategy/north-star.md\` — skip unless evident from the site
 4. Cite sources inline (URLs) for every factual claim. Where the site
    doesn't say, write \`unknown\` — never invent.
-5. Reply to the user with: a 3-bullet summary of what's filled in, and
-   the single biggest gap they should fill by hand.
+5. Reply with: a 3-bullet summary of what's filled in, and the single
+   biggest gap the user should fill by hand.
 `,
 
   'import-legacy-org.md': `---
@@ -448,22 +659,35 @@ inputs: [{ name: source_dir, required: true }]
 ---
 
 Port a legacy apidog-team-style /org/ + /marketing/branding/ directory
-into this vault's \`us/\` structure.
+into this vault's \`us/\` subfolder structure.
 
 ## Steps
 
-1. Read every \`.md\` under \`{{source_dir}}\` with \`list_dir\` + \`read_file\`.
-2. Map content into the \`us/\` schema:
-     - marketing-strategy.md → \`us/positioning.md\` + \`us/icp.md\`
-     - competitive-landscape.md + competitors.json → \`us/competitors/\`
-     - top-customers.md → \`us/customers/top.md\`
-     - brand-voice.md → \`us/voice.md\`
-     - decisions-log.md → \`us/decisions.md\`
-     - (anything else) → summarise into \`us/decisions.md\` as a dated note
-3. Preserve source attribution as a small footer in each migrated file:
-   \`> Imported from <source path> on <iso>\`.
-4. After writing, diff-report: for each file you wrote, one line on what
-   you pulled from which source.
+1. Read every \`.md\` / \`.json\` under \`{{source_dir}}\` with \`list_dir\`
+   + \`read_file\`.
+2. **Also copy the raw source files to \`us/sources/imported-<iso>/\`
+   first** so we preserve provenance before any rewriting.
+3. Map content into the new \`us/\` schema:
+     - \`strategy/marketing-strategy.md\`   → \`us/market/positioning.md\`
+       + \`us/market/icp.md\` + \`us/strategy/north-star.md\`
+     - \`competitors/competitive-landscape.md\` + \`competitors.json\`
+       → \`us/competitors/landscape.md\` and one \`us/competitors/<slug>.md\`
+       per tracked competitor
+     - \`customers/top-customers.md\`       → \`us/customers/top.md\`
+       + one \`us/customers/<slug>.md\` per named account
+     - \`marketing/branding/voice/brand-voice.md\` → \`us/brand/voice.md\`
+     - \`marketing/branding/positioning/market-positioning.md\`
+       → merge into \`us/market/positioning.md\`
+     - \`marketing/branding/visual/visual-identity.md\` → \`us/brand/visual.md\`
+     - \`decisions-log.md\`                 → \`us/strategy/decisions.md\`
+     - \`docs/product-knowledge/MOC-PRODUCT.md\` + docs index
+       → \`us/product/features.md\` + \`us/product/integrations.md\`
+     - \`team/*.md\` (if present)           → \`us/team/roster.md\`
+     - anything unclassified                → \`us/strategy/decisions.md\`
+       as a dated "imported" note
+4. Every migrated file gets a footer: \`> Imported from <source path> on <iso>\`.
+5. After writing, reply with a diff report: for each file you wrote,
+   one line saying which source file(s) it pulled from.
 `,
 
   'deep-research-account.md': `---
