@@ -27,6 +27,7 @@ function render(template: string, values: Record<string, string>): string {
 // Friendly group labels keyed off the `group:` frontmatter field that the
 // seeded playbooks use. Order here is the order they appear in the UI.
 const GROUPS: Array<{ id: string; label: string; description: string; color: string }> = [
+  { id: 'swan-gtm', label: 'Swan-style GTM starter pack', description: 'Visitor ID, signal-based outbound, lead qualification, ICP tuning, demand-gen briefs, sales research, RevOps pipeline health.', color: '#E8523A' },
   { id: 'building-blocks', label: 'Building blocks', description: 'Used by other Playbooks. Run them on their own only when you need to.', color: '#605A57' },
   { id: 'setup', label: 'Setup', description: 'One-time configuration — bootstrap your company info, import legacy data.', color: '#9A8C6E' },
   { id: 'research', label: 'Research', description: 'Build account briefs and competitor reports.', color: '#7E8C67' },

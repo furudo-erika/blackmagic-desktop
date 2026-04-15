@@ -22,6 +22,11 @@ const SKELETON_DIRS = [
   'signals/mentions',
   'signals/competitors',
   'signals/news',
+  // External pixel/script drops per-date JSON here. visitor-identify
+  // playbook sweeps it and writes companies/ + contacts/.
+  'signals/visitors',
+  // RevOps weekly pipeline-health reports.
+  'signals/pipeline-health',
   // ── who WE are ─────────────────────────────────────────
   // Borrowed from the apidog-team /org/ + /marketing/branding/ pattern.
   // Each subdirectory is one facet so the agent can page in only what it
@@ -1255,6 +1260,292 @@ Daily industry news scan.
 5. Reply with the single most important item and one sentence on
    whether it suggests any outbound angle this week.
 `,
+
+  // === Swan-style GTM pack =================================================
+  // Out-of-the-box equivalents of getswan.com's core flows. Each plays well
+  // with zero integrations configured (falls back to web_fetch + the model's
+  // built-in web_search) and better if ENRICHLAYER_API_KEY / APIFY_API_KEY
+  // are set.
+  'visitor-identify.md': `---
+kind: playbook
+name: visitor-identify
+group: swan-gtm
+agent: researcher
+inputs: [{ name: date, required: false }]
+---
+
+Sweep anonymous visitor logs, de-anonymise to companies, score for ICP fit.
+
+## Steps
+
+1. Read \`signals/visitors/{{date}}.json\` (default: today UTC). Shape is a
+   JSON array of \`{ ip, domain?, company?, pages, ts }\`. If the file
+   does not exist, reply "no visitor log for {{date}} — install a pixel
+   first" and stop. If the file is empty, write a "quiet day" note and stop.
+2. For every unique \`domain\` (or \`company\`) in the log, skip consumer
+   ISPs and our own domain. Cap at 25 per run.
+3. For each survivor, call \`enrich_company\` on the domain. If that
+   returns an \`error\` (no proxy key), fall back to
+   \`scrape_apify_actor({ actorId: "code_crafter/apollo-io-scraper",
+   input: { domain } })\` — Apollo's actor returns company + top contacts.
+   If both fail (no \`APIFY_API_KEY\`), just \`web_fetch\` the homepage and
+   parse title/description for a minimum viable record.
+4. Score ICP fit 0-100 vs \`us/market/icp.md\` (fall back to \`us/company.md\`).
+5. Write \`companies/<slug>.md\` with frontmatter
+   \`kind: company, source: visitor-id, domain, intent_score, visit_count,
+   pages_viewed, enriched_at\` and a one-paragraph body. Top 3 contacts per
+   company go to \`contacts/<slug>-<name>.md\` with
+   \`kind: contact, company, title, linkedin\`.
+6. Reply: top 5 companies by \`intent_score\` with one-line why.
+`,
+
+  'signal-based-outbound.md': `---
+kind: playbook
+name: signal-based-outbound
+group: swan-gtm
+agent: sdr
+inputs: []
+---
+
+Draft contextual outbound emails anchored on the latest signal per company.
+
+## Steps
+
+1. Read the newest file from each of \`signals/mentions/\`,
+   \`signals/competitors/\`, \`signals/news/\`, \`signals/visitors/\`.
+   If all four are empty, reply "no fresh signals yet" and stop.
+2. Group signal items by referenced company (match on domain or
+   company name; skip items with no company attribution).
+3. For each signal-bearing company (cap 15 per run):
+     a. Read \`companies/<slug>.md\` — create a stub via \`enrich-company\`
+        if missing.
+     b. Pick the single strongest signal. Craft a first-touch email
+        that *explicitly references it* (e.g. "saw your team posted
+        about X", "noticed you switched from competitor Y last week",
+        "congrats on the Series B — related to why we built Z for
+        teams in your stage").
+     c. Pull voice + length caps from \`us/brand/voice.md\`. 90 words max.
+     d. Pick the best contact from \`contacts/<slug>-*.md\` (prefer
+        champion titles from \`us/market/icp.md\`). If none exist, skip
+        the email and write a TODO note to the company file instead.
+4. Write each draft to \`drafts/<slug>-<YYYY-MM-DD>.md\` with frontmatter
+   \`kind: draft, channel: email, status: pending, signal_ref: <path>,
+   tool: gmail.send_email\` and the email body below.
+5. Reply with a bulleted list of drafts written + the signal each one
+   references.
+`,
+
+  'lead-qualify.md': `---
+kind: playbook
+name: lead-qualify
+group: swan-gtm
+agent: researcher
+inputs: [{ name: contact_path, required: true }]
+---
+
+Score a contact for ICP fit and label with a tier.
+
+## Steps
+
+1. Read \`{{contact_path}}\`. Pull \`company\`, \`domain\`, \`linkedin\`, \`title\`.
+2. Load the ICP: prefer \`us/market/icp.md\`; fall back to \`us/company.md\`
+   if the ICP file is still a seed template. Extract size, industry,
+   tech-stack, geo criteria and anti-signals.
+3. Gather evidence:
+     - \`web_fetch\` the company's homepage + \`/about\` + \`/careers\` (best
+       effort — a 404 is fine, just note it).
+     - If the contact has a \`linkedin\` URL, call
+       \`enrich_contact_linkedin({ linkedinUrl })\`. If it returns an
+       \`ENRICHLAYER_API_KEY\` error, skip silently — qualification still
+       works from web evidence.
+4. Score 0-100 on each criterion, sum-average to an overall
+   \`qualification_score\`. Map to \`qualification_tier\`: A (≥75),
+   B (50-74), C (30-49), disqualified (<30 or anti-signal hit).
+5. \`edit_file\` the contact frontmatter to set:
+   \`qualification_score\`, \`qualification_tier\`,
+   \`qualification_reason\` (one line), \`qualified_at\` (iso).
+6. Append a \`## Qualification (YYYY-MM-DD)\` section to the body listing
+   each criterion with PASS/FAIL/UNKNOWN + the evidence source.
+7. Reply with \`<name> — Tier <X> (<score>): <one-line reason>\`.
+`,
+
+  'enrich-contact-deep.md': `---
+kind: playbook
+name: enrich-contact-deep
+group: swan-gtm
+agent: researcher
+inputs: [{ name: contact_path, required: true }]
+---
+
+Deep enrichment beyond a basic LinkedIn scrape.
+
+## Steps
+
+1. Read \`{{contact_path}}\`. Pull \`linkedin\`, \`company\`, \`domain\`.
+2. If \`linkedin\` is present, call
+   \`enrich_contact_linkedin({ linkedinUrl })\`. On
+   \`ENRICHLAYER_API_KEY\` error, note it and continue — the rest still
+   works.
+3. If \`domain\` is present, \`web_fetch\` the following and summarise each
+   in one line: \`/about\`, \`/team\` (or \`/company\`), \`/careers\` (or
+   \`/jobs\`). 404 is fine, just skip.
+4. Run \`deep_research({ query: "Latest 90 days news on <company>:
+   funding, exec hires, product launches, press", focus: "company" })\`
+   — skip if the domain looks trivial / consumer.
+5. Merge results and \`edit_file\` the contact frontmatter to set any of:
+   \`title\`, \`seniority\` (ic | manager | director | vp | c-level),
+   \`company_size\`, \`industry\`, \`recent_news\` (≤ 120 chars),
+   \`linkedin_summary\` (≤ 240 chars). Only overwrite fields you have
+   evidence for — leave the rest untouched.
+6. Append a \`## Enrichment (YYYY-MM-DD)\` section to the contact body
+   with cited URLs for every factual claim.
+7. Reply with the 3 freshest data points you added.
+`,
+
+  'icp-tune.md': `---
+kind: playbook
+name: icp-tune
+group: swan-gtm
+agent: researcher
+inputs: []
+---
+
+RevOps weekly: learn the ICP from what's actually working.
+
+## Steps
+
+1. \`list_dir companies/\` and \`list_dir contacts/\`. Read every file.
+2. Build two cohorts:
+     - **Winners** — files with \`tier: A\` OR \`intent_score >= 80\`
+       OR \`qualification_tier: A\` in frontmatter, OR companies linked
+       from \`deals/closed-won/\`.
+     - **Losers** — \`tier: disqualified\` or \`qualification_tier: disqualified\`.
+   If the winner set is empty (< 3 examples), reply "need at least 3
+   tier-A examples before retuning — come back in a week" and stop.
+3. Across the winner cohort, extract common patterns:
+     - industry mode + top-2 industries
+     - headcount range (p25 / median / p75)
+     - tech-stack tokens seen 2+ times
+     - dominant signal source (visitor-id, brand-mention, news,
+       inbound demo, etc.)
+4. Read current \`us/market/icp.md\`. \`edit_file\` it to refine:
+     - tighten size range
+     - add / promote industries that appear in winners
+     - add tech-stack signals seen in ≥ 30% of winners
+     - add anti-signals for anything common in losers but absent in
+       winners
+5. Append a \`## Tuning log (YYYY-MM-DD)\` section listing every change
+   and the sample size it's drawn from — never silently rewrite.
+6. Reply with a 3-bullet diff: what got tightened, what got added, what
+   evidence it's drawn from.
+`,
+
+  'demand-gen-content-brief.md': `---
+kind: playbook
+name: demand-gen-content-brief
+group: swan-gtm
+agent: researcher
+inputs: [{ name: keyword, required: false }]
+---
+
+Demand-gen: produce a content brief anchored on a target keyword.
+
+## Steps
+
+1. Resolve the keyword: if \`{{keyword}}\` is empty, read
+   \`us/strategy/target-keywords.md\` and pick the top unworked one (one
+   without an existing brief in \`us/strategy/content/briefs/\`). If that
+   file doesn't exist or is empty, reply "pass a keyword or fill
+   \`us/strategy/target-keywords.md\` first" and stop.
+2. Use the model's built-in \`web_search\` for the keyword and capture:
+     - top 10 SERP URLs + titles
+     - 3 "People also ask" style questions if visible
+     - any featured snippet / answer box content
+3. \`web_fetch\` the top-3 result pages; summarise each in 2 lines.
+4. Scan \`us/sources/docs/\` and \`us/product/\` for existing content we
+   can internally link to — list up to 5 candidate links.
+5. Produce a brief at \`us/strategy/content/briefs/<slug>.md\`:
+     - frontmatter: \`kind: content-brief, keyword, target_serp (3-5
+       urls), est_word_count, primary_cta, created_at\`
+     - body: H1 (working title, ≤60 chars), 4-6 H2s with one-line intent
+       each, angle-of-attack (what we say that top-3 don't), internal
+       links block, suggested CTAs (product demo, newsletter, gated
+       asset) keyed off \`us/brand/messaging.md\`.
+6. Reply with the title, the 4-6 H2s, and the single wedge we have vs
+   the top result.
+`,
+
+  'sales-account-research.md': `---
+kind: playbook
+name: sales-account-research
+group: swan-gtm
+agent: researcher
+inputs: [{ name: domain, required: true }]
+---
+
+Sales rep one-pager: who they are, why now, who to open with.
+
+## Steps
+
+1. Slugify \`{{domain}}\` → \`<slug>\`. If \`companies/<slug>.md\` doesn't
+   exist, call \`enrich_company({ domain })\` first; on error, fall back
+   to \`web_fetch({{domain}})\` + built-in \`web_search\` for basic
+   firmographics.
+2. Run \`deep_research({ query: "Account brief on {{domain}}: last 90d
+   news (funding, exec hires, launches), tech stack from jobs + repos,
+   GTM motion, top competitors they compare to, one trigger event we
+   can open on. Cite every claim.", focus: "company" })\`.
+3. Pick 3-5 likely buyer titles (from \`us/market/icp.md\` buying
+   committee or default: VP Eng, Head of Platform, CTO, RevOps lead).
+   For each, if \`APIFY_API_KEY\` is set, call
+   \`scrape_apify_actor({ actorId: "code_crafter/apollo-io-scraper",
+   input: { domain: "{{domain}}", titles: [...] } })\`. Otherwise list
+   them as TODO contacts with just \`title\` + \`company\`.
+4. Write \`companies/<slug>-research.md\` with frontmatter
+   \`kind: company-research, domain, updated_at\` and body sections:
+     - **Who they are** (2 sentences)
+     - **Why now** (the single trigger event, cited)
+     - **Tech-stack guesses** (2-3 bullets, sourced from jobs / repos)
+     - **Who to open with** (3-5 titles, names if we found them)
+     - **Opener** (≤ 60 words, references the trigger event, no filler)
+5. Save each buyer to \`contacts/<slug>-<person-slug>.md\` with
+   frontmatter \`kind: contact, company: {{domain}}, title, linkedin?,
+   source: sales-account-research\`.
+6. Reply with the opener line + the path to the brief.
+`,
+
+  'revops-pipeline-health.md': `---
+kind: playbook
+name: revops-pipeline-health
+group: swan-gtm
+agent: ae
+inputs: [{ name: stale_days, required: false }]
+---
+
+Weekly pipeline-health report across all open deals.
+
+## Steps
+
+1. \`list_dir deals/open/\`. Read every \`.md\` file. If empty, write a
+   "no open deals this week" report and stop.
+2. For each deal: pull \`stage\`, \`value_usd\`, \`updated_at\`,
+   \`next_step\`, \`health\`, \`owner\`. Default stale-threshold is 7
+   days — override via \`{{stale_days}}\`.
+3. Bucket deals:
+     - \`stuck\` — no \`updated_at\` change in ≥ \`stale_days\`
+     - \`no_next_step\` — missing or empty \`next_step\`
+     - \`at_risk\` — \`health: red\` OR close date pushed twice+
+     - \`healthy\` — everything else
+4. Sum \`value_usd\` per bucket. Compute stage distribution.
+5. Write \`signals/pipeline-health/<YYYY-MM-DD>.md\` with frontmatter
+   \`kind: report, date, total_open, stuck_count, at_risk_count,
+   stuck_arr, at_risk_arr\` and a body with:
+     - headline: "N open deals, $X ARR — Y stuck, Z at risk"
+     - table of buckets (stage, owner, value, last update, next step)
+     - top-5 "act this week" — the deals to unblock first, sorted by
+       ARR at risk × days stuck
+6. Reply with the headline + the top-5 deals to unblock.
+`,
 };
 
 // Multi-touch drip sequences. A sequence is an ordered list of touches with
@@ -1328,6 +1619,56 @@ touches:
 
 Enroll a contact right after a discovery or demo call. Stops on reply.
 `,
+
+  'post-signal-5-touch.md': `---
+kind: sequence
+name: post-signal-5-touch
+description: >-
+  Five-touch drip for contacts who trip a high-intent signal (intent_score >=
+  80). Each touch references the signal-based-outbound playbook so context
+  stays grounded in what actually happened.
+enrollment_rule: intent_score >= 80
+touches:
+  - day: 0
+    channel: email
+    playbook: signal-based-outbound
+    prompt: >-
+      Contextual intro to {{contact_path}}. Reference the exact signal that
+      triggered enrollment (from signals/* or the contact's frontmatter).
+      <=90 words, one CTA, no filler.
+  - day: 2
+    channel: email
+    playbook: signal-based-outbound
+    prompt: >-
+      Bump on the day-0 thread with one relevant case-study link from
+      us/customers/ or us/brand/press.md. <=50 words.
+  - day: 5
+    channel: email
+    playbook: signal-based-outbound
+    prompt: >-
+      Specific value-prop touch to {{contact_path}}: tie one line from
+      us/product/overview.md to the signal's implied pain. <=80 words.
+  - day: 10
+    channel: email
+    playbook: signal-based-outbound
+    prompt: >-
+      Break-up email. "Timing might be off — want me to check back next
+      quarter?" <=35 words.
+  - day: 21
+    channel: email
+    playbook: signal-based-outbound
+    prompt: >-
+      Polite re-open. Reference any *new* signal from signals/* for the
+      same company; if none, share a fresh data point from us/product or
+      a recent us/brand/press.md win. <=70 words.
+---
+
+# Post-signal 5-touch
+
+For contacts who tripped a Swan-style signal (visitor-id, competitor
+switch, funding, high-intent brand mention). Enroll right after the
+signal-based-outbound playbook drafts its first touch.
+`,
 };
 
 // Preset triggers installed on demand from the Triggers UI. Kept separate
@@ -1370,6 +1711,49 @@ enabled: true
 
 Daily 07:00 industry-news digest, keyed off positioning + ICP keywords
 from \`us/market/\`. Results land in \`signals/news/<date>.md\`.
+`,
+
+  // ── Swan-style GTM triggers ─────────────────────────────────────────────
+  // These assume the Swan-style starter playbooks exist in every vault
+  // (seeded by DEFAULT_PLAYBOOKS). Visitor sweep expects an external pixel
+  // or script to be writing to signals/visitors/<date>.json — without that
+  // the playbook no-ops gracefully.
+  'swan-daily-visitor-sweep.md': `---
+kind: trigger
+name: swan-daily-visitor-sweep
+schedule: '0 8 * * 1-5'
+playbook: visitor-identify
+enabled: true
+---
+
+Weekday 08:00 sweep of \`signals/visitors/<YYYY-MM-DD>.json\`. Expects an
+external pixel or script to drop that file (see the getting-started
+guide). De-anonymises to companies, scores ICP fit, promotes top
+accounts to \`companies/\` + \`contacts/\`.
+`,
+  'swan-weekly-icp-tune.md': `---
+kind: trigger
+name: swan-weekly-icp-tune
+schedule: '0 9 * * 1'
+playbook: icp-tune
+enabled: true
+---
+
+Monday 09:00 RevOps sweep. Reads what's currently in \`companies/\` +
+\`contacts/\` + \`deals/closed-won/\`, identifies shared traits of your
+winners, and refines \`us/market/icp.md\` with evidence-cited edits.
+`,
+  'swan-weekly-pipeline-health.md': `---
+kind: trigger
+name: swan-weekly-pipeline-health
+schedule: '0 8 * * 1'
+playbook: revops-pipeline-health
+enabled: true
+---
+
+Monday 08:00 pipeline-health report. Flags stuck deals, missing
+next-steps, and at-risk ARR. Writes a dated report under
+\`signals/pipeline-health/<date>.md\`.
 `,
 };
 

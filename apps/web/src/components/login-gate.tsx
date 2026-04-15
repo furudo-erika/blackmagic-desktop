@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { getBridge, setBridge } from '../lib/bridge';
@@ -306,7 +307,14 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   }
 
   if (state.isLoading) return <>{children}</>;
-  if (!state.data?.needsOnboarding) return <>{children}</>;
+  if (!state.data?.needsOnboarding) {
+    return (
+      <>
+        <GettingStartedRedirector />
+        {children}
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-cream-light dark:bg-[#17140F] p-6">
@@ -392,4 +400,24 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
       </form>
     </div>
   );
+}
+
+/**
+ * If the user is freshly through sign-in + onboarding and hasn't seen the
+ * Getting-started guide yet, bounce them to it once. Safe no-op afterwards
+ * because localStorage `bm-seen-getting-started` is set on dismiss.
+ *
+ * Only redirects from `/` so a refresh on `/integrations` (etc.) doesn't
+ * yank the user out of what they were doing.
+ */
+function GettingStartedRedirector() {
+  const router = useRouter();
+  const pathname = usePathname();
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (pathname !== '/') return;
+    if (localStorage.getItem('bm-seen-getting-started') === '1') return;
+    router.replace('/getting-started');
+  }, [pathname, router]);
+  return null;
 }
