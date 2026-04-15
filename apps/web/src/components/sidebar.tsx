@@ -131,7 +131,7 @@ export function Sidebar() {
         className="pt-10 pb-3 pl-[84px] pr-4 flex items-center gap-2"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <span className="inline-block w-5 h-5 rounded-full bg-flame shrink-0" />
+        <img src="/logo.svg" alt="" className="w-5 h-5 shrink-0 dark:invert" />
         <span className="font-semibold tracking-tight text-[14px] text-ink dark:text-[#F5F1EA] truncate">
           Black Magic
         </span>
