@@ -2,6 +2,15 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { Send, Mail } from 'lucide-react';
+import {
+  PageShell,
+  PageHeader,
+  PageBody,
+  Panel,
+  EmptyState,
+  Button,
+} from '../../components/ui/primitives';
 
 type Draft = { path: string; frontmatter: Record<string, unknown>; body: string };
 
@@ -33,53 +42,67 @@ export default function OutreachPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['drafts'] }),
   });
 
+  const items = drafts.data ?? [];
+
   return (
-    <div className="h-full flex flex-col">
-      <header className="px-6 py-4 border-b border-line">
-        <h1 className="text-lg font-semibold">Outreach</h1>
-        <p className="text-xs text-muted">Drafts awaiting human approval before send.</p>
-      </header>
-      <div className="h-full overflow-y-auto px-6 py-6">
-        {drafts.isLoading && <div className="text-sm text-muted">loading…</div>}
+    <PageShell>
+      <PageHeader
+        title="Outreach"
+        subtitle="Drafts waiting for your approve/reject before the agent sends them."
+        icon={Send}
+      />
+      <PageBody maxWidth="2xl">
+        {drafts.isLoading && <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>}
         {drafts.error && <div className="text-sm text-flame">{(drafts.error as Error).message}</div>}
-        <div className="space-y-3 max-w-2xl">
-          {drafts.data?.map((d) => {
-            const fm = d.frontmatter;
-            return (
-              <div key={d.path} className="bg-white rounded-xl border border-line p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-muted font-mono">
-                      {String(fm.channel ?? '')} · {String(fm.status ?? 'pending')}
+
+        {!drafts.isLoading && !drafts.error && items.length === 0 && (
+          <EmptyState
+            icon={Mail}
+            title="No drafts pending."
+            hint="When an agent composes an email or LinkedIn DM, it will land here for your approval before send."
+          />
+        )}
+
+        {items.length > 0 && (
+          <div className="space-y-3">
+            {items.map((d) => {
+              const fm = d.frontmatter;
+              return (
+                <Panel key={d.path}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[10px] uppercase tracking-wider text-muted dark:text-[#8C837C] font-mono">
+                        {String(fm.channel ?? '')} · {String(fm.status ?? 'pending')}
+                      </div>
+                      <div className="text-sm font-semibold text-ink dark:text-[#F5F1EA] mt-1 truncate">
+                        {String(fm.subject ?? '(no subject)')}
+                      </div>
+                      <div className="text-[11px] text-muted dark:text-[#8C837C] font-mono truncate">
+                        to: {String(fm.to ?? '')}
+                      </div>
                     </div>
-                    <div className="text-sm font-semibold text-ink mt-1">{String(fm.subject ?? '(no subject)')}</div>
-                    <div className="text-xs text-muted">to: {String(fm.to ?? '')}</div>
                   </div>
-                </div>
-                <div className="mt-3 text-xs whitespace-pre-wrap text-ink/80">
-                  {d.body.slice(0, 200)}
-                  {d.body.length > 200 && '…'}
-                </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    onClick={() => approve.mutate(d.path)}
-                    className="h-8 px-3 rounded-md bg-flame text-white text-xs hover:opacity-90"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => reject.mutate(d.path)}
-                    className="h-8 px-3 rounded-md border border-line text-xs hover:border-flame"
-                  >
-                    Reject
-                  </button>
-                  <span className="text-xs text-muted">approve/reject not yet wired</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+                  <div className="mt-3 text-[12px] whitespace-pre-wrap text-ink/80 dark:text-[#E6E0D8]/80 leading-relaxed">
+                    {d.body.slice(0, 280)}
+                    {d.body.length > 280 && '…'}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-line dark:border-[#2A241D] flex items-center gap-2">
+                    <Button variant="primary" onClick={() => approve.mutate(d.path)}>
+                      Approve
+                    </Button>
+                    <Button variant="secondary" onClick={() => reject.mutate(d.path)}>
+                      Reject
+                    </Button>
+                    <span className="ml-auto text-[11px] text-muted dark:text-[#8C837C]">
+                      approve/reject not yet wired
+                    </span>
+                  </div>
+                </Panel>
+              );
+            })}
+          </div>
+        )}
+      </PageBody>
+    </PageShell>
   );
 }

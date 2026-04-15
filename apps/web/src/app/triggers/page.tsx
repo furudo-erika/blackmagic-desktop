@@ -1,9 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { getBridge } from '../../lib/bridge';
+import { Zap, Play, Search } from 'lucide-react';
+import {
+  PageShell,
+  PageHeader,
+  PageBody,
+  Panel,
+  EntityList,
+  EntityRow,
+  EmptyState,
+  Button,
+} from '../../components/ui/primitives';
 
 type Trigger = { path: string; frontmatter: Record<string, unknown> };
 
@@ -14,6 +25,7 @@ type FireResult =
 
 export default function TriggersPage() {
   const qc = useQueryClient();
+  const [q, setQ] = useState('');
   // Map of trigger name → last fire result, so we can show a "view log" link
   // per-trigger after shell runs finish.
   const [lastFire, setLastFire] = useState<Record<string, FireResult>>({});
@@ -58,10 +70,13 @@ export default function TriggersPage() {
   const fire = useMutation({
     mutationFn: async (name: string): Promise<FireResult & { name: string }> => {
       const { daemonPort, daemonToken } = getBridge();
-      const res = await fetch(`http://127.0.0.1:${daemonPort}/api/triggers/${encodeURIComponent(name)}/fire`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${daemonToken}` },
-      });
+      const res = await fetch(
+        `http://127.0.0.1:${daemonPort}/api/triggers/${encodeURIComponent(name)}/fire`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${daemonToken}` },
+        },
+      );
       if (res.status === 404) return { ok: false, coming: true, name };
       if (!res.ok) throw new Error(`${res.status}`);
       const json = await res.json().catch(() => ({} as any));
@@ -78,121 +93,185 @@ export default function TriggersPage() {
     },
   });
 
+  const filtered = useMemo(() => {
+    const all = triggers.data ?? [];
+    const filter = q.trim().toLowerCase();
+    if (!filter) return all;
+    return all.filter((t) => {
+      const name = String(t.frontmatter.name ?? '').toLowerCase();
+      const pb = String(t.frontmatter.playbook ?? '').toLowerCase();
+      const shell = String(t.frontmatter.shell ?? '').toLowerCase();
+      const sched = String(t.frontmatter.schedule ?? t.frontmatter.cron ?? '').toLowerCase();
+      return name.includes(filter) || pb.includes(filter) || shell.includes(filter) || sched.includes(filter);
+    });
+  }, [triggers.data, q]);
+
   return (
-    <div className="h-full flex flex-col">
-      <header className="px-6 py-4 border-b border-line">
-        <h1 className="text-lg font-semibold">Triggers</h1>
-        <p className="text-xs text-muted">Cron + webhook triggers from your vault.</p>
-      </header>
-      <div className="h-full overflow-y-auto px-6 py-6">
-        <div className="max-w-2xl mb-6 bg-white rounded-xl border border-line p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm font-semibold text-ink">Presets</div>
-              <div className="text-xs text-muted mt-1">
-                Install the brand-monitor bundle: daily brand-mention sweep,
-                weekly competitor teardown, daily industry-news digest. All
-                write to <span className="font-mono">signals/</span>.
-              </div>
+    <PageShell>
+      <PageHeader
+        title="Triggers"
+        subtitle="Things that fire on a cron schedule — run a Playbook or a shell command automatically."
+        icon={Zap}
+        trailing={
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-muted dark:text-[#8C837C]" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Filter…"
+              className="w-48 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md pl-7 pr-3 py-1.5 text-xs text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+            />
+          </div>
+        }
+      />
+      <PageBody maxWidth="3xl">
+        <Panel className="mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-ink dark:text-[#F5F1EA]">Presets</div>
+              <p className="text-xs text-muted dark:text-[#8C837C] mt-1">
+                Install the brand-monitor bundle: daily brand-mention sweep, weekly competitor
+                teardown, daily industry-news digest. All write to{' '}
+                <span className="font-mono">signals/</span>.
+              </p>
+              {installPresets.data && (
+                <div className="text-xs text-muted dark:text-[#8C837C] mt-3">
+                  {installPresets.data.created.length > 0
+                    ? `Installed: ${installPresets.data.created.join(', ')}`
+                    : 'All presets already installed.'}
+                  {installPresets.data.existing.length > 0 && installPresets.data.created.length > 0
+                    ? ` · Skipped: ${installPresets.data.existing.join(', ')}`
+                    : ''}
+                </div>
+              )}
+              {installPresets.error && (
+                <div className="text-xs text-flame mt-3">{(installPresets.error as Error).message}</div>
+              )}
             </div>
-            <button
+            <Button
+              variant="secondary"
               onClick={() => installPresets.mutate()}
               disabled={installPresets.isPending}
-              className="h-8 px-3 rounded-md border border-line text-xs hover:border-flame disabled:opacity-50 whitespace-nowrap ml-4"
+              className="whitespace-nowrap"
             >
               {installPresets.isPending ? 'Installing…' : 'Install brand-monitor presets'}
-            </button>
+            </Button>
           </div>
-          {installPresets.data && (
-            <div className="text-xs text-muted mt-3">
-              {installPresets.data.created.length > 0
-                ? `Installed: ${installPresets.data.created.join(', ')}`
-                : 'All presets already installed.'}
-              {installPresets.data.existing.length > 0 && installPresets.data.created.length > 0
-                ? ` · Skipped: ${installPresets.data.existing.join(', ')}`
-                : ''}
-            </div>
-          )}
-          {installPresets.error && (
-            <div className="text-xs text-flame mt-3">{(installPresets.error as Error).message}</div>
-          )}
-        </div>
-        {triggers.isLoading && <div className="text-sm text-muted">loading…</div>}
-        {triggers.error && <div className="text-sm text-flame">{(triggers.error as Error).message}</div>}
-        <div className="space-y-3 max-w-2xl">
-          {triggers.data?.map((t) => {
-            const fm = t.frontmatter;
-            const enabled = fm.enabled === true || fm.enabled === 'true';
-            const name = String(fm.name ?? '');
-            const isShell = typeof fm.shell === 'string' && (fm.shell as string).length > 0;
-            // `schedule:` is the canonical field; `cron:` is accepted as an
-            // alias by the daemon, so mirror both here.
-            const schedule = (typeof fm.schedule === 'string' && fm.schedule)
-              || (typeof fm.cron === 'string' && fm.cron)
-              || '';
-            const recent = lastFire[name];
-            return (
-              <div key={t.path} className="bg-white rounded-xl border border-line p-4">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-ink flex items-center gap-2">
-                      {name}
+        </Panel>
+
+        {triggers.isLoading && (
+          <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>
+        )}
+        {triggers.error && (
+          <div className="text-sm text-flame">{(triggers.error as Error).message}</div>
+        )}
+
+        {triggers.data && filtered.length === 0 && (
+          <EmptyState
+            icon={Zap}
+            title={q ? 'No triggers match that filter.' : 'No triggers yet.'}
+            hint={
+              q
+                ? 'Try a different search term, or clear the filter to see everything.'
+                : 'Install the brand-monitor preset above, or drop a .md file in triggers/ to define your own cron.'
+            }
+          />
+        )}
+
+        {filtered.length > 0 && (
+          <EntityList>
+            {filtered.map((t) => {
+              const fm = t.frontmatter;
+              const enabled = fm.enabled === true || fm.enabled === 'true';
+              const name = String(fm.name ?? '');
+              const isShell = typeof fm.shell === 'string' && (fm.shell as string).length > 0;
+              const schedule =
+                (typeof fm.schedule === 'string' && fm.schedule) ||
+                (typeof fm.cron === 'string' && fm.cron) ||
+                '';
+              const recent = lastFire[name];
+              const subtitleParts: string[] = [];
+              if (schedule) subtitleParts.push(`cron: ${schedule}`);
+              else if (fm.webhook) subtitleParts.push('webhook');
+              subtitleParts.push(
+                isShell ? `shell: ${String(fm.shell)}` : `playbook: ${String(fm.playbook ?? '')}`,
+              );
+              return (
+                <EntityRow
+                  key={t.path}
+                  asButton={false}
+                  leading={
+                    <span
+                      className={
+                        'relative flex h-2.5 w-2.5 rounded-full ' +
+                        (enabled ? 'bg-flame' : 'bg-muted/40')
+                      }
+                    />
+                  }
+                  title={
+                    <span className="flex items-center gap-2">
+                      <span>{name || t.path}</span>
                       {isShell && (
                         <span
                           title={String(fm.shell)}
-                          className="inline-flex items-center h-5 px-1.5 rounded border border-line text-[10px] font-mono uppercase tracking-wide text-muted"
+                          className="inline-flex items-center h-4 px-1.5 rounded border border-line dark:border-[#2A241D] text-[9px] font-mono uppercase tracking-wide text-muted dark:text-[#8C837C]"
                         >
                           shell
                         </span>
                       )}
+                    </span>
+                  }
+                  subtitle={<span className="font-mono">{subtitleParts.join(' · ')}</span>}
+                  trailing={
+                    <div className="flex items-center gap-3 flex-wrap justify-end">
+                      {recent?.ok && recent.log && (
+                        <a
+                          href={`/vault?path=${encodeURIComponent(recent.log)}`}
+                          className="text-[11px] text-muted dark:text-[#8C837C] hover:text-flame underline underline-offset-2"
+                        >
+                          view log
+                          {typeof recent.exit === 'number' ? (
+                            <span
+                              className={
+                                recent.exit === 0 ? 'text-[#7E8C67] ml-1' : 'text-flame ml-1'
+                              }
+                            >
+                              (exit {recent.exit})
+                            </span>
+                          ) : null}
+                        </a>
+                      )}
+                      {recent?.ok && !recent.log && (
+                        <span className="text-[11px] text-[#7E8C67]">queued ✓</span>
+                      )}
+                      <label className="flex items-center gap-1.5 text-[11px]">
+                        <input
+                          type="checkbox"
+                          checked={enabled}
+                          onChange={() => toggle.mutate(t)}
+                          className="accent-flame"
+                        />
+                        <span>{enabled ? 'enabled' : 'disabled'}</span>
+                      </label>
+                      <Button
+                        variant="secondary"
+                        onClick={() => fire.mutate(name)}
+                        disabled={fire.isPending}
+                      >
+                        <Play className="w-3 h-3" />
+                        {fire.isPending && fire.variables === name ? 'Firing…' : 'Fire now'}
+                      </Button>
                     </div>
-                    <div className="text-xs text-muted font-mono truncate">
-                      {schedule ? `cron: ${schedule}` : fm.webhook ? 'webhook' : ''}
-                      {' · '}
-                      {isShell
-                        ? `shell: ${String(fm.shell)}`
-                        : `playbook: ${String(fm.playbook ?? '')}`}
-                    </div>
-                  </div>
-                  <label className="flex items-center gap-2 text-xs ml-3 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      checked={enabled}
-                      onChange={() => toggle.mutate(t)}
-                      className="accent-flame"
-                    />
-                    {enabled ? 'enabled' : 'disabled'}
-                  </label>
-                </div>
-                <div className="mt-3 flex items-center gap-3 flex-wrap">
-                  <button
-                    onClick={() => fire.mutate(name)}
-                    disabled={fire.isPending}
-                    className="h-8 px-3 rounded-md border border-line text-xs hover:border-flame disabled:opacity-50"
-                  >
-                    {fire.isPending && fire.variables === name ? 'Firing…' : 'Fire now'}
-                  </button>
-                  {recent?.ok && recent.log && (
-                    <a
-                      href={`/vault?path=${encodeURIComponent(recent.log)}`}
-                      className="text-xs text-muted hover:text-flame underline underline-offset-2"
-                    >
-                      view log
-                      {typeof recent.exit === 'number' ? (
-                        <span className={recent.exit === 0 ? 'text-[#7E8C67] ml-1' : 'text-flame ml-1'}>
-                          (exit {recent.exit})
-                        </span>
-                      ) : null}
-                    </a>
-                  )}
-                  {recent?.ok && !recent.log && <span className="text-xs text-[#7E8C67]">queued ✓</span>}
-                  {fire.error && <span className="text-xs text-flame">{(fire.error as Error).message}</span>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+                  }
+                />
+              );
+            })}
+          </EntityList>
+        )}
+        {fire.error && (
+          <div className="mt-3 text-xs text-flame">{(fire.error as Error).message}</div>
+        )}
+      </PageBody>
+    </PageShell>
   );
 }

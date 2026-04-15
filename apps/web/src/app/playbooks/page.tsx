@@ -3,7 +3,15 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Play, Search, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { Play, Search, ChevronDown, ChevronRight, FileText, BookOpen } from 'lucide-react';
+import {
+  PageShell,
+  PageHeader,
+  PageBody,
+  Panel,
+  EmptyState,
+  Button,
+} from '../../components/ui/primitives';
 
 type PlaybookInput = { name: string; required?: boolean };
 type Playbook = {
@@ -59,11 +67,11 @@ function PlaybookCard({ pb, color }: { pb: Playbook; color: string }) {
   });
 
   return (
-    <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl overflow-hidden">
+    <Panel padded={false} className="overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full text-left p-4 flex items-start gap-3 hover:bg-cream-light dark:hover:bg-[#17140F]"
+        className="w-full text-left p-4 flex items-start gap-3 hover:bg-cream-light dark:hover:bg-[#17140F] transition-colors"
       >
         <span
           className="mt-1 inline-block w-2 h-2 rounded-full shrink-0"
@@ -87,7 +95,11 @@ function PlaybookCard({ pb, color }: { pb: Playbook; color: string }) {
             </div>
           )}
         </div>
-        {open ? <ChevronDown className="w-4 h-4 text-muted shrink-0 mt-1" /> : <ChevronRight className="w-4 h-4 text-muted shrink-0 mt-1" />}
+        {open ? (
+          <ChevronDown className="w-4 h-4 text-muted shrink-0 mt-1" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-muted shrink-0 mt-1" />
+        )}
       </button>
 
       {open && (
@@ -120,15 +132,10 @@ function PlaybookCard({ pb, color }: { pb: Playbook; color: string }) {
           </details>
 
           <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => run.mutate()}
-              disabled={run.isPending}
-              className="h-8 px-4 rounded-md bg-flame text-white text-sm font-medium hover:opacity-90 disabled:opacity-40 flex items-center gap-1.5"
-            >
+            <Button variant="primary" size="md" onClick={() => run.mutate()} disabled={run.isPending}>
               <Play className="w-3 h-3" />
               {run.isPending ? 'Running…' : 'Run Playbook'}
-            </button>
+            </Button>
             {result?.ok && (
               <span className="text-[11px] text-muted dark:text-[#8C837C] font-mono">
                 ✓ run {result.runId}
@@ -140,7 +147,7 @@ function PlaybookCard({ pb, color }: { pb: Playbook; color: string }) {
           </div>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -183,41 +190,56 @@ export default function PlaybooksPage() {
     return map;
   }, [playbooks.data, q]);
 
-  return (
-    <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A]">
-      <header className="px-6 py-4 border-b border-line dark:border-[#2A241D] flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold text-ink dark:text-[#F5F1EA]">Playbooks</h1>
-          <p className="text-xs text-muted dark:text-[#8C837C]">
-            Click any Playbook to see what it does and run it. The agent will edit your vault according to the steps.
-          </p>
-        </div>
-        <div className="relative w-64">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-muted dark:text-[#8C837C]" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Filter…"
-            className="w-full bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md pl-7 pr-3 py-1.5 text-xs text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
-          />
-        </div>
-      </header>
+  const totalMatching = useMemo(
+    () => Array.from(grouped.values()).reduce((n, arr) => n + arr.length, 0),
+    [grouped],
+  );
 
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+  return (
+    <PageShell>
+      <PageHeader
+        title="Playbooks"
+        subtitle="One-shot prompts the agent runs on demand — click a Playbook to see what it does, fill in any inputs, and run it."
+        icon={BookOpen}
+        trailing={
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-muted dark:text-[#8C837C]" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Filter…"
+              className="w-64 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md pl-7 pr-3 py-1.5 text-xs text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+            />
+          </div>
+        }
+      />
+      <PageBody maxWidth="3xl">
         {playbooks.isLoading && <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>}
         {playbooks.error && <div className="text-sm text-flame">{(playbooks.error as Error).message}</div>}
 
-        <div className="max-w-3xl mx-auto space-y-8">
+        {playbooks.data && totalMatching === 0 && (
+          <EmptyState
+            icon={BookOpen}
+            title={q ? 'No Playbooks match that filter.' : 'No Playbooks in this vault.'}
+            hint={
+              q
+                ? 'Try a different search term, or clear the filter to see everything.'
+                : 'Playbooks live under playbooks/ as .md files. Seed examples are added on first daemon run.'
+            }
+          />
+        )}
+
+        <div className="space-y-8">
           {GROUPS.filter((g) => grouped.has(g.id)).map((g) => {
             const list = grouped.get(g.id)!;
             return (
               <section key={g.id}>
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-1 flex items-center gap-2">
                   <span className="inline-block w-2 h-2 rounded-full" style={{ background: g.color }} />
                   <h2 className="text-[14px] font-semibold text-ink dark:text-[#F5F1EA]">{g.label}</h2>
                   <span className="text-[11px] text-muted dark:text-[#8C837C]">· {list.length}</span>
                 </div>
-                <p className="text-[12px] text-muted dark:text-[#8C837C] mb-3 -mt-2 ml-4">
+                <p className="text-[12px] text-muted dark:text-[#8C837C] mb-3 ml-4">
                   {g.description}
                 </p>
                 <div className="space-y-2">
@@ -244,7 +266,7 @@ export default function PlaybooksPage() {
               </section>
             ))}
         </div>
-      </div>
-    </div>
+      </PageBody>
+    </PageShell>
   );
 }

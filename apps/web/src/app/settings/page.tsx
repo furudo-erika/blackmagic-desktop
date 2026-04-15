@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { getBridge, setBridge } from '../../lib/bridge';
 import { ExternalLink, FolderOpen, Cpu, KeyRound, Settings as SettingsIcon, Plug, Sun, Moon } from 'lucide-react';
+import { PageShell, PageHeader, PageBody } from '../../components/ui/primitives';
 
 function Section({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
   return (
@@ -83,12 +84,14 @@ export default function SettingsPage() {
   const connected = (integrations.data?.integrations ?? []).filter((i) => i.status === 'connected');
 
   return (
-    <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A]">
-      <header className="px-6 py-3 border-b border-line dark:border-[#2A241D]">
-        <h1 className="text-base font-semibold text-ink dark:text-[#F5F1EA]">Settings</h1>
-      </header>
-      <div className="flex-1 overflow-y-auto px-6 py-5">
-        <div className="max-w-2xl mx-auto space-y-4">
+    <PageShell>
+      <PageHeader
+        title="Settings"
+        subtitle="Vault path, default model, billing key and developer options — anything that affects this device."
+        icon={SettingsIcon}
+      />
+      <PageBody maxWidth="2xl">
+        <div className="space-y-4">
 
           <Section icon={FolderOpen} title="Vault">
             <KV k="Vault path" v={health.data?.vaultPath ?? '—'} mono />
@@ -248,7 +251,7 @@ export default function SettingsPage() {
             v{health.data?.version ?? '0.1.0'} · open source · MIT
           </p>
         </div>
-      </div>
-    </div>
+      </PageBody>
+    </PageShell>
   );
 }
