@@ -20,19 +20,31 @@ const COLOR: Record<string, string> = {
 
 type Vec = { x: number; y: number; vx: number; vy: number };
 
-// Canvas-based force-directed graph. Continuous animation gives the "alive"
-// feel; hover dims everything except the 1-hop neighborhood; click opens
-// the file in /vault. Works across hundreds of nodes.
+// Canvas + force-directed simulation.
+//
+// Critical detail: the simulation runs continuously in its own rAF loop
+// installed *once* per dataset. Hover / query / theme are read through
+// refs so they never cause the loop to restart — that was the source of
+// the "jumping" feedback. A `freeze` flag pauses the physics when the
+// graph is settled, so hovering doesn't keep nudging nodes around.
 export default function OntologyPage() {
   const router = useRouter();
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [isDark, setIsDark] = useState(false);
 
+  // Mirror React state into refs so the rAF loop reads the latest values
+  // without being re-installed.
+  const hoverIdRef = useRef<string | null>(null);
+  hoverIdRef.current = hoverId;
+  const queryRef = useRef('');
+  queryRef.current = query;
+  const isDarkRef = useRef(false);
   useEffect(() => {
-    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    const check = () => {
+      isDarkRef.current = document.documentElement.classList.contains('dark');
+    };
     check();
     const obs = new MutationObserver(check);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
@@ -55,25 +67,6 @@ export default function OntologyPage() {
     return { nodes, edges, adj, degree };
   }, [q.data]);
 
-  // Force-directed simulation, stored in ref so animation loop can mutate.
-  const stateRef = useRef<{
-    pos: Map<string, Vec>;
-    nodes: OntologyNode[];
-    edges: OntologyEdge[];
-    adj: Map<string, Set<string>>;
-    degree: Map<string, number>;
-    width: number;
-    height: number;
-    t: number;
-    raf: number | null;
-  } | null>(null);
-
-  const counts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const n of graph.nodes) m.set(n.kind, (m.get(n.kind) ?? 0) + 1);
-    return m;
-  }, [graph.nodes]);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     const wrap = wrapRef.current;
@@ -82,69 +75,57 @@ export default function OntologyPage() {
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
+    let width = 0;
+    let height = 0;
 
     function resize() {
       if (!wrap || !canvas) return;
       const rect = wrap.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
       canvas.width = Math.floor(rect.width * dpr);
       canvas.height = Math.floor(rect.height * dpr);
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
-      if (stateRef.current) {
-        stateRef.current.width = rect.width;
-        stateRef.current.height = rect.height;
-      }
     }
     resize();
     window.addEventListener('resize', resize);
 
-    // Initialise positions around category clusters.
-    const catAngle = new Map<string, number>();
+    // Category clusters.
     const kinds = [...new Set(graph.nodes.map((n) => n.kind))];
+    const catAngle = new Map<string, number>();
     kinds.forEach((k, i) => catAngle.set(k, (i / Math.max(1, kinds.length)) * Math.PI * 2));
 
-    const rect = wrap.getBoundingClientRect();
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
     const pos = new Map<string, Vec>();
     for (const n of graph.nodes) {
       const a = catAngle.get(n.kind) ?? 0;
       const r = 160 + Math.random() * 120;
       pos.set(n.id, {
-        x: cx + Math.cos(a) * r + (Math.random() - 0.5) * 40,
-        y: cy + Math.sin(a) * r + (Math.random() - 0.5) * 40,
+        x: width / 2 + Math.cos(a) * r + (Math.random() - 0.5) * 20,
+        y: height / 2 + Math.sin(a) * r + (Math.random() - 0.5) * 20,
         vx: 0,
         vy: 0,
       });
     }
-
-    stateRef.current = {
-      pos,
-      nodes: graph.nodes,
-      edges: graph.edges,
-      adj: graph.adj,
-      degree: graph.degree,
-      width: rect.width,
-      height: rect.height,
-      t: 0,
-      raf: null,
-    };
 
     const REPULSE = 2400;
     const SPRING = 0.015;
     const SPRING_LEN = 110;
     const CENTER = 0.008;
     const DAMP = 0.86;
+    const FREEZE_KE = 0.05; // freeze threshold — total kinetic energy per node
+
+    let frozen = false;
 
     function step() {
-      const S = stateRef.current!;
-      const list = S.nodes;
-      // Repulsion (O(n^2) but typical vault < ~500 nodes).
+      const list = graph.nodes;
+      if (list.length === 0) return;
+      // Repulsion (pairwise).
       for (let i = 0; i < list.length; i++) {
-        const a = S.pos.get(list[i]!.id);
+        const a = pos.get(list[i]!.id);
         if (!a) continue;
         for (let j = i + 1; j < list.length; j++) {
-          const b = S.pos.get(list[j]!.id);
+          const b = pos.get(list[j]!.id);
           if (!b) continue;
           const dx = a.x - b.x;
           const dy = a.y - b.y;
@@ -157,9 +138,9 @@ export default function OntologyPage() {
           b.vx -= fx; b.vy -= fy;
         }
       }
-      for (const e of S.edges) {
-        const a = S.pos.get(e.source);
-        const b = S.pos.get(e.target);
+      for (const e of graph.edges) {
+        const a = pos.get(e.source);
+        const b = pos.get(e.target);
         if (!a || !b) continue;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
@@ -171,62 +152,68 @@ export default function OntologyPage() {
         a.vx += fx; a.vy += fy;
         b.vx -= fx; b.vy -= fy;
       }
+      let ke = 0;
       for (const n of list) {
-        const p = S.pos.get(n.id);
+        const p = pos.get(n.id);
         if (!p) continue;
-        p.vx += (S.width / 2 - p.x) * CENTER;
-        p.vy += (S.height / 2 - p.y) * CENTER;
+        p.vx += (width / 2 - p.x) * CENTER;
+        p.vy += (height / 2 - p.y) * CENTER;
         p.vx *= DAMP;
         p.vy *= DAMP;
         p.x += p.vx;
         p.y += p.vy;
+        ke += p.vx * p.vx + p.vy * p.vy;
       }
+      if (list.length > 0 && ke / list.length < FREEZE_KE) frozen = true;
     }
 
     function draw() {
-      const S = stateRef.current!;
       if (!ctx || !canvas) return;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, S.width, S.height);
+      ctx.clearRect(0, 0, width, height);
 
-      // Background subtle gradient.
-      const bg = isDark ? '#0F0D0A' : '#FBFAF8';
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, S.width, S.height);
+      const isDark = isDarkRef.current;
+      const qs = queryRef.current.toLowerCase();
+      const hover = hoverIdRef.current;
 
-      const qs = query.toLowerCase();
+      ctx.fillStyle = isDark ? '#0F0D0A' : '#FBFAF8';
+      ctx.fillRect(0, 0, width, height);
+
       const matching = qs
-        ? new Set(S.nodes.filter((n) => n.label.toLowerCase().includes(qs) || n.path.toLowerCase().includes(qs)).map((n) => n.id))
+        ? new Set(
+            graph.nodes
+              .filter((n) => n.label.toLowerCase().includes(qs) || n.path.toLowerCase().includes(qs))
+              .map((n) => n.id),
+          )
         : null;
 
-      const connected = hoverId ? S.adj.get(hoverId) ?? new Set<string>() : null;
-      const focused = hoverId ? new Set<string>([hoverId, ...(connected ?? [])]) : null;
+      const connected = hover ? graph.adj.get(hover) ?? new Set<string>() : null;
+      const focused = hover ? new Set<string>([hover, ...(connected ?? [])]) : null;
 
-      // Edges as curves.
-      for (const e of S.edges) {
-        const a = S.pos.get(e.source);
-        const b = S.pos.get(e.target);
+      // Edges.
+      for (const e of graph.edges) {
+        const a = pos.get(e.source);
+        const b = pos.get(e.target);
         if (!a || !b) continue;
         const highlight = focused ? focused.has(e.source) && focused.has(e.target) : true;
-        if (!highlight) continue;
+        if (focused && !highlight) continue;
         const mx = (a.x + b.x) / 2;
         const my = (a.y + b.y) / 2 - 18;
-
-        const color = COLOR[S.nodes.find((n) => n.id === e.source)?.kind ?? 'other'] ?? '#888';
+        const col =
+          COLOR[graph.nodes.find((n) => n.id === e.source)?.kind ?? 'other'] ?? '#888';
         const op = focused ? 0.75 : 0.22;
-        ctx.strokeStyle = hexWithAlpha(color, op);
+        ctx.strokeStyle = hexWithAlpha(col, op);
         ctx.lineWidth = focused ? 1.4 : 0.9;
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.quadraticCurveTo(mx, my, b.x, b.y);
         ctx.stroke();
       }
-      // Dim-layer for non-highlighted edges when focused.
       if (focused) {
-        for (const e of S.edges) {
+        for (const e of graph.edges) {
           if (focused.has(e.source) && focused.has(e.target)) continue;
-          const a = S.pos.get(e.source);
-          const b = S.pos.get(e.target);
+          const a = pos.get(e.source);
+          const b = pos.get(e.target);
           if (!a || !b) continue;
           ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(26,22,20,0.06)';
           ctx.lineWidth = 0.6;
@@ -238,41 +225,37 @@ export default function OntologyPage() {
       }
 
       // Nodes.
-      for (const n of S.nodes) {
-        const p = S.pos.get(n.id);
+      for (const n of graph.nodes) {
+        const p = pos.get(n.id);
         if (!p) continue;
-        const deg = S.degree.get(n.id) ?? 0;
+        const deg = graph.degree.get(n.id) ?? 0;
         const r = 4 + Math.log2(deg + 1) * 3.2;
-        const color = COLOR[n.kind] ?? '#888';
+        const col = COLOR[n.kind] ?? '#888';
         const isMatch = matching ? matching.has(n.id) : true;
         const isFocused = focused ? focused.has(n.id) : true;
         const dim = (isMatch ? 1 : 0.15) * (isFocused ? 1 : 0.2);
 
-        // Glow
         if (dim === 1 && deg > 1) {
-          const glow = ctx.createRadialGradient(p.x, p.y, r * 0.4, p.x, p.y, r * 3.4);
-          glow.addColorStop(0, hexWithAlpha(color, 0.35));
-          glow.addColorStop(1, hexWithAlpha(color, 0));
-          ctx.fillStyle = glow;
+          const g = ctx.createRadialGradient(p.x, p.y, r * 0.4, p.x, p.y, r * 3.4);
+          g.addColorStop(0, hexWithAlpha(col, 0.35));
+          g.addColorStop(1, hexWithAlpha(col, 0));
+          ctx.fillStyle = g;
           ctx.beginPath();
           ctx.arc(p.x, p.y, r * 3.4, 0, Math.PI * 2);
           ctx.fill();
         }
-        // Core
-        ctx.fillStyle = hexWithAlpha(color, 0.92 * dim);
+        ctx.fillStyle = hexWithAlpha(col, 0.92 * dim);
         ctx.beginPath();
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
         ctx.fill();
-        // Ring
-        if (hoverId === n.id) {
+        if (hover === n.id) {
           ctx.strokeStyle = isDark ? '#F5F1EA' : '#1A1614';
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.arc(p.x, p.y, r + 3, 0, Math.PI * 2);
           ctx.stroke();
         }
-        // Label — only for high-degree or focused nodes.
-        if ((deg >= 2 || hoverId === n.id) && dim > 0.5) {
+        if ((deg >= 2 || hover === n.id) && dim > 0.5) {
           ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
           ctx.textBaseline = 'middle';
           ctx.fillStyle = isDark ? 'rgba(230,224,216,0.85)' : 'rgba(26,22,20,0.8)';
@@ -282,26 +265,26 @@ export default function OntologyPage() {
     }
 
     let running = true;
+    let raf = 0;
     function loop() {
       if (!running) return;
-      step();
+      if (!frozen) step();
       draw();
-      stateRef.current!.raf = requestAnimationFrame(loop);
+      raf = requestAnimationFrame(loop);
     }
     loop();
 
-    // Hit-testing for hover + click.
+    // Hit-test against current positions. Does NOT trigger a React re-render
+    // unless hover actually changed.
     function nearestAt(clientX: number, clientY: number): OntologyNode | null {
       const rect = canvas!.getBoundingClientRect();
       const x = clientX - rect.left;
       const y = clientY - rect.top;
-      const S = stateRef.current;
-      if (!S) return null;
       let best: { n: OntologyNode; d: number } | null = null;
-      for (const n of S.nodes) {
-        const p = S.pos.get(n.id);
+      for (const n of graph.nodes) {
+        const p = pos.get(n.id);
         if (!p) continue;
-        const deg = S.degree.get(n.id) ?? 0;
+        const deg = graph.degree.get(n.id) ?? 0;
         const r = 4 + Math.log2(deg + 1) * 3.2 + 3;
         const dx = p.x - x;
         const dy = p.y - y;
@@ -312,24 +295,39 @@ export default function OntologyPage() {
     }
     function onMove(ev: MouseEvent) {
       const n = nearestAt(ev.clientX, ev.clientY);
-      setHoverId(n?.id ?? null);
+      const id = n?.id ?? null;
+      if (hoverIdRef.current !== id) setHoverId(id);
       canvas!.style.cursor = n ? 'pointer' : 'default';
+    }
+    function onLeave() {
+      if (hoverIdRef.current !== null) setHoverId(null);
     }
     function onClick(ev: MouseEvent) {
       const n = nearestAt(ev.clientX, ev.clientY);
       if (n) router.push(`/vault?path=${encodeURIComponent(n.path)}`);
     }
     canvas.addEventListener('mousemove', onMove);
+    canvas.addEventListener('mouseleave', onLeave);
     canvas.addEventListener('click', onClick);
 
     return () => {
       running = false;
-      if (stateRef.current?.raf) cancelAnimationFrame(stateRef.current.raf);
+      cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('mousemove', onMove);
+      canvas.removeEventListener('mouseleave', onLeave);
       canvas.removeEventListener('click', onClick);
     };
-  }, [graph, isDark, query, hoverId, router]);
+    // Only restart the simulation when the dataset changes. Hover / query /
+    // theme are read via refs so they never restart the loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph]);
+
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const n of graph.nodes) m.set(n.kind, (m.get(n.kind) ?? 0) + 1);
+    return m;
+  }, [graph.nodes]);
 
   return (
     <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A]">

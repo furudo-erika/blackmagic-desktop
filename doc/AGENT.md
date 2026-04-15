@@ -114,3 +114,52 @@ On `response.completed`, daemon:
 - One run per agent per vault at a time (lockfile in `runs/<ts>/.lock`).
 - Global max-concurrent runs default 3.
 - Chat messages from the UI are their own runs with agent=`chat`.
+
+## MCP integration
+
+Black Magic Desktop speaks the Model Context Protocol (stdio transport) as a
+client. External capabilities — Gmail, Slack, LinkedIn, etc. — are plugged in
+by declaring servers in `~/BlackMagic/.bm/mcp.json`:
+
+```json
+{
+  "servers": {
+    "gmail": { "command": "npx", "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"] },
+    "slack": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"], "env": { "SLACK_TOKEN": "..." } }
+  }
+}
+```
+
+On daemon startup each server is spawned and the JSON-RPC handshake runs:
+
+1. `initialize` (`protocolVersion: "2024-11-05"`) → capabilities + `serverInfo`.
+2. `notifications/initialized`.
+3. `tools/list` → inventory of that server's tools.
+
+Every discovered tool is registered in the daemon's tool registry under the
+namespaced name `<server>.<rawTool>` (e.g. `gmail.send_email`). They show up in
+`GET /api/tools` with `source: "mcp"` alongside built-ins. The agent loop
+calls them exactly like any other tool — handler forwards `tools/call` over
+stdio to the owning subprocess.
+
+A failing server (missing binary, handshake timeout) is logged and skipped;
+the daemon keeps running. Servers are stopped on SIGTERM/SIGINT.
+
+### Approve-gated send
+
+Drafts written by `draft_create` carry a `tool:` frontmatter field naming the
+MCP tool that should deliver the message (e.g. `gmail.send_email`). `POST
+/api/drafts/:id/approve`:
+
+- If the named tool is an MCP tool that's currently available, the daemon
+  calls it with `{to, subject, body}` (shape expected by Gmail MCP + most
+  outreach servers), flips `status: sent`, records `sent_at` and `message_id`
+  (when the server returns one), and returns `{ok: true, messageId?}`.
+- If the tool isn't wired, the draft is marked `approved` and the response
+  includes a note pointing the user at `.bm/mcp.json`. This preserves the
+  V1 behaviour for environments without MCP configured.
+- On MCP call failure the draft stays at `approved` with `last_error` and
+  the endpoint returns `{ok: false, error}`.
+
+OAuth for third-party services lives inside each MCP server (typical pattern
+for Gmail / Slack MCPs). The daemon never handles those credentials directly.

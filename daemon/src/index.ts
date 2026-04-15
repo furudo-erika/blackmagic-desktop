@@ -9,13 +9,22 @@ import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { loadConfig, VAULT_ROOT } from './paths.js';
 import { ensureVault, readVaultFile, writeVaultFile, walkTree } from './vault.js';
-import { BUILTIN_TOOLS } from './tools.js';
+import { BUILTIN_TOOLS, allTools } from './tools.js';
 import { runAgent } from './agent.js';
 import { listPlaybooks, runPlaybook } from './playbooks.js';
 import { triggerList, fireTrigger, loadCronTriggers } from './triggers.js';
 import { listDrafts, approveDraft, rejectDraft } from './drafts.js';
-import { mcpServerList } from './mcp.js';
+import { mcpServerList, McpRegistry } from './mcp.js';
 import { buildOntology } from './ontology.js';
+import { pushTriggers, pushDrafts } from './sync.js';
+import {
+  PROVIDERS,
+  listIntegrations,
+  saveIntegration,
+  deleteIntegration,
+  oauthStartUrl,
+  type IntegrationProvider,
+} from './integrations.js';
 
 const LOCAL_TOKEN = process.env.BM_LOCAL_TOKEN ?? crypto.randomBytes(24).toString('base64url');
 
@@ -52,6 +61,15 @@ async function pickPort(preferred?: number): Promise<number> {
 async function main() {
   const config = loadConfig();
   await ensureVault();
+  await McpRegistry.start().catch((err) => console.error('[mcp] registry start failed:', err));
+
+  const shutdown = (sig: string) => {
+    console.log(`[daemon] ${sig} received, shutting down`);
+    try { McpRegistry.stop(); } catch {}
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 
   const app = new Hono();
   app.use('*', cors({ origin: (o) => o ?? '*', credentials: false }));
@@ -147,16 +165,69 @@ async function main() {
   });
 
   app.get('/api/tools', async (c) => {
-    const mcp = await mcpServerList();
+    const mcpServers = await mcpServerList();
+    const mcpTools = allTools().filter((t) => t.name.includes('.'));
     return c.json({
       tools: [
         ...BUILTIN_TOOLS.map((t) => ({ name: t.name, description: t.description, source: 'builtin' })),
-        ...mcp.map((s) => ({ name: s.name, description: `MCP: ${s.command} ${s.args.join(' ')}`, source: 'mcp' })),
+        ...mcpTools.map((t) => ({ name: t.name, description: t.description, source: 'mcp' })),
       ],
+      servers: mcpServers,
     });
   });
 
   app.get('/api/ontology', async (c) => c.json(await buildOntology()));
+
+  // Integrations CRUD. Credentials stay in ~/BlackMagic/.bm/integrations.json
+  // and never leave the machine.
+  app.get('/api/integrations', async (c) =>
+    c.json({ integrations: await listIntegrations() }),
+  );
+  app.put('/api/integrations/:provider', async (c) => {
+    const provider = c.req.param('provider') as IntegrationProvider;
+    if (!PROVIDERS.includes(provider)) return c.json({ error: 'unknown provider' }, 400);
+    const body = await c.req.json<{ credentials?: Record<string, string> }>().catch(() => ({} as any));
+    if (
+      !body.credentials ||
+      Object.values(body.credentials).filter((v) => typeof v === 'string' && v.trim()).length === 0
+    ) {
+      return c.json({ error: 'credentials required' }, 400);
+    }
+    await saveIntegration(provider, body.credentials);
+    return c.json({ ok: true });
+  });
+  app.delete('/api/integrations/:provider', async (c) => {
+    const provider = c.req.param('provider') as IntegrationProvider;
+    if (!PROVIDERS.includes(provider)) return c.json({ error: 'unknown provider' }, 400);
+    await deleteIntegration(provider);
+    return c.json({ ok: true });
+  });
+  app.get('/api/integrations/:provider/oauth/start', async (c) => {
+    const provider = c.req.param('provider') as IntegrationProvider;
+    if (!PROVIDERS.includes(provider)) return c.json({ error: 'unknown provider' }, 400);
+    const billing = (config.billing_url ?? 'https://blackmagic.run');
+    return c.json(oauthStartUrl(provider, port, LOCAL_TOKEN, billing));
+  });
+  // Browser-facing OAuth callback — bounce from blackmagic.run returns here.
+  app.get('/integrations/:provider/callback', async (c) => {
+    const provider = c.req.param('provider') as IntegrationProvider;
+    const token = c.req.query('token');
+    if (token !== LOCAL_TOKEN) return c.html('<h1>Bad token</h1>', 400);
+    if (!PROVIDERS.includes(provider)) return c.html('<h1>Unknown provider</h1>', 400);
+    const access = c.req.query('access_token') ?? c.req.query('token_access') ?? '';
+    const email = c.req.query('email') ?? undefined;
+    const workspace = c.req.query('workspace') ?? undefined;
+    if (!access) {
+      return c.html('<h1>Missing access_token</h1><p>The OAuth provider did not return a token.</p>', 400);
+    }
+    const creds: Record<string, string> = { access_token: access };
+    if (email) creds.email = email;
+    if (workspace) creds.workspace = workspace;
+    await saveIntegration(provider, creds);
+    return c.html(
+      `<!doctype html><html><body style="font-family:-apple-system,sans-serif;padding:48px;text-align:center;background:#FBFAF8"><h1 style="color:#37322F">${provider} connected</h1><p style="color:#605A57">You can close this tab and return to Black Magic.</p></body></html>`,
+    );
+  });
 
   // Onboarding state: considered complete once CLAUDE.md has been
   // user-customised (default seed marker is absent).
@@ -222,12 +293,17 @@ async function main() {
     }
   });
 
-  app.get('/api/triggers', async (c) => c.json({ triggers: await triggerList() }));
+  app.get('/api/triggers', async (c) => {
+    const triggers = await triggerList();
+    pushTriggers(config).catch(() => {});
+    return c.json({ triggers });
+  });
   app.post('/api/triggers/:name/fire', async (c) => {
     const name = c.req.param('name');
     const body = await c.req.json<{ input?: Record<string, unknown> }>().catch(() => ({} as any));
     try {
       const result = await fireTrigger(name, config, body.input ?? {});
+      pushDrafts(config).catch(() => {});
       return c.json(result);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
@@ -235,13 +311,19 @@ async function main() {
   });
   app.post('/api/triggers/reload', async (c) => {
     await loadCronTriggers(config);
+    pushTriggers(config).catch(() => {});
     return c.json({ ok: true });
   });
 
-  app.get('/api/drafts', async (c) => c.json({ drafts: await listDrafts() }));
+  app.get('/api/drafts', async (c) => {
+    const drafts = await listDrafts();
+    pushDrafts(config).catch(() => {});
+    return c.json({ drafts });
+  });
   app.post('/api/drafts/:id/approve', async (c) => {
     try {
       const r = await approveDraft(c.req.param('id'));
+      pushDrafts(config).catch(() => {});
       return c.json(r);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
@@ -250,6 +332,7 @@ async function main() {
   app.post('/api/drafts/:id/reject', async (c) => {
     try {
       const r = await rejectDraft(c.req.param('id'));
+      pushDrafts(config).catch(() => {});
       return c.json(r);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
@@ -391,6 +474,8 @@ async function main() {
   console.log(`[daemon] model ${config.default_model}  zenn=${config.zenn_api_key ? 'set' : 'MISSING'}`);
 
   await loadCronTriggers(config).catch((err) => console.error('[triggers] load failed:', err));
+  pushTriggers(config).catch(() => {});
+  pushDrafts(config).catch(() => {});
 }
 
 main().catch((err) => {

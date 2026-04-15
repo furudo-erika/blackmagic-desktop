@@ -6,6 +6,7 @@
 
 import { readVaultFile, writeVaultFile, editVaultFile, renameVaultFile, listDir, grepVault } from './vault.js';
 import type { Config } from './paths.js';
+import { McpRegistry } from './mcp.js';
 
 export interface ToolCtx {
   config: Config;
@@ -224,8 +225,12 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   draft_create,
 ];
 
+export function allTools(): ToolDef[] {
+  return [...BUILTIN_TOOLS, ...McpRegistry.tools()];
+}
+
 export function toolsByName(): Map<string, ToolDef> {
-  return new Map(BUILTIN_TOOLS.map((t) => [t.name, t]));
+  return new Map(allTools().map((t) => [t.name, t]));
 }
 
 // Render for OpenAI Responses API tools[] field.
