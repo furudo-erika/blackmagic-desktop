@@ -127,12 +127,13 @@ export default function TriggersPage() {
                 <div className="mt-3 flex items-center gap-3">
                   <button
                     onClick={() => fire.mutate(name)}
-                    className="h-8 px-3 rounded-md border border-line text-xs hover:border-flame"
+                    disabled={fire.isPending}
+                    className="h-8 px-3 rounded-md border border-line text-xs hover:border-flame disabled:opacity-50"
                   >
-                    Fire now
+                    {fire.isPending ? 'Firing…' : 'Fire now'}
                   </button>
-                  <span className="text-xs text-muted">coming soon</span>
-                  {fire.data?.coming && <span className="text-xs text-muted">(endpoint not live)</span>}
+                  {fire.isSuccess && <span className="text-xs text-[#7E8C67]">queued ✓</span>}
+                  {fire.error && <span className="text-xs text-flame">{(fire.error as Error).message}</span>}
                 </div>
               </div>
             );
