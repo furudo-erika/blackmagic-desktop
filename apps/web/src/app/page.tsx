@@ -149,8 +149,11 @@ export default function ChatPage() {
           <div className="max-w-3xl mx-auto py-10">
             <div className="text-center mb-6">
               <MessageSquare className="w-8 h-8 mx-auto mb-3 text-muted dark:text-[#8C837C] opacity-50" />
+              <h2 className="text-base font-semibold text-ink dark:text-[#F5F1EA] mb-1">
+                What do you want to do?
+              </h2>
               <p className="text-sm text-muted dark:text-[#8C837C]">
-                Click a scenario to pre-fill the prompt, edit the bracketed bits for your use, then send.
+                Pick a scenario, edit the <span className="font-mono text-flame">[bracketed]</span> bits, and send. Or just type your own.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
