@@ -20,10 +20,12 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 28px;
+  height: 38px;
   z-index: 60;
   -webkit-app-region: drag;
+  background: transparent;
 }
+.bm-titlebar * { -webkit-app-region: drag; }
 button, a, input, textarea, select, [role="button"] {
   -webkit-app-region: no-drag;
 }
