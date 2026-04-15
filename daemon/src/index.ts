@@ -8,7 +8,7 @@ import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { loadConfig, VAULT_ROOT } from './paths.js';
-import { ensureVault, readVaultFile, writeVaultFile, walkTree } from './vault.js';
+import { ensureVault, readVaultFile, writeVaultFile, walkTree, installPresetTriggers } from './vault.js';
 import { BUILTIN_TOOLS, allTools } from './tools.js';
 import { runAgent } from './agent.js';
 import { listPlaybooks, runPlaybook } from './playbooks.js';
@@ -386,6 +386,21 @@ async function main() {
     await loadCronTriggers(config);
     pushTriggers(config).catch(() => {});
     return c.json({ ok: true });
+  });
+
+  // Install the brand-monitor preset trigger bundle. Idempotent — files
+  // that already exist (including user-disabled ones) are left alone.
+  // After writing, we reload the cron scheduler so newly-installed
+  // triggers start firing without a daemon restart.
+  app.post('/api/triggers/install-presets', async (c) => {
+    try {
+      const result = await installPresetTriggers();
+      await loadCronTriggers(config);
+      pushTriggers(config).catch(() => {});
+      return c.json(result);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
   });
 
   // Sequences — multi-touch drip outreach. The list endpoint joins each

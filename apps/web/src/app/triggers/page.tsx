@@ -40,6 +40,11 @@ export default function TriggersPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['triggers'] }),
   });
 
+  const installPresets = useMutation({
+    mutationFn: () => api.installTriggerPresets(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['triggers'] }),
+  });
+
   const fire = useMutation({
     mutationFn: async (name: string) => {
       // NOTE: /api/triggers/:name/fire not wired in daemon yet
@@ -61,6 +66,38 @@ export default function TriggersPage() {
         <p className="text-xs text-muted">Cron + webhook triggers from your vault.</p>
       </header>
       <div className="h-full overflow-y-auto px-6 py-6">
+        <div className="max-w-2xl mb-6 bg-white rounded-xl border border-line p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-ink">Presets</div>
+              <div className="text-xs text-muted mt-1">
+                Install the brand-monitor bundle: daily brand-mention sweep,
+                weekly competitor teardown, daily industry-news digest. All
+                write to <span className="font-mono">signals/</span>.
+              </div>
+            </div>
+            <button
+              onClick={() => installPresets.mutate()}
+              disabled={installPresets.isPending}
+              className="h-8 px-3 rounded-md border border-line text-xs hover:border-flame disabled:opacity-50 whitespace-nowrap ml-4"
+            >
+              {installPresets.isPending ? 'Installing…' : 'Install brand-monitor presets'}
+            </button>
+          </div>
+          {installPresets.data && (
+            <div className="text-xs text-muted mt-3">
+              {installPresets.data.created.length > 0
+                ? `Installed: ${installPresets.data.created.join(', ')}`
+                : 'All presets already installed.'}
+              {installPresets.data.existing.length > 0 && installPresets.data.created.length > 0
+                ? ` · Skipped: ${installPresets.data.existing.join(', ')}`
+                : ''}
+            </div>
+          )}
+          {installPresets.error && (
+            <div className="text-xs text-flame mt-3">{(installPresets.error as Error).message}</div>
+          )}
+        </div>
         {triggers.isLoading && <div className="text-sm text-muted">loading…</div>}
         {triggers.error && <div className="text-sm text-flame">{(triggers.error as Error).message}</div>}
         <div className="space-y-3 max-w-2xl">

@@ -16,6 +16,12 @@ const SKELETON_DIRS = [
   'triggers',
   'drafts',
   'runs',
+  // Signals surfaced by cron-driven scans — brand mentions, competitor
+  // product/pricing/hiring diffs, and industry news. One note per scan run.
+  'signals',
+  'signals/mentions',
+  'signals/competitors',
+  'signals/news',
   // ── who WE are ─────────────────────────────────────────
   // Borrowed from the apidog-team /org/ + /marketing/branding/ pattern.
   // Each subdirectory is one facet so the agent can page in only what it
@@ -190,6 +196,22 @@ What category are we in?
 ## Positioning statement
 For **<who>** who **<struggle>**, **<product>** is a **<category>** that **<benefit>**.
 Unlike **<alternative>**, we **<key differentiator>**.
+`,
+  'market/competitors.md': `---
+kind: us.market.competitors
+---
+
+# Competitor watchlist
+
+One bullet per competitor the weekly scan should track. Use the root
+domain — the agent will fetch homepage, /pricing, /careers, /blog and
+summarize diffs vs. the last scan into \`signals/competitors/<date>.md\`.
+
+-
+-
+-
+-
+-
 `,
   'market/objections.md': `---
 kind: us.market.objections
@@ -1091,6 +1113,120 @@ If not yet connected, draft a connection-request note (<=300 char)
 referencing their recent post. Queue via draft_create(channel=
 linkedin_connect). Log intent to the contact file.
 `,
+
+  // === Signal scans (cron-driven) ==========================================
+  // These three back the "brand-monitor preset" triggers. Each is idempotent,
+  // writes one note per run under signals/<kind>/, and only uses tools we
+  // already ship (web_search, web_fetch, deep_research, write_vault_file).
+  'brand-mention-scan.md': `---
+kind: playbook
+name: brand-mention-scan
+group: signals
+agent: researcher
+inputs: []
+---
+
+Daily brand-mention sweep.
+
+## Steps
+
+1. Read \`us/company.md\` frontmatter to get our \`name\` and \`domain\`.
+   Also skim \`us/product/overview.md\` for product names worth querying.
+2. Run \`web_search\` for each of:
+     - "<company name>" (last 24h)
+     - "<product name>" review OR "vs" (last 7d)
+     - site:news.ycombinator.com OR site:reddit.com "<company or product>"
+     - site:twitter.com OR site:x.com "<company or product>"
+   Skip queries that obviously won't hit (e.g. ultra-generic names — note
+   the skip).
+3. For every genuine mention (ignore our own blog, our own socials, and
+   paid ad copy), capture:
+     - source URL
+     - publication / handle
+     - date
+     - 1-sentence summary
+     - sentiment: positive | neutral | negative | question
+     - actionable? (yes/no) — e.g. a complaint worth replying to, or
+       a journalist worth briefing
+4. Write ONE file: \`signals/mentions/<YYYY-MM-DD>.md\` with frontmatter
+   \`kind: signal.mentions, date: <iso>, count: <n>\` and a markdown table
+   of the findings above. If there are zero mentions, still write the file
+   with \`count: 0\` and a one-line "quiet day" note — this is how we
+   notice if the scan itself breaks.
+5. Reply with a 2-bullet digest: the most positive mention and the most
+   actionable one (if any).
+`,
+
+  'competitor-scan.md': `---
+kind: playbook
+name: competitor-scan
+group: signals
+agent: researcher
+inputs: []
+---
+
+Weekly competitor sweep.
+
+## Steps
+
+1. Read \`us/market/competitors.md\`. Each bullet is a competitor domain
+   or name. If the file is empty or still the seed template, write
+   \`signals/competitors/<YYYY-MM-DD>.md\` with a note that the watchlist
+   is empty and stop.
+2. For each competitor (cap at 8 to keep the scan cheap):
+     - \`web_fetch\` their homepage, \`/pricing\`, \`/careers\` or
+       \`/jobs\`, and the latest blog/changelog entry if discoverable.
+     - Use \`web_search\` for "<competitor> funding OR layoffs OR
+       acquisition" (last 7d) and "<competitor> launch OR release"
+       (last 7d).
+     - If a prior \`us/competitors/<slug>.md\` file exists, compare
+       against it and call out diffs; otherwise note this as a baseline.
+3. Summarize for each competitor in 4-6 lines:
+     - product / positioning changes
+     - pricing changes (new tier, price move, removed plan)
+     - hiring signals (net new roles, geos, seniority)
+     - funding / exec / M&A news
+     - one-line "so what for us"
+4. Write ONE file: \`signals/competitors/<YYYY-MM-DD>.md\` with
+   frontmatter \`kind: signal.competitors, date: <iso>, tracked: <n>\`
+   and one H2 section per competitor. Cite URLs inline.
+5. If any diff is material (pricing move, exec change, a launch that
+   overlaps our roadmap), call it out at the top under \`## Watch this\`.
+6. Reply with the top-3 "watch this" items.
+`,
+
+  'news-scan.md': `---
+kind: playbook
+name: news-scan
+group: signals
+agent: researcher
+inputs: []
+---
+
+Daily industry news scan.
+
+## Steps
+
+1. Pull keywords from \`us/market/\`:
+     - category / positioning terms from \`us/market/positioning.md\`
+     - ICP industry + tech-stack signals from \`us/market/icp.md\`
+     - segment names from \`us/market/segments.md\`
+   If all three are still seed templates, write a one-line
+   \`signals/news/<YYYY-MM-DD>.md\` saying "market keywords not set yet"
+   and stop.
+2. Run \`web_search\` (last 24h) for the 3-5 sharpest keyword phrases.
+   Prefer specific compounds ("AI eval platform", not "AI"). Also search
+   site:techcrunch.com, site:theinformation.com, site:news.ycombinator.com
+   for the same phrases.
+3. Dedupe to at most 10 items. For each: headline, source, URL, date,
+   1-sentence "why it matters to us". Drop anything that's purely
+   general-interest tech news with no ICP overlap.
+4. Write ONE file: \`signals/news/<YYYY-MM-DD>.md\` with frontmatter
+   \`kind: signal.news, date: <iso>, count: <n>\` and a markdown list.
+   Zero items → write the file anyway with a "quiet day" note.
+5. Reply with the single most important item and one sentence on
+   whether it suggests any outbound angle this week.
+`,
 };
 
 // Multi-touch drip sequences. A sequence is an ordered list of touches with
@@ -1165,6 +1301,71 @@ touches:
 Enroll a contact right after a discovery or demo call. Stops on reply.
 `,
 };
+
+// Preset triggers installed on demand from the Triggers UI. Kept separate
+// from SEEDED-on-ensureVault intentionally: we don't want every new vault
+// to automatically run web scans until the user opts in. The
+// \`installPresetTriggers\` helper writes any missing files and is
+// idempotent.
+const PRESET_TRIGGERS: Record<string, string> = {
+  'daily-brand-scan.md': `---
+kind: trigger
+name: daily-brand-scan
+schedule: '0 8 * * *'
+playbook: brand-mention-scan
+enabled: true
+---
+
+Daily 08:00 sweep for brand mentions. Writes one note per run under
+\`signals/mentions/<date>.md\`. Edit the playbook, not this file, to
+change what gets searched.
+`,
+  'weekly-competitor-scan.md': `---
+kind: trigger
+name: weekly-competitor-scan
+schedule: '0 9 * * 1'
+playbook: competitor-scan
+enabled: true
+---
+
+Monday 09:00 teardown of everyone listed in
+\`us/market/competitors.md\`. Results land in
+\`signals/competitors/<date>.md\`.
+`,
+  'daily-news-scan.md': `---
+kind: trigger
+name: daily-news-scan
+schedule: '0 7 * * *'
+playbook: news-scan
+enabled: true
+---
+
+Daily 07:00 industry-news digest, keyed off positioning + ICP keywords
+from \`us/market/\`. Results land in \`signals/news/<date>.md\`.
+`,
+};
+
+// Idempotent: writes any missing preset trigger files and reports which
+// were created. Safe to call every time the user hits "Install presets"
+// — existing files (including user-disabled ones) are never overwritten.
+export async function installPresetTriggers(): Promise<{
+  created: string[];
+  existing: string[];
+}> {
+  const created: string[] = [];
+  const existing: string[] = [];
+  await fs.mkdir(path.join(VAULT_ROOT, 'triggers'), { recursive: true });
+  for (const [name, body] of Object.entries(PRESET_TRIGGERS)) {
+    const p = path.join(VAULT_ROOT, 'triggers', name);
+    if (fsSync.existsSync(p)) {
+      existing.push(name);
+      continue;
+    }
+    await fs.writeFile(p, body, 'utf-8');
+    created.push(name);
+  }
+  return { created, existing };
+}
 
 export async function ensureVault(): Promise<{ created: boolean }> {
   let created = false;

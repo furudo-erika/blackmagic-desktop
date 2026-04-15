@@ -182,6 +182,11 @@ export const api = {
     ),
   reloadTriggers: () =>
     request<{ ok: true }>('/api/triggers/reload', { method: 'POST' }),
+  installTriggerPresets: () =>
+    request<{ created: string[]; existing: string[] }>(
+      '/api/triggers/install-presets',
+      { method: 'POST' },
+    ),
   onboardingState: () =>
     request<{ needsOnboarding: boolean; claudeDefault: boolean; hasSelfCompany: boolean }>(
       '/api/onboarding',
