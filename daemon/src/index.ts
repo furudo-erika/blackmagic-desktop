@@ -30,18 +30,64 @@ import {
 
 const LOCAL_TOKEN = process.env.BM_LOCAL_TOKEN ?? crypto.randomBytes(24).toString('base64url');
 
-// In-memory pending OAuth states. Each entry expires after 10 minutes.
+// Pending OAuth states are persisted to disk so a daemon restart between
+// "click sign in" and "browser hits callback" doesn't invalidate the
+// handshake. Entries expire after 10 minutes.
+const OAUTH_TTL_MS = 10 * 60 * 1000;
 const pendingOAuthStates = new Map<string, number>();
+
+function oauthStatesPath() {
+  return path.join(
+    process.env.BM_VAULT_PATH ?? path.join(require('node:os').homedir(), 'BlackMagic'),
+    '.bm',
+    'oauth-states.json',
+  );
+}
+
+async function loadOAuthStates() {
+  try {
+    const raw = await fs.readFile(oauthStatesPath(), 'utf-8');
+    const obj = JSON.parse(raw) as Record<string, number>;
+    const now = Date.now();
+    for (const [k, t] of Object.entries(obj)) {
+      if (now - t < OAUTH_TTL_MS) pendingOAuthStates.set(k, t);
+    }
+  } catch {
+    // no file yet — fine
+  }
+}
+
+async function saveOAuthStates() {
+  try {
+    await fs.mkdir(path.dirname(oauthStatesPath()), { recursive: true });
+    await fs.writeFile(
+      oauthStatesPath(),
+      JSON.stringify(Object.fromEntries(pendingOAuthStates)),
+      'utf-8',
+    );
+  } catch (err) {
+    console.error('[oauth] could not persist states:', err);
+  }
+}
+
 function issueOAuthState(): string {
   const s = crypto.randomBytes(16).toString('base64url');
   pendingOAuthStates.set(s, Date.now());
+  saveOAuthStates().catch(() => {});
   return s;
 }
+
 function consumeOAuthState(s: string): boolean {
   const t = pendingOAuthStates.get(s);
-  if (!t) return false;
+  if (!t) {
+    console.warn(`[oauth] state not found: ${s.slice(0, 8)}… (have ${pendingOAuthStates.size} pending)`);
+    return false;
+  }
   pendingOAuthStates.delete(s);
-  return Date.now() - t < 10 * 60 * 1000;
+  saveOAuthStates().catch(() => {});
+  const fresh = Date.now() - t < OAUTH_TTL_MS;
+  if (!fresh) console.warn(`[oauth] state expired: ${s.slice(0, 8)}…`);
+  return fresh;
 }
 
 async function pickPort(preferred?: number): Promise<number> {
@@ -63,6 +109,7 @@ async function pickPort(preferred?: number): Promise<number> {
 async function main() {
   const config = loadConfig();
   await ensureVault();
+  await loadOAuthStates();
   await McpRegistry.start().catch((err) => console.error('[mcp] registry start failed:', err));
 
   const shutdown = (sig: string) => {
@@ -119,11 +166,21 @@ async function main() {
   app.get('/auth/callback', async (c) => {
     const token = (c.req.query('token') ?? '').trim();
     const state = (c.req.query('state') ?? '').trim();
+    console.log(
+      `[oauth] /auth/callback hit  state=${state.slice(0, 8)}…  token=${token ? token.slice(0, 8) + '…' : '(missing)'}`,
+    );
     if (!token.startsWith('ck_') || token.length < 10) {
       return c.html(callbackPage('Invalid key', 'The key returned by blackmagic.run was malformed.', false), 400);
     }
     if (!consumeOAuthState(state)) {
-      return c.html(callbackPage('Expired or unknown state', 'Please retry the sign-in from the app.', false), 400);
+      return c.html(
+        callbackPage(
+          'Expired or unknown state',
+          'This sign-in link was minted by a different daemon session. Close this tab, return to the app, and click "Sign in" again.',
+          false,
+        ),
+        400,
+      );
     }
     const cfgDir = path.join(VAULT_ROOT, '.bm');
     await fs.mkdir(cfgDir, { recursive: true });
