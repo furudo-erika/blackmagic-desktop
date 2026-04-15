@@ -458,83 +458,135 @@ async function main() {
     if (last.role !== 'user') return c.json({ error: 'last message must be user' }, 400);
     const history = body.messages.slice(0, -1).filter((m) => m.role === 'user' || m.role === 'assistant');
 
-    // Path B: delegate to the Codex CLI. It runs in the vault, reads
-    // CLAUDE.md + files, edits in place, and streams reasoning to stdout.
-    // Billing is still authoritative on the server side because codex hits
-    // our /api/agent/responses proxy using the user's ck_.
+    // Path B: Codex CLI, streamed.  The daemon converts codex's JSONL
+    // event stream (--json flag) into SSE frames the renderer can consume
+    // incrementally.  Billing happens server-side in /api/v1/responses.
     if (codexReady) {
-      try {
-        const result = await runCodex(last.content, { config, history });
-        const runId = `codex-${Date.now()}`;
-        const runDir = path.join(VAULT_ROOT, 'runs', runId);
-        await fs.mkdir(runDir, { recursive: true });
-        await fs.writeFile(path.join(runDir, 'stdout.log'), result.stdout, 'utf-8');
-        await fs.writeFile(path.join(runDir, 'stderr.log'), result.stderr, 'utf-8');
-        await fs.writeFile(
-          path.join(runDir, 'meta.json'),
-          JSON.stringify(
-            { runId, agent: 'codex', engine: 'codex-cli', exitCode: result.exitCode, durationMs: result.durationMs },
-            null,
-            2,
-          ),
-          'utf-8',
-        );
-        if (body.threadId) {
-          const tp = path.join(VAULT_ROOT, 'chats', `${body.threadId}.json`);
-          await fs.mkdir(path.dirname(tp), { recursive: true });
-          await fs.writeFile(
-            tp,
-            JSON.stringify(
-              {
-                threadId: body.threadId,
-                agent: 'codex',
-                updatedAt: new Date().toISOString(),
-                messages: [...body.messages, { role: 'assistant', content: result.stdout }],
-              },
-              null,
-              2,
-            ),
-            'utf-8',
-          );
-        }
-        // Extract the assistant's visible output from codex's stdout. Codex
-        // prints its session header + a `user\n...` block + the assistant
-        // reply. Strip the header so the UI shows only the answer.
-        const clean = (() => {
-          const lines = result.stdout.split('\n');
-          // Drop everything up to and including the last `--------` separator
-          // and the following `user` block.
-          let start = 0;
-          let sepCount = 0;
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i]!.trim() === '--------') sepCount++;
-            if (sepCount === 2) { start = i + 1; break; }
+      const runId = `codex-${Date.now()}`;
+      const runDir = path.join(VAULT_ROOT, 'runs', runId);
+      await fs.mkdir(runDir, { recursive: true });
+
+      const encoder = new TextEncoder();
+      let finalText = '';
+      let exitCode = 0;
+      let stdoutAccum = '';
+      let stderrAccum = '';
+
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const send = (event: string, data: unknown) => {
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+          };
+          send('meta', { runId });
+
+          // Parse codex JSONL events as they arrive, forward meaningful
+          // ones downstream.  Keep a rolling buffer for partial lines.
+          let buf = '';
+          const onStdout = (chunk: string) => {
+            stdoutAccum += chunk;
+            buf += chunk;
+            let nl: number;
+            while ((nl = buf.indexOf('\n')) !== -1) {
+              const line = buf.slice(0, nl).trim();
+              buf = buf.slice(nl + 1);
+              if (!line) continue;
+              let ev: any;
+              try { ev = JSON.parse(line); } catch { continue; }
+
+              const t = ev.type;
+              const it = ev.item ?? {};
+              const itType = it.type as string | undefined;
+              if (t === 'item.completed' && itType === 'agent_message') {
+                const text = String(it.text ?? '');
+                // Emit the whole message (codex doesn't stream per-token in
+                // this version). Treat it as a single delta so the UI just
+                // appends.
+                if (text) {
+                  const delta = text.slice(finalText.length);
+                  finalText = text;
+                  send('text', { delta });
+                }
+              } else if (t === 'item.completed' && itType === 'reasoning') {
+                const summary = String(it.text ?? '').trim();
+                if (summary) send('reasoning', { text: summary });
+              } else if (t === 'item.completed' && (itType === 'command_execution' || itType?.startsWith('command'))) {
+                send('tool', {
+                  name: 'shell',
+                  args: it.command ?? '',
+                  output: String(it.aggregated_output ?? '').slice(0, 2000),
+                });
+              } else if ((t === 'item.started' || t === 'item.updated') && itType) {
+                if (itType.startsWith('command')) {
+                  send('tool_pending', { name: 'shell', args: it.command ?? '' });
+                } else if (itType === 'reasoning') {
+                  send('reasoning_pending', {});
+                }
+              } else if (t === 'turn.completed' && ev.usage) {
+                send('usage', ev.usage);
+              } else if (t === 'error') {
+                send('error', { message: ev.message ?? 'error' });
+              } else if (t === 'turn.failed') {
+                send('error', { message: ev.error?.message ?? 'turn failed' });
+              }
+            }
+          };
+          const onStderr = (chunk: string) => { stderrAccum += chunk; };
+
+          try {
+            const result = await runCodex(last.content, { config, history, onStdout, onStderr });
+            exitCode = result.exitCode;
+            if (!finalText && exitCode !== 0) {
+              send('error', { message: stderrAccum.trim() || 'codex exited non-zero' });
+            }
+          } catch (err) {
+            if (err instanceof CodexNotInstalled) {
+              send('error', { message: 'codex binary not found' });
+            } else {
+              send('error', { message: err instanceof Error ? err.message : String(err) });
+            }
           }
-          // After the 2nd separator we may have `user\n<prompt>\n\nassistant\n...`.
-          const rest = lines.slice(start).join('\n');
-          const idx = rest.indexOf('\nassistant\n');
-          return (idx >= 0 ? rest.slice(idx + '\nassistant\n'.length) : rest).trim();
-        })();
 
-        const contentOrError = clean
-          ? clean
-          : result.exitCode !== 0 && result.stderr
-            ? `Error (exit ${result.exitCode}):\n\n${result.stderr.trim()}`
-            : '(agent produced no output — check Runs for details)';
+          // Persist run
+          try {
+            await fs.writeFile(path.join(runDir, 'stdout.log'), stdoutAccum, 'utf-8');
+            await fs.writeFile(path.join(runDir, 'stderr.log'), stderrAccum, 'utf-8');
+            await fs.writeFile(
+              path.join(runDir, 'meta.json'),
+              JSON.stringify({ runId, agent: 'codex', engine: 'codex-cli', exitCode }, null, 2),
+              'utf-8',
+            );
+            if (body.threadId) {
+              const tp = path.join(VAULT_ROOT, 'chats', `${body.threadId}.json`);
+              await fs.mkdir(path.dirname(tp), { recursive: true });
+              await fs.writeFile(
+                tp,
+                JSON.stringify(
+                  {
+                    threadId: body.threadId,
+                    agent: 'codex',
+                    updatedAt: new Date().toISOString(),
+                    messages: [...body.messages, { role: 'assistant', content: finalText }],
+                  },
+                  null,
+                  2,
+                ),
+                'utf-8',
+              );
+            }
+          } catch {}
 
-        return c.json({
-          role: 'assistant',
-          content: contentOrError,
-          runId,
-          costCents: 0, // server-side /api/agent/responses did the billing
-          exitCode: result.exitCode,
-        });
-      } catch (err) {
-        if (!(err instanceof CodexNotInstalled)) {
-          return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
-        }
-        // fall through to built-in loop
-      }
+          send('done', { runId, final: finalText, exitCode });
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
     }
 
     // Fallback: our own Responses API loop.

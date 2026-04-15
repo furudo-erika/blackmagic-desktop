@@ -77,7 +77,14 @@ export async function runCodex(
         '\n\n## Current request\n\n';
   const prompt = prelude + task;
 
-  const args = ['exec', '-C', VAULT_ROOT, '--skip-git-repo-check', '--full-auto', prompt];
+  const args = [
+    'exec',
+    '-C', VAULT_ROOT,
+    '--skip-git-repo-check',
+    '--full-auto',
+    '--json',         // JSONL events to stdout — the daemon streams them out
+    prompt,
+  ];
 
   // Codex inherits env, and if the user has http_proxy / https_proxy set
   // for their normal browsing, codex will try to route localhost traffic

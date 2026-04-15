@@ -73,6 +73,56 @@ export const api = {
       '/api/chat',
       { method: 'POST', body: JSON.stringify({ messages, agent, threadId }) },
     ),
+
+  /** Streaming chat.  Invokes onEvent for every SSE frame the daemon emits. */
+  chatStream: async (
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+    opts: {
+      agent?: string;
+      threadId?: string;
+      onEvent: (ev: { type: string; data: any }) => void;
+      signal?: AbortSignal;
+    },
+  ) => {
+    const { daemonPort, daemonToken } = getBridge();
+    if (!daemonPort) throw new Error('daemon not connected');
+    const res = await fetch(`http://127.0.0.1:${daemonPort}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${daemonToken}`,
+      },
+      body: JSON.stringify({ messages, agent: opts.agent, threadId: opts.threadId }),
+      signal: opts.signal,
+    });
+    if (!res.ok || !res.body) {
+      const text = await res.text().catch(() => '');
+      throw new ApiError(res.status, `${res.status} ${text.slice(0, 300)}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buf.indexOf('\n\n')) !== -1) {
+        const block = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        let event = 'message';
+        const dataLines: string[] = [];
+        for (const line of block.split('\n')) {
+          if (line.startsWith('event: ')) event = line.slice(7).trim();
+          else if (line.startsWith('data: ')) dataLines.push(line.slice(6));
+        }
+        if (!dataLines.length) continue;
+        try {
+          opts.onEvent({ type: event, data: JSON.parse(dataLines.join('\n')) });
+        } catch {}
+      }
+    }
+  },
   listChats: () =>
     request<{ threads: Array<{ threadId: string; agent: string; updatedAt: string; preview: string; count: number }> }>(
       '/api/chats',

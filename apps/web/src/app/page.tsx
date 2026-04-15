@@ -58,20 +58,70 @@ export default function ChatPage() {
     }
   }
 
+  const [streamingTools, setStreamingTools] = useState<string[]>([]);
   const sendMut = useMutation({
-    mutationFn: (msgs: Msg[]) => api.chat(msgs, undefined, threadId),
-    onSuccess: (data: any) => {
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.content || '(no response)' }]);
-      setLastMeta({
-        runId: data.runId,
-        costCents: data.costCents ?? 0,
-        tokensIn: data.tokensIn,
-        tokensOut: data.tokensOut,
+    mutationFn: async (msgs: Msg[]) => {
+      // Append a placeholder assistant bubble we'll mutate as deltas arrive.
+      setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
+      setStreamingTools([]);
+      let assistantText = '';
+      let runId = '';
+      await api.chatStream(msgs, {
+        threadId,
+        onEvent: ({ type, data }) => {
+          if (type === 'meta') runId = data.runId;
+          else if (type === 'text') {
+            assistantText += String(data.delta ?? '');
+            setMessages((prev) => {
+              const copy = prev.slice();
+              copy[copy.length - 1] = { role: 'assistant', content: assistantText };
+              return copy;
+            });
+          } else if (type === 'tool_pending') {
+            setStreamingTools((t) => [...t, `→ ${data.name}`]);
+          } else if (type === 'tool') {
+            setStreamingTools((t) => [...t, `✓ ${data.name}`]);
+          } else if (type === 'error') {
+            assistantText = assistantText
+              ? assistantText + '\n\n_error_: ' + data.message
+              : '⚠︎ ' + data.message;
+            setMessages((prev) => {
+              const copy = prev.slice();
+              copy[copy.length - 1] = { role: 'assistant', content: assistantText };
+              return copy;
+            });
+          } else if (type === 'done') {
+            runId = data.runId ?? runId;
+            if (!assistantText && data.final) {
+              assistantText = String(data.final);
+              setMessages((prev) => {
+                const copy = prev.slice();
+                copy[copy.length - 1] = { role: 'assistant', content: assistantText };
+                return copy;
+              });
+            }
+          }
+        },
       });
+      return { runId, assistantText };
+    },
+    onSuccess: ({ runId }) => {
+      setLastMeta({ runId, costCents: 0 });
+      setStreamingTools([]);
       qc.invalidateQueries({ queryKey: ['sidebar-chats'] });
     },
     onError: (e: Error) => {
-      setMessages((prev) => [...prev, { role: 'assistant', content: `error: ${e.message}` }]);
+      setStreamingTools([]);
+      setMessages((prev) => {
+        const copy = prev.slice();
+        const last = copy[copy.length - 1];
+        if (last?.role === 'assistant' && !last.content) {
+          copy[copy.length - 1] = { role: 'assistant', content: `error: ${e.message}` };
+        } else {
+          copy.push({ role: 'assistant', content: `error: ${e.message}` });
+        }
+        return copy;
+      });
     },
   });
 
@@ -129,10 +179,10 @@ export default function ChatPage() {
               </div>
             </div>
           ))}
-          {sendMut.isPending && (
+          {sendMut.isPending && messages[messages.length - 1]?.content === '' && (
             <div className="flex justify-start">
               <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-muted dark:text-[#8C837C]">
-                thinking…
+                {streamingTools.length > 0 ? streamingTools.slice(-1)[0] : 'thinking…'}
               </div>
             </div>
           )}
