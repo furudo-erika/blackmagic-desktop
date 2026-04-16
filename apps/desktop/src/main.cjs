@@ -1,7 +1,7 @@
 // Electron main. Responsibilities:
 //  1. Spawn the Node daemon as a child process.
 //  2. Wait for its discovery file ~/BlackMagic/.bm/daemon.json.
-//  3. Create a BrowserWindow loading either the dev URL (http://localhost:3000)
+//  3. Create a BrowserWindow loading either the dev URL (http://localhost:<port>)
 //     or the packaged static export (resources/web/index.html).
 //  4. Inject daemon port + local token into window.bmBridge.
 
@@ -15,6 +15,7 @@ const APP_NAME = 'Black Magic';
 const RESOURCES = path.join(__dirname, '..', 'resources');
 const ICON_PNG = path.join(RESOURCES, 'icon.png');
 const ICON_ICNS = path.join(RESOURCES, 'icon.icns');
+const WEB_DEV_PORT = process.env.BM_WEB_PORT || '3000';
 
 // Force the app name before app.whenReady(). In dev, macOS still reads
 // CFBundleName from Electron.app/Contents/Info.plist (= "Electron") for the
@@ -154,7 +155,7 @@ async function createWindow() {
   });
 
   if (!app.isPackaged && process.env.BM_DEV) {
-    win.loadURL('http://localhost:3000');
+    win.loadURL(`http://localhost:${WEB_DEV_PORT}`);
     if (process.env.BM_DEVTOOLS === '1') {
       win.webContents.openDevTools({ mode: 'detach' });
     }

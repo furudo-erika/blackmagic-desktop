@@ -30,6 +30,11 @@ import { pushTriggers, pushDrafts } from './sync.js';
 import { runCodex, codexAvailable, CodexNotInstalled } from './codex.js';
 import { seedAcmeDemo } from './us-demo.js';
 import {
+  deriveRunPreview,
+  extractTaskFromPromptMarkdown,
+  summarizeRunPreview,
+} from './run-preview.js';
+import {
   PROVIDERS,
   listIntegrations,
   saveIntegration,
@@ -114,6 +119,57 @@ async function pickPort(preferred?: number): Promise<number> {
       }
     });
   });
+}
+
+async function loadRunListEntry(runsDir: string, runId: string) {
+  const [meta, prompt, finalMd, stdout] = await Promise.all([
+    fs.readFile(path.join(runsDir, runId, 'meta.json'), 'utf-8').then(JSON.parse).catch(() => null),
+    fs.readFile(path.join(runsDir, runId, 'prompt.md'), 'utf-8').catch(() => ''),
+    fs.readFile(path.join(runsDir, runId, 'final.md'), 'utf-8').catch(() => ''),
+    fs.readFile(path.join(runsDir, runId, 'stdout.log'), 'utf-8').catch(() => ''),
+  ]);
+
+  const entry = meta && typeof meta === 'object' ? { ...meta } : { runId };
+  entry.runId = entry.runId ?? runId;
+  entry.preview = deriveRunPreview({
+    prompt,
+    metaPreview: entry.preview,
+    final: finalMd,
+    stdout,
+    agent: entry.agent,
+    runId: entry.runId,
+  });
+  return entry;
+}
+
+type ChatMessage = { role: 'user' | 'assistant'; content: string };
+
+async function loadRunConversation(meta: any, prompt: string, finalMd: string): Promise<{
+  threadId?: string;
+  messages: ChatMessage[];
+}> {
+  const threadId = typeof meta?.threadId === 'string' && meta.threadId ? meta.threadId : undefined;
+  if (threadId) {
+    try {
+      const chatRaw = await fs.readFile(path.join(getVaultRoot(), 'chats', `${threadId}.json`), 'utf-8');
+      const chat = JSON.parse(chatRaw) as { messages?: ChatMessage[] };
+      if (Array.isArray(chat.messages)) {
+        const messages = chat.messages.filter(
+          (m): m is ChatMessage =>
+            !!m &&
+            (m.role === 'user' || m.role === 'assistant') &&
+            typeof m.content === 'string',
+        );
+        if (messages.length > 0) return { threadId, messages };
+      }
+    } catch {}
+  }
+
+  const messages: ChatMessage[] = [];
+  const task = extractTaskFromPromptMarkdown(prompt);
+  if (task) messages.push({ role: 'user', content: task });
+  if (finalMd.trim()) messages.push({ role: 'assistant', content: finalMd.trim() });
+  return { threadId, messages };
 }
 
 async function main() {
@@ -600,16 +656,7 @@ async function main() {
       const runs = await Promise.all(
         entries
           .filter((e) => e.isDirectory())
-          .map(async (e) => {
-            try {
-              const meta = JSON.parse(
-                await fs.readFile(path.join(runsDir, e.name, 'meta.json'), 'utf-8'),
-              );
-              return meta;
-            } catch {
-              return { runId: e.name };
-            }
-          }),
+          .map((e) => loadRunListEntry(runsDir, e.name)),
       );
       runs.sort((a, b) => (a.runId < b.runId ? 1 : -1));
       return c.json({ runs });
@@ -630,7 +677,8 @@ async function main() {
           .then((s) => s.split('\n').filter(Boolean).map((l) => JSON.parse(l)))
           .catch(() => []),
       ]);
-      return c.json({ meta, prompt, final: finalMd, toolCalls });
+      const conversation = await loadRunConversation(meta, prompt, finalMd);
+      return c.json({ meta, prompt, final: finalMd, toolCalls, ...conversation });
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 404);
     }
@@ -743,11 +791,22 @@ async function main() {
 
           // Persist run
           try {
+            const preview = summarizeRunPreview(last.content) ?? summarizeRunPreview(finalText);
+            await fs.writeFile(
+              path.join(runDir, 'prompt.md'),
+              `# Run ${runId}\n\n## Task\n\n${last.content}\n`,
+              'utf-8',
+            );
+            await fs.writeFile(path.join(runDir, 'final.md'), finalText + '\n', 'utf-8');
             await fs.writeFile(path.join(runDir, 'stdout.log'), stdoutAccum, 'utf-8');
             await fs.writeFile(path.join(runDir, 'stderr.log'), stderrAccum, 'utf-8');
             await fs.writeFile(
               path.join(runDir, 'meta.json'),
-              JSON.stringify({ runId, agent: 'codex', engine: 'codex-cli', exitCode }, null, 2),
+              JSON.stringify(
+                { runId, agent: 'codex', engine: 'codex-cli', exitCode, preview, threadId: body.threadId },
+                null,
+                2,
+              ),
               'utf-8',
             );
             if (body.threadId) {
@@ -790,6 +849,7 @@ async function main() {
         agent: body.agent ?? 'researcher',
         task: last.content,
         history,
+        threadId: body.threadId,
         config,
       });
       // Persist full thread so /runs and a future history UI can show it.

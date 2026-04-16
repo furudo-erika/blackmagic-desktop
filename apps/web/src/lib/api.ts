@@ -164,11 +164,18 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ agent, task }) },
     ),
   listRuns: () =>
-    request<{ runs: Array<{ runId: string; agent: string; model: string; tokensIn: number; tokensOut: number; costCents: number; toolCalls: number; turns: number }> }>(
+    request<{ runs: Array<{ runId: string; agent: string; model: string; preview?: string; tokensIn: number; tokensOut: number; costCents: number; toolCalls: number; turns: number }> }>(
       '/api/agent/runs',
     ),
   getRun: (id: string) =>
-    request<{ meta: any; prompt: string; final: string; toolCalls: any[] }>(`/api/agent/runs/${encodeURIComponent(id)}`),
+    request<{
+      meta: any;
+      prompt: string;
+      final: string;
+      toolCalls: any[];
+      threadId?: string;
+      messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    }>(`/api/agent/runs/${encodeURIComponent(id)}`),
   listIntegrations: () => request<{ integrations: Integration[] }>('/api/integrations'),
   saveIntegrationToken: (provider: IntegrationProvider, credentials: Record<string, string>) =>
     request<{ ok: true }>(`/api/integrations/${provider}`, {

@@ -5,6 +5,9 @@ out
 .turbo
 .env
 .env.local
+.env.*
+!.env.example
+.claude/
 *.log
 .DS_Store
 apps/desktop/release

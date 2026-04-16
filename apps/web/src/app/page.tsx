@@ -279,10 +279,13 @@ export default function HomePage() {
                     <Bot className="w-3.5 h-3.5 text-muted dark:text-[#8C837C] shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="text-[12px] text-ink dark:text-[#F5F1EA] truncate">
-                        <span className="font-medium">{r.agent || '—'}</span>
+                        <span className="font-medium">{r.preview || r.agent || '—'}</span>
                         {r.model && <span className="ml-2 text-[11px] font-mono text-muted dark:text-[#8C837C]">{r.model}</span>}
                       </div>
-                      <div className="text-[10px] font-mono text-muted dark:text-[#8C837C] truncate">{r.runId}</div>
+                      <div className="text-[10px] text-muted dark:text-[#8C837C] truncate">
+                        <span className="font-mono">{r.runId}</span>
+                        {r.agent && <span className="ml-2">{r.agent}</span>}
+                      </div>
                     </div>
                     <div className="text-[10px] font-mono text-muted dark:text-[#8C837C] shrink-0 text-right">
                       <div>${((r.costCents ?? 0) / 100).toFixed(2)}</div>

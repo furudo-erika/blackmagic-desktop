@@ -111,7 +111,7 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
   ), [tree.data, slug]);
   const mentioningRuns = useMemo(() => (runs.data?.runs ?? [])
     .filter((r) => {
-      const hay = `${r.agent ?? ''} ${r.runId ?? ''}`.toLowerCase();
+      const hay = `${r.preview ?? ''} ${r.agent ?? ''} ${r.runId ?? ''}`.toLowerCase();
       return hay.includes(slug) || (domain && hay.includes(domain));
     })
     .slice(0, 5), [runs.data, slug, domain]);
@@ -167,8 +167,9 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
         <DrawerSection icon={History} label="Recent runs" count={mentioningRuns.length} allHref="/runs" empty="no runs referenced this company">
           <ul className="space-y-0.5">
             {mentioningRuns.map((r) => (
-              <li key={r.runId} className="text-[11px] font-mono text-muted dark:text-[#8C837C] truncate">
-                {r.agent} · {timeAgo(runStartedMs(r.runId))}
+              <li key={r.runId} className="text-[11px] text-muted dark:text-[#8C837C] truncate">
+                <span className="text-ink dark:text-[#E6E0D8]">{r.preview || r.agent || r.runId}</span>
+                <span className="ml-2 font-mono">{timeAgo(runStartedMs(r.runId))}</span>
               </li>
             ))}
           </ul>

@@ -3,6 +3,7 @@ import path from 'node:path';
 import matter from 'gray-matter';
 import { BUILTIN_TOOLS, toolsAsOpenAI, toolsByName, type ToolDef, type ToolCtx } from './tools.js';
 import { getVaultRoot, type Config } from './paths.js';
+import { summarizeRunPreview } from './run-preview.js';
 
 // Price table — must match doc/BILLING.md
 const PRICE: Record<string, { in: number; out: number }> = {
@@ -72,6 +73,7 @@ export interface RunOptions {
   task: string;
   /** Optional prior conversation (user + assistant turns). Prepended before `task`. */
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  threadId?: string;
   config: Config;
   onEvent?: (ev: RunEvent) => void;
   maxTurns?: number;
@@ -297,10 +299,22 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
   );
 
   const costCents = priceCents(spec.model, tokensIn, tokensOut);
+  const preview = summarizeRunPreview(task) ?? summarizeRunPreview(finalText);
   await fs.writeFile(
     path.join(runDir, 'meta.json'),
     JSON.stringify(
-      { runId, agent, model: spec.model, tokensIn, tokensOut, costCents, toolCalls, turns: toolLog.length },
+      {
+        runId,
+        agent,
+        model: spec.model,
+        tokensIn,
+        tokensOut,
+        costCents,
+        toolCalls,
+        turns: toolLog.length,
+        preview,
+        threadId: opts.threadId,
+      },
       null,
       2,
     ),

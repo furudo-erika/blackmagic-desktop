@@ -40,20 +40,27 @@ function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () => void
       {run.isLoading && <div className="p-5 text-sm text-muted dark:text-[#8C837C]">loading…</div>}
       {run.data && (
         <div className="p-5 space-y-5">
-          {run.data.meta && (
+          {run.data.messages?.length > 0 && (
             <section>
-              <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-2">Meta</div>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px] font-mono">
-                {Object.entries(run.data.meta).map(([k, v]) => (
-                  <div key={k} className="contents">
-                    <dt className="text-muted dark:text-[#8C837C]">{k}</dt>
-                    <dd className="text-ink dark:text-[#E6E0D8] break-words">{typeof v === 'string' ? v : JSON.stringify(v)}</dd>
+              <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-3">Conversation</div>
+              <div className="space-y-4">
+                {run.data.messages.map((m, i) => (
+                  <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+                    <div
+                      className={
+                        m.role === 'user'
+                          ? 'bg-ink dark:bg-[#3A322A] text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[88%] whitespace-pre-wrap'
+                          : 'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-5 py-3 max-w-[92%]'
+                      }
+                    >
+                      {m.role === 'user' ? m.content : <Markdown source={m.content} />}
+                    </div>
                   </div>
                 ))}
-              </dl>
+              </div>
             </section>
           )}
-          {run.data.final && (
+          {!run.data.messages?.length && run.data.final && (
             <section>
               <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-2">Final answer</div>
               <div className="bg-cream-light dark:bg-[#17140F] rounded-md p-4 max-h-72 overflow-y-auto">
@@ -62,11 +69,11 @@ function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () => void
             </section>
           )}
           {run.data.toolCalls?.length > 0 && (
-            <section>
-              <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-2">
+            <details>
+              <summary className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] cursor-pointer">
                 Tool calls ({run.data.toolCalls.length})
-              </div>
-              <div className="space-y-2">
+              </summary>
+              <div className="mt-2 space-y-2">
                 {run.data.toolCalls.map((tc, i) => (
                   <details key={i} className="bg-cream-light dark:bg-[#17140F] rounded-md">
                     <summary className="px-3 py-2 cursor-pointer text-[12px] font-mono text-ink dark:text-[#E6E0D8] flex items-center gap-2">
@@ -79,7 +86,22 @@ function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () => void
                   </details>
                 ))}
               </div>
-            </section>
+            </details>
+          )}
+          {run.data.meta && (
+            <details>
+              <summary className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] cursor-pointer">
+                Meta
+              </summary>
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px] font-mono">
+                {Object.entries(run.data.meta).map(([k, v]) => (
+                  <div key={k} className="contents">
+                    <dt className="text-muted dark:text-[#8C837C]">{k}</dt>
+                    <dd className="text-ink dark:text-[#E6E0D8] break-words">{typeof v === 'string' ? v : JSON.stringify(v)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
           )}
           {run.data.prompt && (
             <details>
@@ -132,7 +154,7 @@ export default function RunsPage() {
                     leading={<Bot className="w-4 h-4 text-muted dark:text-[#8C837C]" />}
                     title={
                       <span className="flex items-center gap-2 min-w-0">
-                        <span className="truncate">{r.agent || '—'}</span>
+                        <span className="truncate">{r.preview || r.agent || '—'}</span>
                         {r.model && (
                           <span className="text-[10px] font-mono text-muted dark:text-[#8C837C] truncate">
                             {r.model}
@@ -140,7 +162,12 @@ export default function RunsPage() {
                         )}
                       </span>
                     }
-                    subtitle={<span className="font-mono">{r.runId}</span>}
+                    subtitle={
+                      <span className="truncate">
+                        <span className="font-mono">{r.runId}</span>
+                        {r.agent && <span className="ml-2 text-muted dark:text-[#8C837C]">{r.agent}</span>}
+                      </span>
+                    }
                     trailing={
                       <div className="hidden sm:flex items-center gap-4 font-mono">
                         {r.toolCalls != null && <span>{r.toolCalls} tools</span>}
