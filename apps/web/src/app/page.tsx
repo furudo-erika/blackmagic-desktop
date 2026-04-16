@@ -125,7 +125,9 @@ export default function HomePage() {
   const counts = useMemo(() => {
     const files = tree.data?.tree.filter((e) => e.type === 'file') ?? [];
     return {
-      companies: files.filter((f) => f.path.startsWith('companies/') && f.path.endsWith('.md')).length,
+      companies: files.filter(
+        (f) => f.path.startsWith('companies/') && f.path.endsWith('.md') && !f.path.endsWith('-research.md'),
+      ).length,
       contacts: files.filter((f) => f.path.startsWith('contacts/') && f.path.endsWith('.md')).length,
       openDeals: files.filter((f) => f.path.startsWith('deals/open/') && f.path.endsWith('.md')).length,
     };

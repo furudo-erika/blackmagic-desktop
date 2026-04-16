@@ -219,6 +219,8 @@ export default function CompaniesPage() {
             frontmatter: fm,
           };
         }),
+      ).then((rows) =>
+        rows.filter((row) => row.frontmatter.kind !== 'company-research' && !row.path.endsWith('-research.md')),
       );
     },
   });
