@@ -77,13 +77,16 @@ let task: cron.ScheduledTask | null = null;
 
 export function startSequenceCron(config: Config) {
   if (task) task.stop();
-  // 09:05 every day — after the daily trigger window, before business hours
-  // in most timezones. Keep this lightweight; it's a walk, not a spray.
-  task = cron.schedule('5 9 * * *', () => {
+  const run = () =>
     walkSequencesOnce(config).then(
       (r) => console.log(`[sequence-cron] walk complete: ${r.fired} touches fired over ${r.enrollments} enrollments`),
       (err) => console.error('[sequence-cron] walk failed:', err),
     );
-  });
-  console.log('[sequence-cron] scheduled daily walk @ 09:05');
+  // Every 30 minutes — day-0 touches fire promptly after enrollment,
+  // and the step bump makes re-runs idempotent.
+  task = cron.schedule('*/30 * * * *', run);
+  // Fire once on startup so a freshly-started daemon picks up any due touches
+  // without waiting up to 30 minutes.
+  setTimeout(run, 10_000).unref?.();
+  console.log('[sequence-cron] scheduled walk every 30m (plus startup kick)');
 }

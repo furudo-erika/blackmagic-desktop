@@ -537,16 +537,30 @@ tools:
   - web_fetch
   - web_search
   - enrich_company
+  - enrich_contact
+  - enrich_contact_linkedin
+  - draft_create
+  - enroll_contact_in_sequence
 temperature: 0.2
 ---
 
-You are the research agent. Given a company domain, produce a
-companies/<slug>.md with rich frontmatter (name, domain, industry,
-size, revenue, hq, icp_score, icp_reasons, enriched_at) and a 150-word
-body covering what they do, recent news, and best-guess buying committee.
+You are the research + chat agent. You answer freeform user questions
+about the vault and also drive outbound GTM work.
 
-Use \`enrich_company\` first for firmographics, then \`web_search\` for news.
-Never fabricate fields — write \`null\` if unknown.
+When asked to research a company, produce a companies/<slug>.md with
+rich frontmatter (name, domain, industry, size, revenue, hq, icp_score,
+icp_reasons, enriched_at) and a 150-word body covering what they do,
+recent news, and best-guess buying committee. Use \`enrich_company\`
+first for firmographics, then \`web_search\` for news. Never fabricate
+fields — write \`null\` if unknown.
+
+When asked to draft outbound email or LinkedIn DM, call \`draft_create\`
+with the exact recipient, subject, body, and the \`tool\` slug to send
+with (e.g. \`gmail.send_email\` or \`send_email\`). Drafts land in
+drafts/ for human approve/reject — never try to send directly.
+
+When asked to enroll a contact in a multi-touch sequence, call
+\`enroll_contact_in_sequence\` with the contact path and sequence path.
 `,
   'sdr.md': `---
 kind: agent
@@ -1819,6 +1833,26 @@ export async function ensureVault(): Promise<{ created: boolean }> {
   for (const [name, body] of Object.entries(DEFAULT_AGENTS)) {
     const p = path.join(getVaultRoot(), 'agents', name);
     if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
+  }
+
+  // Migration: ensure the researcher/chat agent has outbound tooling.
+  // Early vaults were seeded without draft_create, so chat couldn't draft.
+  const researcherPath = path.join(getVaultRoot(), 'agents', 'researcher.md');
+  if (fsSync.existsSync(researcherPath)) {
+    try {
+      const raw = await fs.readFile(researcherPath, 'utf-8');
+      const parsed = matter(raw);
+      const fm = parsed.data as any;
+      const tools: string[] = Array.isArray(fm.tools) ? fm.tools.slice() : [];
+      let changed = false;
+      for (const need of ['draft_create', 'enroll_contact_in_sequence', 'enrich_contact', 'enrich_contact_linkedin']) {
+        if (!tools.includes(need)) { tools.push(need); changed = true; }
+      }
+      if (changed) {
+        fm.tools = tools;
+        await fs.writeFile(researcherPath, matter.stringify(parsed.content, fm), 'utf-8');
+      }
+    } catch {}
   }
 
   for (const [name, body] of Object.entries(DEFAULT_PLAYBOOKS)) {
