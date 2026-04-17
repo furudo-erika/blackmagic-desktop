@@ -1599,7 +1599,7 @@ description: Classic five-touch cold outbound over three weeks.
 touches:
   - day: 0
     channel: email
-    playbook: outbound-draft
+    playbook: draft-outbound
     prompt: >-
       Opening cold email to {{contact_path}}. Hypothesis-based, <=120 words,
       one CTA. Reference one specific public signal if available.

@@ -263,7 +263,20 @@ export const api = {
       body: JSON.stringify({ contact_path }),
     }),
   walkSequences: () =>
-    request<{ enrollments: number; fired: number }>('/api/sequences/walk', { method: 'POST' }),
+    request<{
+      enrollments: number;
+      fired: number;
+      failed: number;
+      failures: Array<{
+        contactPath: string;
+        sequencePath: string;
+        step: number;
+        day: number;
+        kind: 'playbook' | 'agent';
+        target: string;
+        error: string;
+      }>;
+    }>('/api/sequences/walk', { method: 'POST' }),
 
   // Projects (multi-vault). See daemon/src/projects.ts.
   listProjects: () =>

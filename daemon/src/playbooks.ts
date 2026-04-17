@@ -11,8 +11,24 @@ interface PlaybookSpec {
   body: string;
 }
 
+const PLAYBOOK_ALIASES: Record<string, string> = {
+  'outbound-draft': 'draft-outbound',
+};
+
+async function resolvePlaybookPath(name: string): Promise<string> {
+  const exactPath = path.join(getVaultRoot(), 'playbooks', `${name}.md`);
+  try {
+    await fs.access(exactPath);
+    return exactPath;
+  } catch {
+    const alias = PLAYBOOK_ALIASES[name];
+    if (!alias) return exactPath;
+    return path.join(getVaultRoot(), 'playbooks', `${alias}.md`);
+  }
+}
+
 export async function loadPlaybook(name: string): Promise<PlaybookSpec> {
-  const p = path.join(getVaultRoot(), 'playbooks', `${name}.md`);
+  const p = await resolvePlaybookPath(name);
   const raw = await fs.readFile(p, 'utf-8');
   const m = matter(raw);
   const fm = m.data as any;
