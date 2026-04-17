@@ -17,6 +17,12 @@ export interface Draft {
   created_at?: string;
 }
 
+function normalizeCreatedAt(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+  return undefined;
+}
+
 export async function listDrafts(): Promise<Draft[]> {
   const dir = path.join(getVaultRoot(), 'drafts');
   try {
@@ -24,20 +30,24 @@ export async function listDrafts(): Promise<Draft[]> {
     const out: Draft[] = [];
     for (const f of entries) {
       if (!f.endsWith('.md')) continue;
-      const raw = await fs.readFile(path.join(dir, f), 'utf-8');
-      const m = matter(raw);
-      const fm = m.data as any;
-      out.push({
-        id: path.basename(f, '.md'),
-        path: `drafts/${f}`,
-        channel: fm.channel ?? 'email',
-        to: fm.to ?? '',
-        subject: fm.subject,
-        body: m.content.trim(),
-        tool: fm.tool ?? '',
-        status: fm.status ?? 'pending',
-        created_at: fm.created_at,
-      });
+      try {
+        const raw = await fs.readFile(path.join(dir, f), 'utf-8');
+        const m = matter(raw);
+        const fm = m.data as any;
+        out.push({
+          id: path.basename(f, '.md'),
+          path: `drafts/${f}`,
+          channel: fm.channel ?? 'email',
+          to: fm.to ?? '',
+          subject: fm.subject,
+          body: m.content.trim(),
+          tool: fm.tool ?? '',
+          status: fm.status ?? 'pending',
+          created_at: normalizeCreatedAt(fm.created_at),
+        });
+      } catch {
+        // Skip malformed drafts instead of hiding the whole inbox.
+      }
     }
     out.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
     return out;
