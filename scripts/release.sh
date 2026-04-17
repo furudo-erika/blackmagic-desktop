@@ -1,64 +1,99 @@
 #!/usr/bin/env bash
-# Build installers and upload them to a fresh GitHub Release.
+# Build installers + upload to Cloudflare R2 with cache headers tuned for
+# electron-updater. Two file classes:
+#   - large binaries (dmg/exe/blockmap): max-age=300 (versioned filenames)
+#   - update metadata (latest*.yml, version.json): no-store (must be fresh)
 #
-# Usage:
-#   ./scripts/release.sh [tag]        # defaults to v<package.json version>
-#
-# Requires: pnpm, gh (authenticated), electron-builder deps installed.
-# Drops:    apps/desktop/release/*.dmg, *.exe
-# Uploads:  to github.com/furudo-erika/blackmagic-desktop/releases/<tag>
+# Usage: ./scripts/release.sh
+# Requires: pnpm, aws CLI, .env.local with STORAGE_* creds.
 
 set -euo pipefail
-
 cd "$(dirname "$0")/.."
 
-VERSION=$(node -e "console.log(require('./apps/desktop/package.json').version)")
-TAG="${1:-v$VERSION}"
+# Load R2 creds.
+set -a
+# shellcheck disable=SC1091
+source .env.local
+set +a
+export AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_ACCESS_KEY"
+S3_BASE="s3://$STORAGE_BUCKET_NAME/blackmagic-desktop"
+PUBLIC_BASE="$STORAGE_PUBLIC_URL/blackmagic-desktop"
+ENDPOINT="--endpoint-url $STORAGE_ENDPOINT"
 
-echo "▶ Building renderer + daemon…"
+VERSION=$(node -e "console.log(require('./apps/desktop/package.json').version)")
+# minVersion is the floor below which clients are force-quit on launch.
+# Bump this only when shipping a breaking change clients MUST install.
+MIN_VERSION="${MIN_VERSION:-$VERSION}"
+
+echo "▶ Building renderer + daemon (v$VERSION)…"
 pnpm --filter @bm/web build
 pnpm --filter @bm/daemon build
 
-echo "▶ Packaging Mac (arm64 + x64) + Windows (x64)…"
-pnpm --filter @bm/desktop exec electron-builder --mac --x64 --arm64 --win --x64
+echo "▶ Packaging mac (arm64+x64) + win (x64)…"
+pnpm --filter @bm/desktop exec electron-builder --mac --x64 --arm64 --win --x64 --publish never
 
-RELEASE_DIR="apps/desktop/release"
-MAC_ARM="$RELEASE_DIR/Black Magic-${VERSION}-arm64.dmg"
-MAC_X64="$RELEASE_DIR/Black Magic-${VERSION}.dmg"
-WIN_EXE="$RELEASE_DIR/Black Magic Setup ${VERSION}.exe"
+REL="apps/desktop/release"
+MAC_ARM="$REL/BlackMagic AI-${VERSION}-arm64.dmg"
+MAC_X64="$REL/BlackMagic AI-${VERSION}.dmg"
+WIN_EXE="$REL/BlackMagic AI Setup ${VERSION}.exe"
+MAC_YML="$REL/latest-mac.yml"
+WIN_YML="$REL/latest.yml"
 
-for f in "$MAC_ARM" "$MAC_X64" "$WIN_EXE"; do
+for f in "$MAC_ARM" "$MAC_X64" "$WIN_EXE" "$MAC_YML" "$WIN_YML"; do
   [[ -f "$f" ]] || { echo "✗ Missing: $f" >&2; exit 1; }
 done
 
-NOTES="Automated build of $TAG.
+# Cache policies.
+LONG_CACHE='public, max-age=300'
+NO_CACHE='no-cache, no-store, must-revalidate'
 
-**Install**
-- macOS arm64: \`black-magic-mac-arm64.dmg\`
-- macOS Intel: \`black-magic-mac-x64.dmg\`
-- Windows x64: \`black-magic-win.exe\`
+upload () {
+  # $1=local file  $2=remote key  $3=content-type  $4=cache-control
+  echo "  → $2"
+  aws s3 cp "$1" "$S3_BASE/$2" $ENDPOINT \
+    --content-type "$3" \
+    --cache-control "$4"
+}
 
-First-open on macOS (unsigned): \`xattr -d com.apple.quarantine /Applications/Black\\ Magic.app\`."
+echo "▶ Uploading binaries…"
+# electron-updater filenames (must match what's referenced in the yml).
+upload "$MAC_ARM" "BlackMagic AI-${VERSION}-arm64.dmg" "application/x-apple-diskimage" "$LONG_CACHE"
+upload "$MAC_X64" "BlackMagic AI-${VERSION}.dmg"       "application/x-apple-diskimage" "$LONG_CACHE"
+upload "$WIN_EXE" "BlackMagic AI Setup ${VERSION}.exe" "application/x-msdownload"      "$LONG_CACHE"
 
-echo "▶ Creating release ${TAG}…"
-if gh release view "$TAG" >/dev/null 2>&1; then
-  echo "  (release exists — uploading / overwriting assets)"
-  gh release upload --clobber "$TAG" \
-    "$MAC_ARM#black-magic-mac-arm64.dmg" \
-    "$MAC_X64#black-magic-mac-x64.dmg" \
-    "$WIN_EXE#black-magic-win.exe"
-else
-  gh release create "$TAG" \
-    --title "Black Magic Desktop $TAG" \
-    --notes "$NOTES" \
-    "$MAC_ARM#black-magic-mac-arm64.dmg" \
-    "$MAC_X64#black-magic-mac-x64.dmg" \
-    "$WIN_EXE#black-magic-win.exe"
-fi
+# blockmaps (only if generated).
+[[ -f "${MAC_ARM}.blockmap" ]] && upload "${MAC_ARM}.blockmap" "BlackMagic AI-${VERSION}-arm64.dmg.blockmap" "application/octet-stream" "$LONG_CACHE"
+[[ -f "${MAC_X64}.blockmap" ]] && upload "${MAC_X64}.blockmap" "BlackMagic AI-${VERSION}.dmg.blockmap"       "application/octet-stream" "$LONG_CACHE"
+[[ -f "${WIN_EXE}.blockmap" ]] && upload "${WIN_EXE}.blockmap" "BlackMagic AI Setup ${VERSION}.exe.blockmap" "application/octet-stream" "$LONG_CACHE"
 
-BASE="https://github.com/furudo-erika/blackmagic-desktop/releases/download/$TAG"
+# Stable aliases (used by the marketing/download page — version-agnostic URLs).
+upload "$MAC_ARM" "black-magic-mac-arm64.dmg" "application/x-apple-diskimage" "$LONG_CACHE"
+upload "$MAC_X64" "black-magic-mac-x64.dmg"   "application/x-apple-diskimage" "$LONG_CACHE"
+upload "$WIN_EXE" "black-magic-win.exe"       "application/x-msdownload"      "$LONG_CACHE"
+
+echo "▶ Uploading update metadata (no-cache)…"
+upload "$MAC_YML" "latest-mac.yml" "text/yaml" "$NO_CACHE"
+upload "$WIN_YML" "latest.yml"     "text/yaml" "$NO_CACHE"
+
+echo "▶ Writing version.json (no-cache)…"
+TMP_VERSION_JSON=$(mktemp)
+cat >"$TMP_VERSION_JSON" <<EOF
+{
+  "latestVersion": "$VERSION",
+  "minVersion": "$MIN_VERSION",
+  "downloadUrl": "$PUBLIC_BASE/index.html",
+  "updatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+upload "$TMP_VERSION_JSON" "version.json" "application/json" "$NO_CACHE"
+rm "$TMP_VERSION_JSON"
+
 echo
-echo "✔ Release $TAG live. Stable URLs:"
-echo "  $BASE/black-magic-mac-arm64.dmg"
-echo "  $BASE/black-magic-mac-x64.dmg"
-echo "  $BASE/black-magic-win.exe"
+echo "✔ Released v$VERSION (minVersion=$MIN_VERSION)."
+echo "  $PUBLIC_BASE/version.json"
+echo "  $PUBLIC_BASE/latest-mac.yml"
+echo "  $PUBLIC_BASE/latest.yml"
+echo "  $PUBLIC_BASE/black-magic-mac-arm64.dmg"
+echo "  $PUBLIC_BASE/black-magic-mac-x64.dmg"
+echo "  $PUBLIC_BASE/black-magic-win.exe"

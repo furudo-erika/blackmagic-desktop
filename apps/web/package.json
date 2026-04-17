@@ -1,11 +1,11 @@
 {
   "name": "@bm/web",
-  "version": "0.2.0",
+  "version": "0.2.3",
   "private": true,
   "scripts": {
-    "dev": "sh -c 'next dev -p \"${BM_WEB_PORT:-3000}\"'",
+    "dev": "sh -c 'next dev -p \"${BM_WEB_PORT:-7823}\"'",
     "build": "next build",
-    "start": "sh -c 'next start -p \"${BM_WEB_PORT:-3000}\"'",
+    "start": "sh -c 'next start -p \"${BM_WEB_PORT:-7823}\"'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

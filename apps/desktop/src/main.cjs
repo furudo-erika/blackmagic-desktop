@@ -10,12 +10,15 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
+const { autoUpdater } = require('electron-updater');
 
-const APP_NAME = 'Black Magic';
+const APP_NAME = 'BlackMagic AI';
+const VERSION_MANIFEST_URL = 'https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/version.json';
+const DOWNLOAD_PAGE_URL = 'https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/index.html';
 const RESOURCES = path.join(__dirname, '..', 'resources');
 const ICON_PNG = path.join(RESOURCES, 'icon.png');
 const ICON_ICNS = path.join(RESOURCES, 'icon.icns');
-const WEB_DEV_PORT = process.env.BM_WEB_PORT || '3000';
+const WEB_DEV_PORT = process.env.BM_WEB_PORT || '7823';
 
 // Force the app name before app.whenReady(). In dev, macOS still reads
 // CFBundleName from Electron.app/Contents/Info.plist (= "Electron") for the
@@ -37,7 +40,7 @@ if (process.platform === 'darwin' && app.dock) {
 }
 
 // Menu bar: rewrite the application menu so even in dev the first item is
-// "Black Magic" instead of "Electron".
+// "BlackMagic AI" instead of "Electron".
 function buildAppMenu() {
   const isMac = process.platform === 'darwin';
   const template = [];
@@ -114,6 +117,20 @@ function startDaemon() {
   });
 }
 
+async function waitForHttp(url, timeoutMs = 60_000) {
+  const started = Date.now();
+  // Next.js dev compiles on first hit, so we accept any response (even 500/404)
+  // — what matters is that the server is listening.
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const res = await fetch(url, { method: 'GET' });
+      if (res) return;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  console.warn('[main] dev server did not respond in time:', url);
+}
+
 async function waitForDiscovery(timeoutMs = 15_000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
@@ -155,7 +172,9 @@ async function createWindow() {
   });
 
   if (!app.isPackaged && process.env.BM_DEV) {
-    win.loadURL(`http://localhost:${WEB_DEV_PORT}`);
+    const devUrl = `http://localhost:${WEB_DEV_PORT}`;
+    await waitForHttp(devUrl);
+    win.loadURL(devUrl);
     if (process.env.BM_DEVTOOLS === '1') {
       win.webContents.openDevTools({ mode: 'detach' });
     }
@@ -192,9 +211,76 @@ ipcMain.handle('bm:open-external', async (_event, url) => {
   }
 });
 
-app.whenReady().then(() => {
+// Compare semver-ish "a.b.c" strings. Returns -1/0/1.
+function cmpVersion(a, b) {
+  const pa = String(a).split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0;
+    const y = pb[i] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+// Hard-gate: fetch a tiny manifest from R2 and refuse to run if this build
+// is older than minVersion. Cache-busted so CDN can never serve a stale answer.
+// Network failures are non-fatal — we don't want to brick offline users.
+async function enforceMinVersion() {
+  const current = app.getVersion();
+  try {
+    const url = `${VERSION_MANIFEST_URL}?t=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return;
+    const manifest = await res.json();
+    const min = manifest.minVersion;
+    if (!min) return;
+    if (cmpVersion(current, min) >= 0) return;
+
+    const choice = dialog.showMessageBoxSync({
+      type: 'error',
+      title: 'Update required',
+      message: `BlackMagic AI ${current} is no longer supported.`,
+      detail: `Please install version ${manifest.latestVersion || min} or newer to continue.`,
+      buttons: ['Download update', 'Quit'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (choice === 0) shell.openExternal(DOWNLOAD_PAGE_URL);
+    app.exit(0);
+  } catch (err) {
+    console.warn('[main] version-gate check failed:', err?.message || err);
+  }
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('error', (err) => console.warn('[updater] error:', err?.message || err));
+  autoUpdater.on('update-available', (info) => console.log('[updater] update available:', info?.version));
+  autoUpdater.on('update-downloaded', (info) => {
+    const choice = dialog.showMessageBoxSync({
+      type: 'info',
+      title: 'Update ready',
+      message: `BlackMagic AI ${info?.version || ''} is ready to install.`,
+      detail: 'Restart now to apply the update?',
+      buttons: ['Restart', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (choice === 0) autoUpdater.quitAndInstall();
+  });
+  autoUpdater.checkForUpdates().catch((err) => console.warn('[updater] check failed:', err?.message || err));
+}
+
+app.whenReady().then(async () => {
   buildAppMenu();
-  createWindow();
+  await enforceMinVersion();
+  await createWindow();
+  setupAutoUpdater();
 });
 
 app.on('window-all-closed', () => {

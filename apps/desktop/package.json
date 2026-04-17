@@ -1,6 +1,6 @@
 {
   "name": "@bm/desktop",
-  "version": "0.2.0",
+  "version": "0.2.3",
   "private": true,
   "main": "src/main.cjs",
   "scripts": {
@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "run.blackmagic.desktop",
-    "productName": "Black Magic",
+    "productName": "BlackMagic AI",
     "directories": {
       "output": "release",
       "buildResources": "resources"
@@ -26,23 +26,62 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "../web/out", "to": "web", "filter": ["**/*"] },
-      { "from": "../../daemon/dist", "to": "daemon", "filter": ["**/*"] }
+      {
+        "from": "../web/out",
+        "to": "web",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../daemon/dist",
+        "to": "daemon",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
       "icon": "resources/icon.icns",
       "category": "public.app-category.productivity",
       "identity": null
     },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "resources/icon.ico"
     },
     "nsis": {
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico"
     },
-    "dmg": { "writeUpdateInfo": false }
+    "dmg": {
+      "writeUpdateInfo": true
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/",
+        "channel": "latest"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
   }
 }

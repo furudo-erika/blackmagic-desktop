@@ -123,7 +123,7 @@ export function Sidebar() {
       >
         <img src="/logo.svg" alt="" className="w-5 h-5 shrink-0 dark:invert" />
         <span className="font-semibold tracking-tight text-[14px] text-ink dark:text-[#F5F1EA] truncate">
-          Black Magic
+          BlackMagic AI
         </span>
       </div>
 
