@@ -7,14 +7,13 @@ import { getBridge, setBridge } from '../lib/bridge';
 import { ProjectPicker } from './project-picker';
 
 export function LoginGate({ children }: { children: React.ReactNode }) {
-  const [bridgeReady, setBridgeReady] = useState(false);
+  const [bridgeReady, setBridgeReady] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const b = getBridge();
+    return b.daemonPort > 0 && !!b.daemonToken;
+  });
   const [portDraft, setPortDraft] = useState('');
   const [tokenDraft, setTokenDraft] = useState('');
-
-  useEffect(() => {
-    const b = getBridge();
-    setBridgeReady(b.daemonPort > 0 && !!b.daemonToken);
-  }, []);
 
   // Project picker: shown after bridge-ready the first time, or when the
   // sidebar dispatches "bm:open-project-picker".
@@ -35,6 +34,23 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
     bridgeReady &&
     (forcePicker ||
       (!seenPicker && (projects.data?.projects?.length ?? 0) > 1));
+
+  // Fix: when the picker is skipped on first launch (single-project case),
+  // the daemon's VAULT_ROOT never gets set by `activateProject`. Queries
+  // then return empty / stale until the user manually switches projects.
+  // Force-activate the registered `active` project once per session.
+  const [vaultHydrated, setVaultHydrated] = useState(false);
+  useEffect(() => {
+    if (!bridgeReady || vaultHydrated) return;
+    const active = projects.data?.active;
+    if (!active) return;
+    api
+      .activateProject(active)
+      .catch(() => {
+        /* best-effort — ignore */
+      })
+      .finally(() => setVaultHydrated(true));
+  }, [bridgeReady, vaultHydrated, projects.data?.active]);
 
   const health = useQuery({
     queryKey: ['health', bridgeReady],
@@ -292,10 +308,10 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
       await api.seedDemo();
       // Also mark onboarding complete so the gate lifts.
       await api.completeOnboarding({
-        domain: 'acmecloud.example',
-        what_you_sell: 'Schema-first observability for serverless teams.',
-        icp: '50–500 people; B2B SaaS / fintech API / dev tools; AWS or GCP; 10–80 engineers; no dedicated SRE yet',
-        tone: 'Technically precise, a little dry, never breathless',
+        domain: 'vercel.com',
+        what_you_sell: 'The Frontend Cloud — develop, preview, and ship Next.js and any other frontend.',
+        icp: '50–5,000 people; B2B SaaS / e-commerce / AI-native; Next.js or migrating to it; 5–200 web engineers',
+        tone: 'Precise, developer-first, quietly confident — allergic to marketing puff',
       });
       await state.refetch();
     } catch (e: any) {
@@ -320,7 +336,7 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
         {/* Demo shortcut */}
         <div className="mb-5 p-3 rounded-lg border border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] flex items-center justify-between gap-3">
           <div className="text-[12px] text-muted dark:text-[#8C837C]">
-            Just want to poke around? Load the fictional <strong className="text-ink dark:text-[#F5F1EA]">Acme Cloud</strong> demo vault (populated <code className="text-[11px]">us/</code> + one sample prospect + deal).
+            Just want to poke around? Load the <strong className="text-ink dark:text-[#F5F1EA]">Vercel</strong> demo vault (populated <code className="text-[11px]">us/</code> + one sample prospect + deal).
           </div>
           <button
             type="button"

@@ -199,8 +199,8 @@ export default function PlaybooksPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Playbooks"
-        subtitle="One-shot prompts the agent runs on demand — click a Playbook to see what it does, fill in any inputs, and run it."
+        title="Skills"
+        subtitle="One-shot tasks the agents know how to run — click a skill to see what it does, fill in any inputs, and run it."
         icon={BookOpen}
         trailing={
           <div className="relative">

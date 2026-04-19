@@ -28,7 +28,7 @@ import { mcpServerList, McpRegistry } from './mcp.js';
 import { buildOntology } from './ontology.js';
 import { pushTriggers, pushDrafts } from './sync.js';
 import { runCodex, codexAvailable, CodexNotInstalled } from './codex.js';
-import { seedAcmeDemo } from './us-demo.js';
+import { seedVercelDemo } from './us-demo.js';
 import {
   deriveRunPreview,
   extractTaskFromPromptMarkdown,
@@ -423,8 +423,8 @@ async function main() {
   });
 
   app.post('/api/onboarding/demo', async (c) => {
-    const { written } = await seedAcmeDemo(getVaultRoot());
-    return c.json({ ok: true, written, demo: 'acme-cloud' });
+    const { written } = await seedVercelDemo(getVaultRoot());
+    return c.json({ ok: true, written, demo: 'vercel' });
   });
 
   app.post('/api/onboarding/complete', async (c) => {

@@ -44,12 +44,15 @@ export function SidebarChats() {
     refetchInterval: 4_000,
   });
   const recent = (threads.data?.threads ?? []).slice(0, 8);
-  const chatActive = pathname === '/chat' || pathname.startsWith('/chat/');
+  const chatActive =
+    pathname === '/' ||
+    pathname === '/chat' ||
+    pathname.startsWith('/chat/');
 
   function openThread(id: string) {
     localStorage.setItem('bm-last-thread', id);
     setActiveThread(id);
-    router.push('/chat');
+    router.push('/');
   }
   async function deleteThread(id: string, e: React.MouseEvent) {
     e.preventDefault();
@@ -75,7 +78,7 @@ export function SidebarChats() {
             : 'text-ink/80 dark:text-[#E6E0D8]/80 hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 hover:text-ink dark:hover:text-[#F5F1EA]',
         )}
       >
-        <Link href="/chat" className="flex items-center gap-2.5 flex-1 min-w-0 py-2">
+        <Link href="/" className="flex items-center gap-2.5 flex-1 min-w-0 py-2">
           <MessageSquare className="w-4 h-4 shrink-0" />
           <span className="flex-1 truncate">Chat</span>
         </Link>

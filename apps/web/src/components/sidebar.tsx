@@ -15,29 +15,45 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
+  Activity,
   Briefcase,
   Building2,
   BookOpen,
   Bot,
+  CalendarClock,
   ChevronDown,
+  Copy,
   FolderTree,
   GitBranch,
+  Globe,
   History,
   Inbox,
-  LayoutDashboard,
+  Linkedin,
   Moon,
   Network,
   Plug,
   Repeat,
+  RotateCcw,
   Search,
   Settings as SettingsIcon,
   SquarePen,
   Sun,
   Users,
   Zap,
+  type LucideIcon,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { AGENTS } from '../config/agents';
 import { SidebarNavItem, SidebarSection } from './ui/sidebar-nav';
+
+const SIDEBAR_AGENT_ICONS: Record<string, LucideIcon> = {
+  Globe,
+  Linkedin,
+  CalendarClock,
+  Copy,
+  RotateCcw,
+  Activity,
+};
 import { SidebarChats, newThreadId } from './sidebar-chats';
 import { useRouter } from 'next/navigation';
 
@@ -111,7 +127,7 @@ export function Sidebar() {
   function startNewThread() {
     const id = newThreadId();
     localStorage.setItem('bm-last-thread', id);
-    router.push('/chat');
+    router.push('/');
   }
 
   return (
@@ -146,8 +162,6 @@ export function Sidebar() {
 
       <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 px-2 pb-3">
         <div className="flex flex-col gap-0.5">
-          <SidebarNavItem href="/" label="Home" icon={LayoutDashboard} exact />
-
           <button
             onClick={startNewThread}
             className="flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-ink/80 dark:text-[#E6E0D8]/80 hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 hover:text-ink dark:hover:text-[#F5F1EA] rounded-md transition-colors"
@@ -166,8 +180,22 @@ export function Sidebar() {
           />
         </div>
 
+        <SidebarSection label="Team">
+          {AGENTS.map((agent) => {
+            const Icon = SIDEBAR_AGENT_ICONS[agent.icon] ?? Bot;
+            return (
+              <SidebarNavItem
+                key={agent.slug}
+                href={`/team/${agent.slug}`}
+                label={agent.name}
+                icon={Icon}
+              />
+            );
+          })}
+        </SidebarSection>
+
         <SidebarSection label="Work">
-          <SidebarNavItem href="/playbooks" label="Playbooks" icon={BookOpen} />
+          <SidebarNavItem href="/playbooks" label="Skills" icon={BookOpen} />
           <SidebarNavItem href="/sequences" label="Sequences" icon={Repeat} />
           <SidebarNavItem href="/triggers" label="Triggers" icon={Zap} />
           <SidebarNavItem
@@ -197,7 +225,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="px-3 py-2 border-t border-line dark:border-[#2A241D] flex items-center justify-between shrink-0">
         <span className="text-[10px] text-muted dark:text-[#6B625C] font-mono">
-          v0.2.0
+          v0.2.6
         </span>
         <button
           type="button"
