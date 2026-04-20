@@ -117,10 +117,13 @@ export function Sidebar() {
   });
   const liveRunCount = useMemo(() => {
     const list = runs.data?.runs ?? [];
-    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    // "Live" = run hasn't produced a final.md yet. Cap by a 10-minute ceiling
+    // so an orphaned run from a crashed daemon doesn't display "live" forever.
+    const tenMinAgo = Date.now() - 10 * 60 * 1000;
     return list.filter((r) => {
+      if (r.done) return false;
       const started = runStartedMs(r.runId);
-      return started != null && started >= fiveMinAgo;
+      return started != null && started >= tenMinAgo;
     }).length;
   }, [runs.data]);
 

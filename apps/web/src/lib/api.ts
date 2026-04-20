@@ -168,7 +168,7 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ agent, task }) },
     ),
   listRuns: () =>
-    request<{ runs: Array<{ runId: string; agent: string; model: string; preview?: string; tokensIn: number; tokensOut: number; costCents: number; toolCalls: number; turns: number }> }>(
+    request<{ runs: Array<{ runId: string; agent: string; model: string; preview?: string; tokensIn: number; tokensOut: number; costCents: number; toolCalls: number; turns: number; done?: boolean }> }>(
       '/api/agent/runs',
     ),
   getRun: (id: string) =>

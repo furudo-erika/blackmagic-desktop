@@ -139,6 +139,9 @@ async function loadRunListEntry(runsDir: string, runId: string) {
     agent: entry.agent,
     runId: entry.runId,
   });
+  // final.md is written only after the agent exits the turn loop, so it's a
+  // reliable "this run has completed" marker for the runs list UI.
+  entry.done = typeof finalMd === 'string' && finalMd.trim().length > 0;
   return entry;
 }
 

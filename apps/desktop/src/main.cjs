@@ -226,9 +226,11 @@ function cmpVersion(a, b) {
   return 0;
 }
 
-// Hard-gate: fetch a tiny manifest from R2 and refuse to run if this build
-// is older than minVersion. Cache-busted so CDN can never serve a stale answer.
-// Network failures are non-fatal — we don't want to brick offline users.
+// Hard-gate: fetch the R2 manifest and refuse to run if this build isn't the
+// latest. Updates ship fast; we can't support a long tail of stale clients,
+// so every launch either matches manifest.latestVersion or is blocked with a
+// brew-upgrade dialog. Cache-busted so CDN can never serve a stale answer.
+// Network failures are non-fatal — offline users aren't bricked.
 async function enforceMinVersion() {
   const current = app.getVersion();
   try {
@@ -237,20 +239,29 @@ async function enforceMinVersion() {
     if (!res.ok) return;
     const manifest = await res.json();
     const min = manifest.minVersion;
-    if (!min) return;
-    if (cmpVersion(current, min) >= 0) return;
+    const latest = manifest.latestVersion;
+    const target = latest || min;
+    if (!target) return;
+    if (cmpVersion(current, target) >= 0) return;
 
+    const brewCmd = 'brew upgrade --cask blackmagic-ai';
     const choice = dialog.showMessageBoxSync({
-      type: 'error',
+      type: 'warning',
       title: 'Update required',
-      message: `BlackMagic AI ${current} is no longer supported.`,
-      detail: `Please install version ${manifest.latestVersion || min} or newer to continue.`,
-      buttons: ['Download update', 'Quit'],
+      message: `BlackMagic AI ${current} is out of date.`,
+      detail:
+        `The latest version is ${target}. Run this in Terminal, then reopen:\n\n  ${brewCmd}\n\n` +
+        `"Copy command" puts it on your clipboard; "Quit" closes the app so the upgrade can replace it.`,
+      buttons: ['Copy command and quit', 'Quit'],
       defaultId: 0,
       cancelId: 1,
       noLink: true,
     });
-    if (choice === 0) shell.openExternal(DOWNLOAD_PAGE_URL);
+    if (choice === 0) {
+      try {
+        require('electron').clipboard.writeText(brewCmd);
+      } catch {}
+    }
     app.exit(0);
   } catch (err) {
     console.warn('[main] version-gate check failed:', err?.message || err);
