@@ -10,7 +10,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
-const { autoUpdater } = require('electron-updater');
+// electron-updater removed — distribution is brew-only. notifyIfNewerAvailable
+// below pokes the renderer so it can show an "upgrade via brew" banner.
 
 const APP_NAME = 'BlackMagic AI';
 const VERSION_MANIFEST_URL = 'https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/version.json';
@@ -162,6 +163,7 @@ async function createWindow() {
         `--bm-daemon-port=${discovery.port}`,
         `--bm-daemon-token=${discovery.token}`,
         `--bm-vault-path=${VAULT_PATH}`,
+        `--bm-app-version=${app.getVersion()}`,
       ],
     },
   });
@@ -183,6 +185,7 @@ async function createWindow() {
     // REST API — no CORS, no file:// asset-path weirdness.
     win.loadURL(`http://127.0.0.1:${discovery.port}/`);
   }
+  return win;
 }
 
 ipcMain.handle('bm:pick-folder', async () => {
@@ -254,33 +257,38 @@ async function enforceMinVersion() {
   }
 }
 
-function setupAutoUpdater() {
+// Soft "newer version available" check. We no longer ship auto-updates via
+// electron-updater — distribution is brew-only. On every launch we poll the
+// same R2 manifest and, if a newer version exists, push an IPC event to the
+// renderer so it can show a banner with `brew upgrade --cask blackmagic-ai`.
+async function notifyIfNewerAvailable(win) {
   if (!app.isPackaged) return;
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on('error', (err) => console.warn('[updater] error:', err?.message || err));
-  autoUpdater.on('update-available', (info) => console.log('[updater] update available:', info?.version));
-  autoUpdater.on('update-downloaded', (info) => {
-    const choice = dialog.showMessageBoxSync({
-      type: 'info',
-      title: 'Update ready',
-      message: `BlackMagic AI ${info?.version || ''} is ready to install.`,
-      detail: 'Restart now to apply the update?',
-      buttons: ['Restart', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
+  const current = app.getVersion();
+  try {
+    const url = `${VERSION_MANIFEST_URL}?t=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return;
+    const manifest = await res.json();
+    const latest = manifest.latestVersion;
+    if (!latest || cmpVersion(current, latest) >= 0) return;
+    win.webContents.send('bm:update-available', {
+      currentVersion: current,
+      latestVersion: latest,
+      brewCommand: 'brew upgrade --cask blackmagic-ai',
     });
-    if (choice === 0) autoUpdater.quitAndInstall();
-  });
-  autoUpdater.checkForUpdates().catch((err) => console.warn('[updater] check failed:', err?.message || err));
+  } catch (err) {
+    console.warn('[main] upgrade nudge check failed:', err?.message || err);
+  }
 }
 
 app.whenReady().then(async () => {
   buildAppMenu();
   await enforceMinVersion();
-  await createWindow();
-  setupAutoUpdater();
+  const win = await createWindow();
+  if (win) {
+    // Delay slightly so the renderer has time to mount its listener.
+    setTimeout(() => notifyIfNewerAvailable(win), 3000);
+  }
 });
 
 app.on('window-all-closed', () => {

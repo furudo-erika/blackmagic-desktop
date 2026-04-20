@@ -16,6 +16,14 @@ contextBridge.exposeInMainWorld('bmBridge', {
   daemonToken: arg('bm-daemon-token'),
   vaultPath: arg('bm-vault-path'),
   platform: process.platform,
+  appVersion: arg('bm-app-version'),
   openExternal: (url) => ipcRenderer.invoke('bm:open-external', String(url)),
   pickFolder: () => ipcRenderer.invoke('bm:pick-folder'),
+  // Main process pushes {currentVersion, latestVersion} when R2's version.json
+  // reports a newer release. Renderer renders an "upgrade via brew" banner.
+  onUpdateAvailable: (cb) => {
+    const handler = (_evt, payload) => cb(payload);
+    ipcRenderer.on('bm:update-available', handler);
+    return () => ipcRenderer.removeListener('bm:update-available', handler);
+  },
 });

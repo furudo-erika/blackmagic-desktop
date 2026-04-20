@@ -8,8 +8,16 @@ declare global {
       daemonToken: string;
       vaultPath: string;
       platform: string;
+      appVersion?: string;
       openExternal?: (url: string) => void;
       pickFolder?: () => Promise<string | null>;
+      onUpdateAvailable?: (
+        cb: (payload: {
+          currentVersion: string;
+          latestVersion: string;
+          brewCommand: string;
+        }) => void,
+      ) => () => void;
     };
   }
 }

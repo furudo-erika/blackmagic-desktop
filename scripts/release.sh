@@ -30,17 +30,15 @@ echo "▶ Building renderer + daemon (v$VERSION)…"
 pnpm --filter @bm/web build
 pnpm --filter @bm/daemon build
 
-echo "▶ Packaging mac (arm64+x64) + win (x64)…"
-pnpm --filter @bm/desktop exec electron-builder --mac --x64 --arm64 --win --x64 --publish never
+echo "▶ Packaging mac (arm64+x64)…"
+# brew-only distribution — no Windows build, no electron-updater metadata.
+pnpm --filter @bm/desktop exec electron-builder --mac --x64 --arm64 --publish never
 
 REL="apps/desktop/release"
 MAC_ARM="$REL/BlackMagic AI-${VERSION}-arm64.dmg"
 MAC_X64="$REL/BlackMagic AI-${VERSION}.dmg"
-WIN_EXE="$REL/BlackMagic AI Setup ${VERSION}.exe"
-MAC_YML="$REL/latest-mac.yml"
-WIN_YML="$REL/latest.yml"
 
-for f in "$MAC_ARM" "$MAC_X64" "$WIN_EXE" "$MAC_YML" "$WIN_YML"; do
+for f in "$MAC_ARM" "$MAC_X64"; do
   [[ -f "$f" ]] || { echo "✗ Missing: $f" >&2; exit 1; }
 done
 
@@ -56,25 +54,13 @@ upload () {
     --cache-control "$4"
 }
 
-echo "▶ Uploading binaries…"
-# electron-updater filenames (must match what's referenced in the yml).
+echo "▶ Uploading mac DMGs…"
 upload "$MAC_ARM" "BlackMagic AI-${VERSION}-arm64.dmg" "application/x-apple-diskimage" "$LONG_CACHE"
 upload "$MAC_X64" "BlackMagic AI-${VERSION}.dmg"       "application/x-apple-diskimage" "$LONG_CACHE"
-upload "$WIN_EXE" "BlackMagic AI Setup ${VERSION}.exe" "application/x-msdownload"      "$LONG_CACHE"
 
-# blockmaps (only if generated).
-[[ -f "${MAC_ARM}.blockmap" ]] && upload "${MAC_ARM}.blockmap" "BlackMagic AI-${VERSION}-arm64.dmg.blockmap" "application/octet-stream" "$LONG_CACHE"
-[[ -f "${MAC_X64}.blockmap" ]] && upload "${MAC_X64}.blockmap" "BlackMagic AI-${VERSION}.dmg.blockmap"       "application/octet-stream" "$LONG_CACHE"
-[[ -f "${WIN_EXE}.blockmap" ]] && upload "${WIN_EXE}.blockmap" "BlackMagic AI Setup ${VERSION}.exe.blockmap" "application/octet-stream" "$LONG_CACHE"
-
-# Stable aliases (used by the marketing/download page — version-agnostic URLs).
+# Stable aliases — fallback links for users who can't brew install.
 upload "$MAC_ARM" "black-magic-mac-arm64.dmg" "application/x-apple-diskimage" "$LONG_CACHE"
 upload "$MAC_X64" "black-magic-mac-x64.dmg"   "application/x-apple-diskimage" "$LONG_CACHE"
-upload "$WIN_EXE" "black-magic-win.exe"       "application/x-msdownload"      "$LONG_CACHE"
-
-echo "▶ Uploading update metadata (no-cache)…"
-upload "$MAC_YML" "latest-mac.yml" "text/yaml" "$NO_CACHE"
-upload "$WIN_YML" "latest.yml"     "text/yaml" "$NO_CACHE"
 
 echo "▶ Uploading download page (no-cache)…"
 upload "scripts/download-page.html" "index.html" "text/html; charset=utf-8" "$NO_CACHE"
@@ -155,8 +141,6 @@ CASK
 echo
 echo "✔ Released v$VERSION (minVersion=$MIN_VERSION)."
 echo "  $PUBLIC_BASE/version.json"
-echo "  $PUBLIC_BASE/latest-mac.yml"
-echo "  $PUBLIC_BASE/latest.yml"
 echo "  $PUBLIC_BASE/black-magic-mac-arm64.dmg"
 echo "  $PUBLIC_BASE/black-magic-mac-x64.dmg"
-echo "  $PUBLIC_BASE/black-magic-win.exe"
+echo "  To upgrade: brew upgrade --cask blackmagic-ai"
