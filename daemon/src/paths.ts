@@ -57,10 +57,10 @@ export function loadConfig(): Config {
   // In dev both resolve to localhost:3001.
   const billingUrl = process.env.BM_BILLING_URL ?? 'https://blackmagic.run';
   const apiUrl = process.env.BM_API_URL ?? billingUrl.replace('blackmagic.run', 'api.blackmagic.run');
-  const defaultZennBase = `${apiUrl.replace(/\/+$/, '')}/api/v1`;
+  const defaultZennBase = `${apiUrl.replace(/\/+$/, '')}/v1`;
   const base: Config = {
     vault_path: vault,
-    default_model: process.env.BM_DEFAULT_MODEL ?? 'gpt-5.3-codex',
+    default_model: process.env.BM_DEFAULT_MODEL ?? 'gpt-5.4',
     zenn_base_url: process.env.ZENN_BASE_URL ?? defaultZennBase,
     zenn_api_key: process.env.ZENN_API_KEY,
     billing_url: billingUrl,
