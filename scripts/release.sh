@@ -92,12 +92,12 @@ EOF
 upload "$TMP_VERSION_JSON" "version.json" "application/json" "$NO_CACHE"
 rm "$TMP_VERSION_JSON"
 
-echo "▶ Updating Homebrew cask (furudo-erika/homebrew-tap)…"
+echo "▶ Updating Homebrew cask (blackmagic-ai/homebrew-tap)…"
 ARM_SHA=$(shasum -a 256 "$MAC_ARM" | awk '{print $1}')
 X64_SHA=$(shasum -a 256 "$MAC_X64" | awk '{print $1}')
 TAP_DIR="${TAP_DIR:-$HOME/.cache/blackmagic-homebrew-tap}"
 if [[ ! -d "$TAP_DIR/.git" ]]; then
-  git clone -q https://github.com/furudo-erika/homebrew-tap.git "$TAP_DIR"
+  git clone -q https://github.com/blackmagic-ai/homebrew-tap.git "$TAP_DIR"
 fi
 (
   cd "$TAP_DIR"

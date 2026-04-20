@@ -19,7 +19,7 @@ Local-first AI GTM engineer. Your context lives in `~/BlackMagic/` as plain mark
 ### macOS (recommended — Homebrew)
 
 ```sh
-brew install --cask furudo-erika/tap/blackmagic-ai
+brew install --cask blackmagic-ai/tap/blackmagic-ai
 ```
 
 Homebrew strips the quarantine flag, so the app opens without the
