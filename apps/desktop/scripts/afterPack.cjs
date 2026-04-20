@@ -1,22 +1,20 @@
 // electron-builder afterPack hook: re-sign the app bundle ad-hoc from the
 // inside out so Gatekeeper's launch check accepts it.
 //
-// Strategy: walk the bundle bottom-up. At each node:
-//   - if it's a Mach-O executable or dylib, codesign --sign -
-//   - if it's a code bundle (.app, .framework), codesign --sign - the bundle
-//   - signatures are applied in post-order so nested Mach-O / Helpers
-//     (e.g. Electron Framework/Versions/A/Helpers/chrome_crashpad_handler)
-//     always get signed before the outer framework, which codesign requires.
+// Order matters. codesign refuses to sign a bundle whose nested Mach-O
+// components are unsigned, and readdir returns entries alphabetically — so
+// a naïve post-order walk of Versions/A hits the main framework binary
+// ("Electron Framework") before the Helpers/ directory, which fails.
 //
-// Each call uses `--sign -` alone (no --deep, no --options runtime) to get
-// a consistent ad-hoc signature without hardened-runtime semantics we don't
-// have entitlements for.
+// Handle each bundle type explicitly so inner helpers always go first.
+//
+// Each call uses `--sign -` alone (no --deep, no --options runtime) for a
+// consistent ad-hoc signature; hardened runtime without an entitlements
+// plist breaks Electron at launch.
 
 const { execSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-
-const BUNDLE_EXTS = new Set(['.app', '.framework']);
 
 function sign(target) {
   execSync(`codesign --force --sign - "${target}"`, { stdio: 'inherit' });
@@ -29,7 +27,6 @@ function isMachO(filepath) {
     fs.readSync(fd, buf, 0, 4, 0);
     fs.closeSync(fd);
     const m = buf.readUInt32BE(0);
-    // Mach-O magic numbers (32/64, LE/BE) + fat binary.
     return (
       m === 0xfeedface ||
       m === 0xfeedfacf ||
@@ -43,28 +40,42 @@ function isMachO(filepath) {
   }
 }
 
-function walkAndSign(target) {
-  const stat = fs.lstatSync(target);
-  if (stat.isSymbolicLink()) return;
-
-  if (stat.isDirectory()) {
-    const ext = path.extname(target);
-    const isBundle = BUNDLE_EXTS.has(ext);
-    // Recurse first — post-order sign.
-    for (const entry of fs.readdirSync(target)) {
-      walkAndSign(path.join(target, entry));
+// Recursively sign every Mach-O file under `dir` (skips symlinks).
+// Used on framework helper / library directories where there are no nested
+// code bundles — just plain Mach-O binaries.
+function signMachOsUnder(dir) {
+  if (!fs.existsSync(dir)) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isSymbolicLink()) continue;
+    if (entry.isDirectory()) {
+      signMachOsUnder(p);
+      continue;
     }
-    if (isBundle) sign(target);
-    return;
+    if (entry.isFile() && isMachO(p)) sign(p);
   }
+}
 
-  if (stat.isFile() && stat.mode & 0o111 /* any x bit */) {
-    if (isMachO(target)) sign(target);
-    return;
-  }
-  if (stat.isFile() && /\.(dylib|so|node)$/i.test(target) && isMachO(target)) {
-    sign(target);
-  }
+function signFramework(fwPath) {
+  const fwName = path.basename(fwPath, '.framework');
+  const versionDir = path.join(fwPath, 'Versions', 'A');
+  // 1. Helpers (e.g. chrome_crashpad_handler) — must be signed before the
+  //    main framework binary or codesign on the binary errors "not signed
+  //    at all. In subcomponent: Helpers/chrome_crashpad_handler".
+  signMachOsUnder(path.join(versionDir, 'Helpers'));
+  // 2. Libraries / Resources (if they contain Mach-Os).
+  signMachOsUnder(path.join(versionDir, 'Libraries'));
+  // 3. Main framework binary.
+  const mainBin = path.join(versionDir, fwName);
+  if (fs.existsSync(mainBin)) sign(mainBin);
+  // 4. The framework bundle itself.
+  sign(fwPath);
+}
+
+function signHelperApp(appPath) {
+  // <Something>.app: sign Mach-Os under Contents/MacOS then the bundle.
+  signMachOsUnder(path.join(appPath, 'Contents', 'MacOS'));
+  sign(appPath);
 }
 
 exports.default = async function afterPack(context) {
@@ -72,13 +83,33 @@ exports.default = async function afterPack(context) {
 
   const appName = context.packager.appInfo.productFilename + '.app';
   const appPath = path.join(context.appOutDir, appName);
+  const frameworksDir = path.join(appPath, 'Contents', 'Frameworks');
 
   // Clear any lingering xattrs first — they corrupt re-signing.
   try {
     execSync(`xattr -cr "${appPath}"`, { stdio: 'inherit' });
   } catch {}
 
-  walkAndSign(appPath);
+  // Sign everything inside Contents/Frameworks first.
+  if (fs.existsSync(frameworksDir)) {
+    // Order: frameworks (with their own helpers) before helper .apps —
+    // the helper apps link to Electron Framework so they need it signed.
+    for (const entry of fs.readdirSync(frameworksDir)) {
+      const p = path.join(frameworksDir, entry);
+      if (entry.endsWith('.framework')) signFramework(p);
+    }
+    for (const entry of fs.readdirSync(frameworksDir)) {
+      const p = path.join(frameworksDir, entry);
+      if (entry.endsWith('.app')) signHelperApp(p);
+      else if (/\.(dylib|so|node)$/i.test(entry) && isMachO(p)) sign(p);
+    }
+  }
 
-  console.log(`[afterPack] ad-hoc signed ${appName} (leaf-first)`);
+  // Sign any loose Mach-Os under Contents/MacOS (the main exec).
+  signMachOsUnder(path.join(appPath, 'Contents', 'MacOS'));
+
+  // Finally the outer .app.
+  sign(appPath);
+
+  console.log(`[afterPack] ad-hoc signed ${appName}`);
 };
