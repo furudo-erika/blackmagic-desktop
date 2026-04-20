@@ -249,7 +249,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="px-3 py-2 border-t border-line dark:border-[#2A241D] flex items-center justify-between shrink-0">
         <span className="text-[10px] text-muted dark:text-[#6B625C] font-mono">
-          v{health.data?.version ?? '0.3.0'}
+          v{health.data?.version ?? '…'}
         </span>
         <button
           type="button"

@@ -103,11 +103,12 @@ function startDaemon() {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
       BM_WEB_ROOT: path.join(process.resourcesPath, 'web'),
+      BM_APP_VERSION: app.getVersion(),
     };
     daemonProcess = spawn(process.execPath, [entry], { env, stdio: 'inherit' });
   } else {
     // Dev: run with tsx from the workspace.
-    const env = { ...process.env };
+    const env = { ...process.env, BM_APP_VERSION: app.getVersion() };
     const tsx = path.join(__dirname, '..', '..', '..', 'node_modules', '.bin', 'tsx');
     daemonProcess = spawn(tsx, [entry], { env, stdio: 'inherit' });
   }

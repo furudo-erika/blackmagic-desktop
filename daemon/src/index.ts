@@ -275,7 +275,9 @@ async function main() {
   app.get('/api/health', (c) =>
     c.json({
       ok: true,
-      version: '0.3.0',
+      // Injected by main.cjs at spawn time from app.getVersion(). In dev
+      // (no Electron wrapper) falls back to the daemon's own package.json.
+      version: process.env.BM_APP_VERSION || '0.0.0-dev',
       vaultPath: getVaultRoot(),
       model: config.default_model,
       zennConfigured: Boolean(config.zenn_api_key),
