@@ -46,6 +46,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  changelog: () =>
+    request<{ content: string }>('/api/changelog'),
   health: () =>
     request<{
       ok: boolean;

@@ -272,6 +272,27 @@ async function main() {
     return c.redirect(`${billing}/auth/cli/done`, 302);
   });
 
+  // Serve the bundled CHANGELOG.md so Settings can render release notes.
+  // Packaged: resourcesPath/CHANGELOG.md (electron-builder copies it via
+  // `extraResources`). Dev: walk up from the daemon source to the repo root.
+  app.get('/api/changelog', async (c) => {
+    const candidates: string[] = [];
+    const resourcesPath = (process as unknown as { resourcesPath?: string }).resourcesPath;
+    if (resourcesPath) candidates.push(path.join(resourcesPath, 'CHANGELOG.md'));
+    candidates.push(path.join(__dirname, '..', '..', 'CHANGELOG.md'));
+    candidates.push(path.join(__dirname, '..', '..', '..', 'CHANGELOG.md'));
+    candidates.push(path.join(process.cwd(), 'CHANGELOG.md'));
+    for (const p of candidates) {
+      try {
+        const content = await fs.readFile(p, 'utf-8');
+        return c.json({ content });
+      } catch {
+        // next candidate
+      }
+    }
+    return c.json({ content: '# Changelog\n\n_Not bundled with this build._' });
+  });
+
   app.get('/api/health', (c) =>
     c.json({
       ok: true,

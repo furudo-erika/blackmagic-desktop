@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { getBridge, setBridge } from '../../lib/bridge';
-import { ExternalLink, FolderOpen, Cpu, KeyRound, Settings as SettingsIcon, Plug, Sun, Moon } from 'lucide-react';
+import { ExternalLink, FolderOpen, Cpu, KeyRound, Settings as SettingsIcon, Plug, Sun, Moon, FileText } from 'lucide-react';
 import { PageShell, PageHeader, PageBody } from '../../components/ui/primitives';
+import { Markdown } from '../../components/markdown';
 
 function Section({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
   return (
@@ -429,6 +430,10 @@ export default function SettingsPage() {
             </button>
           </Section>
 
+          <Section icon={FileText} title="What's new">
+            <ChangelogBlock />
+          </Section>
+
           <details className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl">
             <summary className="cursor-pointer p-5 text-sm font-semibold text-ink dark:text-[#F5F1EA]">
               Developer
@@ -459,10 +464,30 @@ export default function SettingsPage() {
           </details>
 
           <p className="text-[11px] text-muted dark:text-[#6B625C] text-center pt-4">
-            v{health.data?.version ?? '0.3.0'} · open source · MIT
+            v{health.data?.version ?? '…'} · open source · MIT
           </p>
         </div>
       </PageBody>
     </PageShell>
+  );
+}
+
+function ChangelogBlock() {
+  const changelog = useQuery({
+    queryKey: ['changelog'],
+    queryFn: api.changelog,
+    staleTime: 5 * 60_000,
+  });
+  if (changelog.isLoading) {
+    return <div className="text-[12px] text-muted dark:text-[#8C837C]">Loading…</div>;
+  }
+  if (changelog.isError) {
+    return <div className="text-[12px] text-flame">Failed to load changelog.</div>;
+  }
+  const content = changelog.data?.content ?? '';
+  return (
+    <div className="max-h-[420px] overflow-y-auto pr-2 prose prose-sm dark:prose-invert max-w-none text-[12.5px]">
+      <Markdown source={content} />
+    </div>
   );
 }
