@@ -12,8 +12,13 @@ exports.default = async function afterPack(context) {
   const appName = context.packager.appInfo.productFilename + '.app';
   const appPath = path.join(context.appOutDir, appName);
 
+  // Ad-hoc sign WITHOUT --options runtime. Hardened runtime without a valid
+  // entitlements.plist + notarization blocks JIT + unsigned dylib loading,
+  // which makes Electron crash on launch with "cannot be opened because of
+  // a problem". We just want Gatekeeper's identifier check to pass; no
+  // hardened runtime until we own an Apple Developer ID.
   execSync(
-    `codesign --force --deep --options runtime --sign - "${appPath}"`,
+    `codesign --force --deep --sign - "${appPath}"`,
     { stdio: 'inherit' }
   );
 
