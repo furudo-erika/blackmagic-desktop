@@ -76,6 +76,9 @@ echo "▶ Uploading update metadata (no-cache)…"
 upload "$MAC_YML" "latest-mac.yml" "text/yaml" "$NO_CACHE"
 upload "$WIN_YML" "latest.yml"     "text/yaml" "$NO_CACHE"
 
+echo "▶ Uploading download page (no-cache)…"
+upload "scripts/download-page.html" "index.html" "text/html; charset=utf-8" "$NO_CACHE"
+
 echo "▶ Writing version.json (no-cache)…"
 TMP_VERSION_JSON=$(mktemp)
 cat >"$TMP_VERSION_JSON" <<EOF
@@ -88,6 +91,56 @@ cat >"$TMP_VERSION_JSON" <<EOF
 EOF
 upload "$TMP_VERSION_JSON" "version.json" "application/json" "$NO_CACHE"
 rm "$TMP_VERSION_JSON"
+
+echo "▶ Updating Homebrew cask (furudo-erika/homebrew-tap)…"
+ARM_SHA=$(shasum -a 256 "$MAC_ARM" | awk '{print $1}')
+X64_SHA=$(shasum -a 256 "$MAC_X64" | awk '{print $1}')
+TAP_DIR="${TAP_DIR:-$HOME/.cache/blackmagic-homebrew-tap}"
+if [[ ! -d "$TAP_DIR/.git" ]]; then
+  git clone -q https://github.com/furudo-erika/homebrew-tap.git "$TAP_DIR"
+fi
+(
+  cd "$TAP_DIR"
+  git pull -q
+  cat > Casks/blackmagic-ai.rb <<CASK
+cask "blackmagic-ai" do
+  version "$VERSION"
+
+  on_arm do
+    sha256 "$ARM_SHA"
+    url "https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/BlackMagic%20AI-#{version}-arm64.dmg",
+        verified: "pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/"
+  end
+
+  on_intel do
+    sha256 "$X64_SHA"
+    url "https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/BlackMagic%20AI-#{version}.dmg",
+        verified: "pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/"
+  end
+
+  name "BlackMagic AI"
+  desc "Agent-first AI desktop app"
+  homepage "https://github.com/furudo-erika/blackmagic-desktop"
+
+  app "BlackMagic AI.app"
+
+  zap trash: [
+    "~/Library/Application Support/BlackMagic AI",
+    "~/Library/Logs/BlackMagic AI",
+    "~/Library/Preferences/run.blackmagic.desktop.plist",
+    "~/Library/Saved Application State/run.blackmagic.desktop.savedState",
+  ]
+end
+CASK
+  if ! git diff --quiet; then
+    git add Casks/blackmagic-ai.rb
+    git commit -q -m "blackmagic-ai $VERSION"
+    git push -q origin main
+    echo "  → cask updated to $VERSION"
+  else
+    echo "  → cask already up-to-date"
+  fi
+)
 
 echo
 echo "✔ Released v$VERSION (minVersion=$MIN_VERSION)."

@@ -16,6 +16,17 @@ Local-first AI GTM engineer. Your context lives in `~/BlackMagic/` as plain mark
 
 ## Install
 
+### macOS (recommended — Homebrew)
+
+```sh
+brew install --cask furudo-erika/tap/blackmagic-ai
+```
+
+Homebrew strips the quarantine flag, so the app opens without the
+"BlackMagic AI is damaged" warning that macOS shows on a direct DMG download.
+
+### Run from source
+
 ```bash
 pnpm install
 cp .env.example .env

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>BlackMagic AI — Download</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #0a0a0a;
+    color: #e5e5e5;
+    line-height: 1.55;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 80px 24px 120px;
+  }
+  h1 {
+    font-size: 2.25rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+  .tagline { color: #a3a3a3; margin: 0 0 48px; }
+  h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #d4d4d4;
+    margin: 40px 0 12px;
+  }
+  .recommended {
+    background: linear-gradient(180deg, #1a1a1a, #141414);
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #0a0a0a;
+    background: #d4d4d4;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+  pre {
+    background: #000;
+    border: 1px solid #262626;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 12px 0 0;
+    overflow-x: auto;
+    font-size: 0.95rem;
+    position: relative;
+  }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  button.copy {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #262626;
+    color: #e5e5e5;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  button.copy:hover { background: #333; }
+  .links { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 560px) { .links { grid-template-columns: 1fr; } }
+  .links a {
+    display: block;
+    padding: 14px 16px;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #e5e5e5;
+    text-decoration: none;
+    background: #141414;
+    transition: border-color 0.15s;
+  }
+  .links a:hover { border-color: #525252; }
+  .links a strong { display: block; font-weight: 600; }
+  .links a span { display: block; font-size: 0.8rem; color: #a3a3a3; margin-top: 2px; }
+  details {
+    margin-top: 20px;
+    padding: 14px 16px;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    background: #0f0f0f;
+  }
+  details summary { cursor: pointer; font-weight: 500; color: #d4d4d4; }
+  details pre { margin-top: 12px; }
+  footer {
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid #1a1a1a;
+    color: #737373;
+    font-size: 0.85rem;
+  }
+  footer a { color: #a3a3a3; }
+</style>
+</head>
+<body>
+<main>
+  <h1>BlackMagic AI</h1>
+  <p class="tagline">Local-first AI GTM engineer for macOS and Windows.</p>
+
+  <section class="recommended">
+    <span class="badge">Recommended · macOS</span>
+    <h2 style="margin-top:0">Install with Homebrew</h2>
+    <p style="margin:0;color:#a3a3a3;font-size:0.9rem">
+      One command. No "app is damaged" warning.
+    </p>
+    <pre><button class="copy" onclick="copyCmd(this)">Copy</button><code id="brew-cmd">brew install --cask furudo-erika/tap/blackmagic-ai</code></pre>
+  </section>
+
+  <h2>Direct download</h2>
+  <div class="links">
+    <a href="https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/black-magic-mac-arm64.dmg">
+      <strong>macOS · Apple Silicon</strong>
+      <span>.dmg — M1/M2/M3/M4</span>
+    </a>
+    <a href="https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/black-magic-mac-x64.dmg">
+      <strong>macOS · Intel</strong>
+      <span>.dmg — x86_64</span>
+    </a>
+    <a href="https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/black-magic-win.exe">
+      <strong>Windows</strong>
+      <span>.exe — x64</span>
+    </a>
+  </div>
+
+  <details>
+    <summary>macOS says "BlackMagic AI is damaged"?</summary>
+    <p style="color:#a3a3a3;font-size:0.9rem">
+      macOS Gatekeeper blocks apps downloaded from browsers that aren't signed with an
+      Apple Developer ID. Either install with Homebrew above (recommended — Homebrew
+      handles this automatically), or run this after dragging to Applications:
+    </p>
+    <pre><button class="copy" onclick="copyCmd(this)">Copy</button><code>xattr -cr "/Applications/BlackMagic AI.app"</code></pre>
+  </details>
+
+  <footer>
+    <a href="https://github.com/furudo-erika/blackmagic-desktop">Source on GitHub</a> ·
+    MIT License
+  </footer>
+</main>
+<script>
+  function copyCmd(btn) {
+    const code = btn.parentElement.querySelector('code').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = orig; }, 1200);
+    });
+  }
+</script>
+</body>
+</html>
