@@ -7,7 +7,10 @@ export type IntegrationProvider =
   | 'gong'
   | 'unipile'
   | 'slack'
-  | 'gmail';
+  | 'gmail'
+  | 'feishu'
+  | 'metabase'
+  | 'supabase';
 
 export type Integration = {
   provider: IntegrationProvider;
@@ -73,6 +76,13 @@ export const api = {
       hubspot_api_key: boolean;
       apollo_api_key: boolean;
       attio_api_key: boolean;
+      feishu_app_id: boolean;
+      feishu_app_secret: boolean;
+      feishu_webhook_url: boolean;
+      metabase_site_url: boolean;
+      metabase_api_key: boolean;
+      supabase_url: boolean;
+      supabase_service_role_key: boolean;
       slack_webhook_url: boolean;
       resend_api_key: boolean;
       from_email: boolean;
@@ -84,6 +94,13 @@ export const api = {
     hubspot_api_key?: string;
     apollo_api_key?: string;
     attio_api_key?: string;
+    feishu_app_id?: string;
+    feishu_app_secret?: string;
+    feishu_webhook_url?: string;
+    metabase_site_url?: string;
+    metabase_api_key?: string;
+    supabase_url?: string;
+    supabase_service_role_key?: string;
     slack_webhook_url?: string;
     resend_api_key?: string;
     from_email?: string;

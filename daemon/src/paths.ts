@@ -15,6 +15,19 @@ export interface Config {
   hubspot_api_key?: string;
   apollo_api_key?: string;
   attio_api_key?: string;
+  // Feishu (Lark). Tenant access comes from app_id + app_secret — the daemon
+  // exchanges them for a tenant_access_token on demand. A separate
+  // feishu_webhook_url supports the simple "notify this group chat" path.
+  feishu_app_id?: string;
+  feishu_app_secret?: string;
+  feishu_webhook_url?: string;
+  // Metabase. Either an API key (preferred, session-less) or username +
+  // password. Base URL always required.
+  metabase_site_url?: string;
+  metabase_api_key?: string;
+  // Supabase. service_role key gives full DB access via PostgREST.
+  supabase_url?: string;
+  supabase_service_role_key?: string;
   slack_webhook_url?: string;
   resend_api_key?: string;
   from_email?: string;
@@ -70,6 +83,15 @@ export function loadConfig(): Config {
     apify_api_key: process.env.APIFY_API_KEY,
     enrichlayer_api_key: process.env.ENRICHLAYER_API_KEY,
     hubspot_api_key: process.env.HUBSPOT_API_KEY,
+    apollo_api_key: process.env.APOLLO_API_KEY,
+    attio_api_key: process.env.ATTIO_API_KEY,
+    feishu_app_id: process.env.FEISHU_APP_ID,
+    feishu_app_secret: process.env.FEISHU_APP_SECRET,
+    feishu_webhook_url: process.env.FEISHU_WEBHOOK_URL,
+    metabase_site_url: process.env.METABASE_SITE_URL,
+    metabase_api_key: process.env.METABASE_API_KEY,
+    supabase_url: process.env.SUPABASE_URL,
+    supabase_service_role_key: process.env.SUPABASE_SERVICE_ROLE_KEY,
     slack_webhook_url: process.env.SLACK_WEBHOOK_URL,
     resend_api_key: process.env.RESEND_API_KEY,
     from_email: process.env.BM_FROM_EMAIL,

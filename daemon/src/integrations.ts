@@ -13,10 +13,14 @@ export type IntegrationProvider =
   | 'gong'
   | 'unipile'
   | 'slack'
-  | 'gmail';
+  | 'gmail'
+  | 'feishu'
+  | 'metabase'
+  | 'supabase';
 
 export const PROVIDERS: IntegrationProvider[] = [
   'hubspot', 'attio', 'salesforce', 'gong', 'unipile', 'slack', 'gmail',
+  'feishu', 'metabase', 'supabase',
 ];
 
 export interface IntegrationRecord {

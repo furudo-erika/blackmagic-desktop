@@ -39,6 +39,13 @@ export default function SettingsPage() {
   const [hubspotDraft, setHubspotDraft] = useState('');
   const [apolloDraft, setApolloDraft] = useState('');
   const [attioDraft, setAttioDraft] = useState('');
+  const [feishuAppIdDraft, setFeishuAppIdDraft] = useState('');
+  const [feishuAppSecretDraft, setFeishuAppSecretDraft] = useState('');
+  const [feishuWebhookDraft, setFeishuWebhookDraft] = useState('');
+  const [metabaseUrlDraft, setMetabaseUrlDraft] = useState('');
+  const [metabaseKeyDraft, setMetabaseKeyDraft] = useState('');
+  const [supabaseUrlDraft, setSupabaseUrlDraft] = useState('');
+  const [supabaseKeyDraft, setSupabaseKeyDraft] = useState('');
   const [slackDraft, setSlackDraft] = useState('');
   const [resendDraft, setResendDraft] = useState('');
   const [fromEmailDraft, setFromEmailDraft] = useState('');
@@ -55,6 +62,13 @@ export default function SettingsPage() {
       if (hubspotDraft.trim()) body.hubspot_api_key = hubspotDraft.trim();
       if (apolloDraft.trim()) body.apollo_api_key = apolloDraft.trim();
       if (attioDraft.trim()) body.attio_api_key = attioDraft.trim();
+      if (feishuAppIdDraft.trim()) body.feishu_app_id = feishuAppIdDraft.trim();
+      if (feishuAppSecretDraft.trim()) body.feishu_app_secret = feishuAppSecretDraft.trim();
+      if (feishuWebhookDraft.trim()) body.feishu_webhook_url = feishuWebhookDraft.trim();
+      if (metabaseUrlDraft.trim()) body.metabase_site_url = metabaseUrlDraft.trim();
+      if (metabaseKeyDraft.trim()) body.metabase_api_key = metabaseKeyDraft.trim();
+      if (supabaseUrlDraft.trim()) body.supabase_url = supabaseUrlDraft.trim();
+      if (supabaseKeyDraft.trim()) body.supabase_service_role_key = supabaseKeyDraft.trim();
       if (slackDraft.trim()) body.slack_webhook_url = slackDraft.trim();
       if (resendDraft.trim()) body.resend_api_key = resendDraft.trim();
       if (fromEmailDraft.trim()) body.from_email = fromEmailDraft.trim();
@@ -68,6 +82,13 @@ export default function SettingsPage() {
         setHubspotDraft('');
         setApolloDraft('');
         setAttioDraft('');
+        setFeishuAppIdDraft('');
+        setFeishuAppSecretDraft('');
+        setFeishuWebhookDraft('');
+        setMetabaseUrlDraft('');
+        setMetabaseKeyDraft('');
+        setSupabaseUrlDraft('');
+        setSupabaseKeyDraft('');
         setSlackDraft('');
         setResendDraft('');
         setFromEmailDraft('');
@@ -232,6 +253,90 @@ export default function SettingsPage() {
                   value={attioDraft}
                   onChange={(e) => setAttioDraft(e.target.value)}
                   placeholder={intKeys.data?.attio_api_key ? '••• (saved)' : 'Attio API key (Bearer token)'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Feishu app id
+                </label>
+                <input
+                  type="text"
+                  value={feishuAppIdDraft}
+                  onChange={(e) => setFeishuAppIdDraft(e.target.value)}
+                  placeholder={intKeys.data?.feishu_app_id ? '••• (saved)' : 'cli_xxxxxxxxxxxx'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Feishu secret
+                </label>
+                <input
+                  type="password"
+                  value={feishuAppSecretDraft}
+                  onChange={(e) => setFeishuAppSecretDraft(e.target.value)}
+                  placeholder={intKeys.data?.feishu_app_secret ? '••• (saved)' : 'app secret'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Feishu webhook
+                </label>
+                <input
+                  type="password"
+                  value={feishuWebhookDraft}
+                  onChange={(e) => setFeishuWebhookDraft(e.target.value)}
+                  placeholder={intKeys.data?.feishu_webhook_url ? '••• (saved)' : 'https://open.feishu.cn/open-apis/bot/v2/hook/…'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Metabase URL
+                </label>
+                <input
+                  type="text"
+                  value={metabaseUrlDraft}
+                  onChange={(e) => setMetabaseUrlDraft(e.target.value)}
+                  placeholder={intKeys.data?.metabase_site_url ? '••• (saved)' : 'https://metabase.yourco.com'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Metabase key
+                </label>
+                <input
+                  type="password"
+                  value={metabaseKeyDraft}
+                  onChange={(e) => setMetabaseKeyDraft(e.target.value)}
+                  placeholder={intKeys.data?.metabase_api_key ? '••• (saved)' : 'mb_api_… (Admin → API Keys)'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Supabase URL
+                </label>
+                <input
+                  type="text"
+                  value={supabaseUrlDraft}
+                  onChange={(e) => setSupabaseUrlDraft(e.target.value)}
+                  placeholder={intKeys.data?.supabase_url ? '••• (saved)' : 'https://xxxx.supabase.co'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Supabase key
+                </label>
+                <input
+                  type="password"
+                  value={supabaseKeyDraft}
+                  onChange={(e) => setSupabaseKeyDraft(e.target.value)}
+                  placeholder={intKeys.data?.supabase_service_role_key ? '••• (saved)' : 'service_role eyJhbGci…'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>

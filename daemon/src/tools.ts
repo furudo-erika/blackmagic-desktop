@@ -900,6 +900,477 @@ const attio_add_to_list: ToolDef = {
 };
 
 // ---------------------------------------------------------------------------
+// Feishu (Lark) — dual-mode.
+//   Chat side: feishu_webhook_url is a custom bot webhook — drop-in Slack
+//   replacement. Cheap, no OAuth.
+//   Data side: feishu_app_id + feishu_app_secret exchange for a
+//   tenant_access_token; with it we can read Bitable (multi-dim tables),
+//   send rich messages to arbitrary chats, and pull docs. We cache the
+//   token for its ~2h lifetime.
+// ---------------------------------------------------------------------------
+
+const FEISHU_BASE = 'https://open.feishu.cn/open-apis';
+let feishuTokenCache: { token: string; expiresAt: number } | null = null;
+
+async function feishuToken(appId: string, appSecret: string): Promise<string | { error: string }> {
+  const now = Date.now();
+  if (feishuTokenCache && feishuTokenCache.expiresAt > now + 60_000) {
+    return feishuTokenCache.token;
+  }
+  try {
+    const res = await fetch(`${FEISHU_BASE}/auth/v3/tenant_access_token/internal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.code !== 0 || !data.tenant_access_token) {
+      return { error: `feishu token: ${data?.msg ?? res.status}` };
+    }
+    const ttl = Math.max(60, Number(data.expire) || 7000) * 1000;
+    feishuTokenCache = { token: data.tenant_access_token, expiresAt: now + ttl };
+    return data.tenant_access_token;
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function feishuAuthed(
+  ctx: ToolCtx,
+  pathname: string,
+  init?: { method?: string; body?: unknown; query?: Record<string, string | number | undefined> },
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  const appId = ctx.config.feishu_app_id;
+  const appSecret = ctx.config.feishu_app_secret;
+  if (!appId || !appSecret) {
+    return { ok: false, status: 0, data: null, error: 'set FEISHU_APP_ID + FEISHU_APP_SECRET in Settings → Integration keys' };
+  }
+  const tok = await feishuToken(appId, appSecret);
+  if (typeof tok !== 'string') return { ok: false, status: 0, data: null, error: tok.error };
+  try {
+    const url = new URL(`${FEISHU_BASE}${pathname}`);
+    if (init?.query) {
+      for (const [k, v] of Object.entries(init.query)) {
+        if (v !== undefined) url.searchParams.set(k, String(v));
+      }
+    }
+    const res = await fetch(url, {
+      method: init?.method ?? 'GET',
+      headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+      body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || (data && data.code !== 0)) {
+      return { ok: false, status: res.status, data, error: data?.msg || `feishu ${res.status}` };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+const feishu_notify: ToolDef = {
+  name: 'feishu_notify',
+  description:
+    'Send a message to a Feishu/Lark group via custom bot webhook (feishu_webhook_url). text is a plain string; use msg_type "interactive" + card for rich content.',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string' },
+      msg_type: { type: 'string', enum: ['text', 'post', 'interactive'] },
+      card: { type: 'object', description: 'Lark card JSON when msg_type=interactive.' },
+    },
+  },
+  handler: async (args, ctx) => {
+    const url = ctx.config.feishu_webhook_url;
+    if (!url) return { ok: false, error: 'set FEISHU_WEBHOOK_URL in Settings → Integration keys' };
+    const msgType = args.msg_type || (args.card ? 'interactive' : 'text');
+    const payload: Record<string, unknown> = { msg_type: msgType };
+    if (msgType === 'text') payload.content = { text: String(args.text ?? '') };
+    else if (msgType === 'interactive') payload.card = args.card;
+    else payload.content = args.text;
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || (data.code !== undefined && data.code !== 0)) {
+        return { ok: false, status: res.status, error: data?.msg || `feishu ${res.status}` };
+      }
+      return { ok: true, data: { posted: true } };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+};
+
+const feishu_send_message: ToolDef = {
+  name: 'feishu_send_message',
+  description:
+    'Send a Feishu/Lark message to a user or chat by ID (uses tenant access token — requires feishu_app_id + feishu_app_secret). receive_id_type is open_id | user_id | chat_id | email.',
+  parameters: {
+    type: 'object',
+    properties: {
+      receive_id: { type: 'string' },
+      receive_id_type: { type: 'string', enum: ['open_id', 'user_id', 'chat_id', 'email'] },
+      msg_type: { type: 'string', enum: ['text', 'interactive', 'post'] },
+      content_text: { type: 'string' },
+      card: { type: 'object' },
+    },
+    required: ['receive_id', 'receive_id_type'],
+  },
+  handler: async (args, ctx) => {
+    const msgType = args.msg_type || (args.card ? 'interactive' : 'text');
+    let content: string;
+    if (msgType === 'text') content = JSON.stringify({ text: String(args.content_text ?? '') });
+    else if (msgType === 'interactive') content = JSON.stringify(args.card ?? {});
+    else content = JSON.stringify(args.content_text ?? {});
+    const r = await feishuAuthed(ctx, '/im/v1/messages', {
+      method: 'POST',
+      query: { receive_id_type: String(args.receive_id_type) },
+      body: { receive_id: args.receive_id, msg_type: msgType, content },
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: r.data?.data ?? null };
+  },
+};
+
+const feishu_bitable_list_records: ToolDef = {
+  name: 'feishu_bitable_list_records',
+  description:
+    'List records from a Feishu Bitable (multi-dim table). Identify by app_token (spreadsheet / base id) + table_id. filter is a Feishu filter expression string; page_size defaults to 100.',
+  parameters: {
+    type: 'object',
+    properties: {
+      app_token: { type: 'string' },
+      table_id: { type: 'string' },
+      filter: { type: 'string' },
+      view_id: { type: 'string' },
+      page_size: { type: 'number' },
+      page_token: { type: 'string' },
+    },
+    required: ['app_token', 'table_id'],
+  },
+  handler: async (args, ctx) => {
+    const r = await feishuAuthed(
+      ctx,
+      `/bitable/v1/apps/${encodeURIComponent(String(args.app_token))}/tables/${encodeURIComponent(String(args.table_id))}/records`,
+      {
+        query: {
+          page_size: (args.page_size as number) || 100,
+          page_token: args.page_token as string | undefined,
+          view_id: args.view_id as string | undefined,
+          filter: args.filter as string | undefined,
+        },
+      },
+    );
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    const d = r.data?.data ?? {};
+    return {
+      ok: true,
+      data: {
+        total: d.total ?? null,
+        has_more: d.has_more ?? false,
+        page_token: d.page_token ?? null,
+        records: d.items ?? [],
+      },
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Metabase — BI/analytics as a data source. Use api key auth (x-api-key
+// header) so we don't juggle sessions. Card = saved question; dataset = SQL.
+// ---------------------------------------------------------------------------
+
+function needsMetabase(ctx: ToolCtx): { url: string; key: string } | { ok: false; error: string } {
+  const url = (ctx.config.metabase_site_url || '').replace(/\/+$/, '');
+  const key = ctx.config.metabase_api_key || '';
+  if (!url || !key) {
+    return { ok: false, error: 'set METABASE_SITE_URL + METABASE_API_KEY in Settings → Integration keys' };
+  }
+  return { url, key };
+}
+
+async function metabaseFetch(
+  url: string,
+  key: string,
+  pathname: string,
+  init?: { method?: string; body?: unknown },
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  try {
+    const res = await fetch(`${url}${pathname}`, {
+      method: init?.method ?? 'GET',
+      headers: { 'x-api-key': key, 'Content-Type': 'application/json' },
+      body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    });
+    const text = await res.text();
+    let data: any = null;
+    if (text) {
+      try { data = JSON.parse(text); } catch { data = text; }
+    }
+    if (!res.ok) {
+      const msg = (data?.message && String(data.message)) || String(text).slice(0, 200) || `metabase ${res.status}`;
+      return { ok: false, status: res.status, data, error: msg };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+const metabase_run_card: ToolDef = {
+  name: 'metabase_run_card',
+  description:
+    'Execute a saved Metabase question (card) by id and return its rows. parameters is an optional array of Metabase parameter objects.',
+  parameters: {
+    type: 'object',
+    properties: {
+      card_id: { type: 'number' },
+      parameters: { type: 'array', items: { type: 'object' } },
+    },
+    required: ['card_id'],
+  },
+  handler: async (args, ctx) => {
+    const cfg = needsMetabase(ctx); if ('ok' in cfg && cfg.ok === false) return cfg;
+    const { url, key } = cfg as { url: string; key: string };
+    const r = await metabaseFetch(url, key, `/api/card/${Number(args.card_id)}/query`, {
+      method: 'POST',
+      body: { parameters: args.parameters ?? [] },
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    const data = r.data?.data ?? r.data;
+    const cols = data?.cols?.map((c: any) => c.name) ?? [];
+    const rows = data?.rows ?? [];
+    return { ok: true, data: { row_count: rows.length, columns: cols, rows: rows.slice(0, 1000) } };
+  },
+};
+
+const metabase_query_sql: ToolDef = {
+  name: 'metabase_query_sql',
+  description:
+    'Run an ad-hoc SQL query against a Metabase database by id (native dataset). Use for exploration when a saved card does not exist yet.',
+  parameters: {
+    type: 'object',
+    properties: {
+      database_id: { type: 'number' },
+      sql: { type: 'string' },
+      template_tags: { type: 'object' },
+    },
+    required: ['database_id', 'sql'],
+  },
+  handler: async (args, ctx) => {
+    const cfg = needsMetabase(ctx); if ('ok' in cfg && cfg.ok === false) return cfg;
+    const { url, key } = cfg as { url: string; key: string };
+    const r = await metabaseFetch(url, key, '/api/dataset', {
+      method: 'POST',
+      body: {
+        type: 'native',
+        database: Number(args.database_id),
+        native: { query: String(args.sql), 'template-tags': args.template_tags ?? {} },
+      },
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    const data = r.data?.data ?? r.data;
+    const cols = data?.cols?.map((c: any) => c.name) ?? [];
+    const rows = data?.rows ?? [];
+    return { ok: true, data: { row_count: rows.length, columns: cols, rows: rows.slice(0, 1000) } };
+  },
+};
+
+const metabase_search: ToolDef = {
+  name: 'metabase_search',
+  description: 'Search Metabase content (cards, dashboards, collections) by name/model.',
+  parameters: {
+    type: 'object',
+    properties: {
+      q: { type: 'string' },
+      models: { type: 'array', items: { type: 'string' }, description: 'e.g. ["card","dashboard"]' },
+    },
+    required: ['q'],
+  },
+  handler: async (args, ctx) => {
+    const cfg = needsMetabase(ctx); if ('ok' in cfg && cfg.ok === false) return cfg;
+    const { url, key } = cfg as { url: string; key: string };
+    const qs = new URLSearchParams({ q: String(args.q) });
+    for (const m of (args.models as string[] | undefined) ?? []) qs.append('models', m);
+    const r = await metabaseFetch(url, key, `/api/search?${qs.toString()}`);
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    const list = r.data?.data ?? r.data ?? [];
+    return { ok: true, data: { count: Array.isArray(list) ? list.length : 0, items: list } };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Supabase — Postgres via PostgREST with the service_role key. The project
+// URL is SUPABASE_URL (e.g. https://xxxx.supabase.co). Every call hits
+// /rest/v1/<table> with service_role Authorization + apikey headers.
+// ---------------------------------------------------------------------------
+
+function needsSupabase(ctx: ToolCtx): { url: string; key: string } | { ok: false; error: string } {
+  const url = (ctx.config.supabase_url || '').replace(/\/+$/, '');
+  const key = ctx.config.supabase_service_role_key || '';
+  if (!url || !key) {
+    return { ok: false, error: 'set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in Settings → Integration keys' };
+  }
+  return { url, key };
+}
+
+async function supabaseFetch(
+  url: string,
+  key: string,
+  pathname: string,
+  init?: { method?: string; body?: unknown; prefer?: string; headers?: Record<string, string> },
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  try {
+    const headers: Record<string, string> = {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(init?.headers ?? {}),
+    };
+    if (init?.prefer) headers.Prefer = init.prefer;
+    const res = await fetch(`${url}${pathname}`, {
+      method: init?.method ?? 'GET',
+      headers,
+      body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    });
+    const text = await res.text();
+    let data: any = null;
+    if (text) {
+      try { data = JSON.parse(text); } catch { data = text; }
+    }
+    if (!res.ok) {
+      const msg =
+        (data?.message && String(data.message)) ||
+        (data?.error && String(data.error)) ||
+        String(text).slice(0, 200) ||
+        `supabase ${res.status}`;
+      return { ok: false, status: res.status, data, error: msg };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+const supabase_select: ToolDef = {
+  name: 'supabase_select',
+  description:
+    'Read rows from a Supabase (Postgres) table via PostgREST. `filter` is a PostgREST query string like "status=eq.open&created_at=gt.2026-01-01". Use `select` to pick columns (defaults to *).',
+  parameters: {
+    type: 'object',
+    properties: {
+      table: { type: 'string' },
+      select: { type: 'string' },
+      filter: { type: 'string', description: 'Raw PostgREST filter querystring, e.g. id=eq.42&status=in.(open,pending).' },
+      order: { type: 'string' },
+      limit: { type: 'number' },
+      offset: { type: 'number' },
+    },
+    required: ['table'],
+  },
+  handler: async (args, ctx) => {
+    const cfg = needsSupabase(ctx); if ('ok' in cfg && cfg.ok === false) return cfg;
+    const { url, key } = cfg as { url: string; key: string };
+    const qs = new URLSearchParams();
+    qs.set('select', String(args.select ?? '*'));
+    if (args.order) qs.set('order', String(args.order));
+    if (args.limit !== undefined) qs.set('limit', String(args.limit));
+    if (args.offset !== undefined) qs.set('offset', String(args.offset));
+    const filter = args.filter ? `&${String(args.filter)}` : '';
+    const r = await supabaseFetch(url, key, `/rest/v1/${encodeURIComponent(String(args.table))}?${qs.toString()}${filter}`);
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    const rows = Array.isArray(r.data) ? r.data : [];
+    return { ok: true, data: { count: rows.length, rows } };
+  },
+};
+
+const supabase_insert: ToolDef = {
+  name: 'supabase_insert',
+  description:
+    'Insert one or more rows into a Supabase table. `rows` is a single object or an array. Set `on_conflict` + `upsert: true` to do an upsert.',
+  parameters: {
+    type: 'object',
+    properties: {
+      table: { type: 'string' },
+      rows: { },
+      upsert: { type: 'boolean' },
+      on_conflict: { type: 'string' },
+    },
+    required: ['table', 'rows'],
+  },
+  handler: async (args, ctx) => {
+    const cfg = needsSupabase(ctx); if ('ok' in cfg && cfg.ok === false) return cfg;
+    const { url, key } = cfg as { url: string; key: string };
+    const qs = new URLSearchParams();
+    if (args.upsert && args.on_conflict) qs.set('on_conflict', String(args.on_conflict));
+    const prefer = [
+      'return=representation',
+      args.upsert ? 'resolution=merge-duplicates' : '',
+    ].filter(Boolean).join(',');
+    const r = await supabaseFetch(url, key, `/rest/v1/${encodeURIComponent(String(args.table))}${qs.toString() ? `?${qs.toString()}` : ''}`, {
+      method: 'POST',
+      body: args.rows,
+      prefer,
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    const rows = Array.isArray(r.data) ? r.data : [r.data];
+    return { ok: true, data: { inserted: rows.length, rows } };
+  },
+};
+
+const supabase_update: ToolDef = {
+  name: 'supabase_update',
+  description:
+    'Update rows in a Supabase table. `filter` is a PostgREST querystring that scopes the update (required — PostgREST refuses unscoped updates). `patch` is the partial row.',
+  parameters: {
+    type: 'object',
+    properties: {
+      table: { type: 'string' },
+      filter: { type: 'string' },
+      patch: { type: 'object' },
+    },
+    required: ['table', 'filter', 'patch'],
+  },
+  handler: async (args, ctx) => {
+    const cfg = needsSupabase(ctx); if ('ok' in cfg && cfg.ok === false) return cfg;
+    const { url, key } = cfg as { url: string; key: string };
+    const r = await supabaseFetch(url, key, `/rest/v1/${encodeURIComponent(String(args.table))}?${String(args.filter)}`, {
+      method: 'PATCH',
+      body: args.patch,
+      prefer: 'return=representation',
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    const rows = Array.isArray(r.data) ? r.data : [r.data];
+    return { ok: true, data: { updated: rows.length, rows } };
+  },
+};
+
+const supabase_rpc: ToolDef = {
+  name: 'supabase_rpc',
+  description:
+    'Invoke a Supabase Postgres function via PostgREST (/rest/v1/rpc/<fn>). `args` is passed as JSON body.',
+  parameters: {
+    type: 'object',
+    properties: {
+      fn: { type: 'string' },
+      args: { type: 'object' },
+    },
+    required: ['fn'],
+  },
+  handler: async (args, ctx) => {
+    const cfg = needsSupabase(ctx); if ('ok' in cfg && cfg.ok === false) return cfg;
+    const { url, key } = cfg as { url: string; key: string };
+    const r = await supabaseFetch(url, key, `/rest/v1/rpc/${encodeURIComponent(String(args.fn))}`, {
+      method: 'POST',
+      body: args.args ?? {},
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: r.data };
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Slack — webhook-only (simplest integration, no OAuth). channel is a hint;
 // the real channel is fixed in the webhook configuration.
 // ---------------------------------------------------------------------------
@@ -1154,6 +1625,16 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   attio_update_record,
   attio_create_note,
   attio_add_to_list,
+  feishu_notify,
+  feishu_send_message,
+  feishu_bitable_list_records,
+  metabase_run_card,
+  metabase_query_sql,
+  metabase_search,
+  supabase_select,
+  supabase_insert,
+  supabase_update,
+  supabase_rpc,
   slack_notify,
   send_email,
   linkedin_enrich_company,

@@ -143,7 +143,14 @@ export function ProjectPicker({
             return (
               <div
                 key={p.id}
-                onClick={() => !active && activate(p.id)}
+                onClick={() => {
+                  if (active) {
+                    onActivated?.(p);
+                    onClose?.();
+                  } else {
+                    activate(p.id);
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -153,7 +160,7 @@ export function ProjectPicker({
                   border: `1px solid ${active ? '#E8523A' : 'rgba(55,50,47,0.10)'}`,
                   borderRadius: 8,
                   background: active ? 'rgba(232,82,58,0.06)' : '#FBFAF8',
-                  cursor: active ? 'default' : 'pointer',
+                  cursor: 'pointer',
                   opacity: busy === p.id ? 0.5 : 1,
                 }}
               >
