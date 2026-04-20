@@ -17,6 +17,7 @@
   "build": {
     "appId": "run.blackmagic.desktop",
     "productName": "BlackMagic AI",
+    "afterPack": "./scripts/afterPack.cjs",
     "directories": {
       "output": "release",
       "buildResources": "resources"

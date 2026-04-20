@@ -124,6 +124,16 @@ cask "blackmagic-ai" do
 
   app "BlackMagic AI.app"
 
+  # Belt-and-suspenders: strip quarantine + any lingering xattrs on the
+  # installed app. Our build re-signs ad-hoc in afterPack, which resolves
+  # the "app is damaged" Gatekeeper error caused by Electron's default
+  # linker-signed stub having a mismatched identifier.
+  postflight do
+    system_command "/usr/bin/xattr",
+                   args: ["-cr", "#{appdir}/BlackMagic AI.app"],
+                   sudo: false
+  end
+
   zap trash: [
     "~/Library/Application Support/BlackMagic AI",
     "~/Library/Logs/BlackMagic AI",
