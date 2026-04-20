@@ -219,6 +219,15 @@ export const api = {
       '/api/triggers/install-presets',
       { method: 'POST' },
     ),
+  listPlaybooks: () =>
+    request<{ playbooks: Array<{ name: string; group?: string; agent: string; inputs?: Array<{ name: string; required?: boolean }> }> }>(
+      '/api/playbooks',
+    ),
+  runPlaybook: (name: string, inputs: Record<string, unknown>) =>
+    request<{ runId: string; final: string; tokensIn: number; tokensOut: number; costCents: number }>(
+      `/api/playbooks/${encodeURIComponent(name)}/run`,
+      { method: 'POST', body: JSON.stringify({ inputs }) },
+    ),
   onboardingState: () =>
     request<{ needsOnboarding: boolean; claudeDefault: boolean; hasSelfCompany: boolean }>(
       '/api/onboarding',

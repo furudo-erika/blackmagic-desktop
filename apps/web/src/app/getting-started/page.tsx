@@ -56,7 +56,7 @@ const SETUP_STEPS: Step[] = [
     n: 2,
     title: 'Tell us about your company',
     hint: "Your domain is enough. Black Magic will crawl your site + docs and fill in us/company.md, product/, market/, brand/ so every draft + research task is grounded.",
-    href: '/vault?path=us%2Fcompany.md',
+    href: '/onboarding/bootstrap',
     icon: Building2,
     cta: 'Edit us/',
   },
