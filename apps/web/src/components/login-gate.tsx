@@ -7,11 +7,14 @@ import { getBridge, setBridge } from '../lib/bridge';
 import { ProjectPicker } from './project-picker';
 
 export function LoginGate({ children }: { children: React.ReactNode }) {
-  const [bridgeReady, setBridgeReady] = useState(() => {
-    if (typeof window === 'undefined') return false;
+  // Start as null on both SSR and first client render so the initial tree
+  // matches. Real value is set in useEffect after mount, so any
+  // `window`-dependent branching happens post-hydration.
+  const [bridgeReady, setBridgeReady] = useState<boolean | null>(null);
+  useEffect(() => {
     const b = getBridge();
-    return b.daemonPort > 0 && !!b.daemonToken;
-  });
+    setBridgeReady(b.daemonPort > 0 && !!b.daemonToken);
+  }, []);
   const [portDraft, setPortDraft] = useState('');
   const [tokenDraft, setTokenDraft] = useState('');
 
@@ -28,7 +31,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   const projects = useQuery({
     queryKey: ['projects'],
     queryFn: api.listProjects,
-    enabled: bridgeReady,
+    enabled: !!bridgeReady,
   });
   const showPicker =
     bridgeReady &&
@@ -55,7 +58,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   const health = useQuery({
     queryKey: ['health', bridgeReady],
     queryFn: api.health,
-    enabled: bridgeReady,
+    enabled: !!bridgeReady,
     refetchInterval: (q) => (q.state.data?.zennConfigured ? false : 2000),
   });
 
@@ -112,6 +115,12 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
     if (!port || !tokenDraft.trim()) return;
     setBridge(port, tokenDraft.trim());
     setBridgeReady(true);
+  }
+
+  // Pre-mount: bridgeReady === null. Render a neutral placeholder so the
+  // SSR output matches the client first render.
+  if (bridgeReady === null) {
+    return <div className="min-h-screen flex items-center justify-center text-muted text-sm">Starting…</div>;
   }
 
   if (!bridgeReady) {
