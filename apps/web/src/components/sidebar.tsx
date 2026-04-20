@@ -76,10 +76,10 @@ export function Sidebar() {
   // Theme -----------------------------------------------------------------
   const [dark, setDark] = useState(false);
   useEffect(() => {
+    // Dark by default. Only go light if the user explicitly chose it;
+    // everything else (first launch, no preference, system=light) stays dark.
     const stored = localStorage.getItem('bm-theme');
-    const initial =
-      stored === 'dark' ||
-      (stored == null && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const initial = stored !== 'light';
     setDark(initial);
     document.documentElement.classList.toggle('dark', initial);
   }, []);

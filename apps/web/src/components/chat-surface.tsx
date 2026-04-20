@@ -213,34 +213,15 @@ export function ChatSurface({
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {messages.length === 0 && scenarios.length > 0 && (
-          <div className="max-w-3xl mx-auto py-6">
-            <div className="text-center mb-6">
-              <MessageSquare className="w-7 h-7 mx-auto mb-2 text-muted dark:text-[#8C837C] opacity-50" />
-              <h2 className="text-base font-semibold text-ink dark:text-[#F5F1EA] mb-1">
-                What do you want to do?
-              </h2>
-              <p className="text-[13px] text-muted dark:text-[#8C837C]">
-                Pick a scenario, edit the <span className="font-mono text-flame">[bracketed]</span> bits, and send. Or type your own.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {scenarios.map((s) => (
-                <button
-                  key={s.title}
-                  type="button"
-                  onClick={() => setInput(s.prompt)}
-                  className="text-left p-3 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl hover:border-flame transition-colors"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-flame" />
-                    <span className="text-[12px] font-semibold text-ink dark:text-[#F5F1EA]">{s.title}</span>
-                  </div>
-                  <div className="text-[11px] text-muted dark:text-[#8C837C] line-clamp-2">
-                    {s.prompt.slice(0, 110)}…
-                  </div>
-                </button>
-              ))}
-            </div>
+          <div className="max-w-3xl mx-auto py-10 text-center">
+            <MessageSquare className="w-7 h-7 mx-auto mb-3 text-muted dark:text-[#8C837C] opacity-50" />
+            <h2 className="text-base font-semibold text-ink dark:text-[#F5F1EA] mb-1">
+              What do you want to do?
+            </h2>
+            <p className="text-[13px] text-muted dark:text-[#8C837C]">
+              Ask anything. Reference files in your vault with{' '}
+              <span className="font-mono text-flame">[[wikilinks]]</span>.
+            </p>
           </div>
         )}
         <div className="max-w-3xl mx-auto space-y-4">
