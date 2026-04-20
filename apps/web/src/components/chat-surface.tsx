@@ -56,6 +56,20 @@ export function ChatSurface({
   const [input, setInput] = useState('');
   const [streamingTools, setStreamingTools] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-size the textarea whenever its contents change — covers typing,
+  // scenario clicks, and the post-send clear. 'auto' collapses the height
+  // first so scrollHeight reflects the real minimum needed, then we cap
+  // at 320px and flip on the scrollbar when we'd exceed that.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const next = Math.min(el.scrollHeight, 320);
+    el.style.height = next + 'px';
+    el.style.overflowY = el.scrollHeight > 320 ? 'auto' : 'hidden';
+  }, [input]);
 
   const isGlobal = threadKey === 'bm-last-thread';
 
@@ -261,23 +275,19 @@ export function ChatSurface({
       <div className="border-t border-line dark:border-[#2A241D] px-6 py-3 bg-cream-light dark:bg-[#17140F]">
         <div className="max-w-3xl mx-auto flex items-end gap-2">
           <textarea
+            ref={inputRef}
             value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              const el = e.currentTarget;
-              el.style.height = 'auto';
-              el.style.height = Math.min(el.scrollHeight, 320) + 'px';
-            }}
+            onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 send();
               }
             }}
-            rows={2}
+            rows={1}
             placeholder="Ask the agent… (Shift+Enter for newline)"
-            className="flex-1 resize-y bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg px-3 py-2 text-sm leading-5 text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame overflow-y-auto"
-            style={{ minHeight: 56, maxHeight: 320 }}
+            className="flex-1 resize-none bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg px-3 py-2 text-sm leading-5 text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+            style={{ minHeight: 40, maxHeight: 320 }}
           />
           <button
             onClick={send}
