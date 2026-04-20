@@ -167,7 +167,7 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
     if (!res.ok || !res.body) {
       const text = await res.text().catch(() => '');
       const err = `zenn ${res.status}: ${text.slice(0, 500)}`;
-      onEvent({ type: 'error', data: err });
+      onEvent({ type: 'error', data: { message: err } });
       throw new Error(err);
     }
 
@@ -208,10 +208,12 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
             if (!data.output || data.output.length === 0) data.output = accumulatedOutput;
             break outer;
           } else if (event === 'response.output_text.delta') {
-            if (typeof parsed.delta === 'string') onEvent({ type: 'text', data: parsed.delta });
+            if (typeof parsed.delta === 'string') {
+              onEvent({ type: 'text', data: { delta: parsed.delta } });
+            }
           } else if (event === 'response.error' || event === 'error') {
             const err = `zenn stream error: ${payloadStr.slice(0, 300)}`;
-            onEvent({ type: 'error', data: err });
+            onEvent({ type: 'error', data: { message: err } });
             throw new Error(err);
           }
         } catch (e) {
@@ -280,7 +282,7 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
 
     if (assistantText) {
       finalText = assistantText;
-      onEvent({ type: 'text', data: assistantText });
+      onEvent({ type: 'text', data: { delta: assistantText } });
       if (!sawToolCall) {
         // Also record the assistant message in case the model interleaves
         input.push({ type: 'message', role: 'assistant', content: assistantText });

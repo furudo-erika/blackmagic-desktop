@@ -847,45 +847,67 @@ async function main() {
       });
     }
 
-    // Fallback: our own Responses API loop.
-    try {
-      const result = await runAgent({
-        agent: body.agent ?? 'researcher',
-        task: last.content,
-        history,
-        threadId: body.threadId,
-        config,
-      });
-      // Persist full thread so /runs and a future history UI can show it.
-      if (body.threadId) {
-        const threadPath = path.join(getVaultRoot(), 'chats', `${body.threadId}.json`);
-        await fs.mkdir(path.dirname(threadPath), { recursive: true });
-        await fs.writeFile(
-          threadPath,
-          JSON.stringify(
-            {
-              threadId: body.threadId,
-              agent: body.agent ?? 'researcher',
-              updatedAt: new Date().toISOString(),
-              messages: [...body.messages, { role: 'assistant', content: result.final }],
+    // Fallback: our own Responses API loop, streamed as SSE so the renderer
+    // shows tokens arriving. runAgent already emits { type, data } events via
+    // onEvent — we just forward them as SSE frames, matching the codex path.
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const send = (event: string, data: unknown) => {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        };
+        try {
+          const result = await runAgent({
+            agent: body.agent ?? 'researcher',
+            task: last.content,
+            history,
+            threadId: body.threadId,
+            config,
+            onEvent: ({ type, data }) => {
+              if (type === 'tool_call') send('tool_pending', data);
+              else if (type === 'tool_result') send('tool', data);
+              else send(type, data);
             },
-            null,
-            2,
-          ),
-          'utf-8',
-        );
-      }
-      return c.json({
-        role: 'assistant',
-        content: result.final,
-        runId: result.runId,
-        costCents: result.costCents,
-        tokensIn: result.tokensIn,
-        tokensOut: result.tokensOut,
-      });
-    } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
-    }
+          });
+          if (body.threadId) {
+            const threadPath = path.join(getVaultRoot(), 'chats', `${body.threadId}.json`);
+            await fs.mkdir(path.dirname(threadPath), { recursive: true });
+            await fs.writeFile(
+              threadPath,
+              JSON.stringify(
+                {
+                  threadId: body.threadId,
+                  agent: body.agent ?? 'researcher',
+                  updatedAt: new Date().toISOString(),
+                  messages: [...body.messages, { role: 'assistant', content: result.final }],
+                },
+                null,
+                2,
+              ),
+              'utf-8',
+            );
+          }
+          send('done', {
+            runId: result.runId,
+            final: result.final,
+            tokensIn: result.tokensIn,
+            tokensOut: result.tokensOut,
+            costCents: result.costCents,
+          });
+        } catch (err) {
+          send('error', { message: err instanceof Error ? err.message : String(err) });
+        } finally {
+          controller.close();
+        }
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    });
   });
 
   // List + read chat threads.
