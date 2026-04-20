@@ -2,6 +2,15 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.3.7 — 2026-04-20
+
+### Fixed
+- **Project picker first-launch dismissal (BUG-005 follow-up)** — the
+  picker now always renders as a modal with Escape / outside-click /
+  ✕ dismissal, including the very first app launch. Previously 0.3.0
+  only made the picker dismissable when re-opened from the sidebar;
+  the first-run page-mode fallback was non-dismissable.
+
 ## 0.3.5 — 2026-04-20
 
 ### Fixed
