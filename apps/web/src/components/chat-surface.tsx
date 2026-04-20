@@ -225,20 +225,27 @@ export function ChatSurface({
           </div>
         )}
         <div className="max-w-3xl mx-auto space-y-4">
-          {messages.map((m, i) => (
-            <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-              <div
-                className={
-                  m.role === 'user'
-                    ? 'bg-ink dark:bg-[#3A322A] text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[80%] whitespace-pre-wrap'
-                    : 'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-5 py-3 max-w-[85%]'
-                }
-              >
-                {m.role === 'user' ? m.content : <Markdown source={m.content} />}
+          {messages.map((m, i) => {
+            // Skip the empty placeholder we push at mutation start — the
+            // "thinking…" bubble below owns that slot. Otherwise the
+            // Markdown renderer shows "(empty)" while tools are still
+            // running, right next to "thinking…", and the UI double-renders.
+            if (m.role === 'assistant' && !m.content) return null;
+            return (
+              <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+                <div
+                  className={
+                    m.role === 'user'
+                      ? 'bg-ink dark:bg-[#3A322A] text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[80%] whitespace-pre-wrap'
+                      : 'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-5 py-3 max-w-[85%]'
+                  }
+                >
+                  {m.role === 'user' ? m.content : <Markdown source={m.content} />}
+                </div>
               </div>
-            </div>
-          ))}
-          {sendMut.isPending && messages[messages.length - 1]?.content === '' && (
+            );
+          })}
+          {sendMut.isPending && (
             <div className="flex justify-start">
               <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-4 py-3 text-sm max-w-[85%] space-y-1.5">
                 <div className="flex items-center gap-2 text-muted dark:text-[#8C837C]">

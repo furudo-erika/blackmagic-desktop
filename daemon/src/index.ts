@@ -781,11 +781,22 @@ async function main() {
                   args: it.command ?? '',
                   output: String(it.aggregated_output ?? '').slice(0, 2000),
                 });
+              } else if (t === 'item.completed' && itType && itType !== 'agent_message' && itType !== 'reasoning') {
+                // Catch-all: every completed item other than the final
+                // message or reasoning is a tool the model just ran. Name
+                // it by its itType so the UI shows, e.g. `✓ file_read`,
+                // `✓ web_fetch` — so the user sees progress instead of
+                // thinking the app is stuck.
+                send('tool', { name: itType });
               } else if ((t === 'item.started' || t === 'item.updated') && itType) {
                 if (itType.startsWith('command')) {
                   send('tool_pending', { name: 'shell', args: it.command ?? '' });
                 } else if (itType === 'reasoning') {
                   send('reasoning_pending', {});
+                } else if (itType !== 'agent_message') {
+                  // Any started tool (file_read, web_fetch, patch, etc.) —
+                  // show it so the user can see progress.
+                  send('tool_pending', { name: itType });
                 }
               } else if (t === 'turn.completed' && ev.usage) {
                 send('usage', ev.usage);
