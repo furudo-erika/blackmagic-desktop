@@ -37,6 +37,8 @@ export default function SettingsPage() {
   const [apifyDraft, setApifyDraft] = useState('');
   const [enrichDraft, setEnrichDraft] = useState('');
   const [hubspotDraft, setHubspotDraft] = useState('');
+  const [apolloDraft, setApolloDraft] = useState('');
+  const [attioDraft, setAttioDraft] = useState('');
   const [slackDraft, setSlackDraft] = useState('');
   const [resendDraft, setResendDraft] = useState('');
   const [fromEmailDraft, setFromEmailDraft] = useState('');
@@ -51,6 +53,8 @@ export default function SettingsPage() {
       if (apifyDraft.trim()) body.apify_api_key = apifyDraft.trim();
       if (enrichDraft.trim()) body.enrichlayer_api_key = enrichDraft.trim();
       if (hubspotDraft.trim()) body.hubspot_api_key = hubspotDraft.trim();
+      if (apolloDraft.trim()) body.apollo_api_key = apolloDraft.trim();
+      if (attioDraft.trim()) body.attio_api_key = attioDraft.trim();
       if (slackDraft.trim()) body.slack_webhook_url = slackDraft.trim();
       if (resendDraft.trim()) body.resend_api_key = resendDraft.trim();
       if (fromEmailDraft.trim()) body.from_email = fromEmailDraft.trim();
@@ -62,6 +66,8 @@ export default function SettingsPage() {
         setApifyDraft('');
         setEnrichDraft('');
         setHubspotDraft('');
+        setApolloDraft('');
+        setAttioDraft('');
         setSlackDraft('');
         setResendDraft('');
         setFromEmailDraft('');
@@ -202,6 +208,30 @@ export default function SettingsPage() {
                   value={hubspotDraft}
                   onChange={(e) => setHubspotDraft(e.target.value)}
                   placeholder={intKeys.data?.hubspot_api_key ? '••• (saved)' : 'pat-… Private App token'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Apollo
+                </label>
+                <input
+                  type="password"
+                  value={apolloDraft}
+                  onChange={(e) => setApolloDraft(e.target.value)}
+                  placeholder={intKeys.data?.apollo_api_key ? '••• (saved)' : 'Apollo API key'}
+                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
+                  Attio
+                </label>
+                <input
+                  type="password"
+                  value={attioDraft}
+                  onChange={(e) => setAttioDraft(e.target.value)}
+                  placeholder={intKeys.data?.attio_api_key ? '••• (saved)' : 'Attio API key (Bearer token)'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>

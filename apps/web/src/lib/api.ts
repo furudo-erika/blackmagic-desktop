@@ -71,6 +71,8 @@ export const api = {
       apify_api_key: boolean;
       enrichlayer_api_key: boolean;
       hubspot_api_key: boolean;
+      apollo_api_key: boolean;
+      attio_api_key: boolean;
       slack_webhook_url: boolean;
       resend_api_key: boolean;
       from_email: boolean;
@@ -80,6 +82,8 @@ export const api = {
     apify_api_key?: string;
     enrichlayer_api_key?: string;
     hubspot_api_key?: string;
+    apollo_api_key?: string;
+    attio_api_key?: string;
     slack_webhook_url?: string;
     resend_api_key?: string;
     from_email?: string;

@@ -578,6 +578,328 @@ const hubspot_search: ToolDef = {
 };
 
 // ---------------------------------------------------------------------------
+// Apollo.io — direct REST (bring-your-own Apollo API key). Faster and cheaper
+// than scraping through Apify. Docs: https://apolloio.github.io/apollo-api-docs
+// Every call POSTs with `api_key` in the body (Apollo's historic convention).
+// ---------------------------------------------------------------------------
+
+const APOLLO_BASE = 'https://api.apollo.io';
+
+async function apolloFetch(
+  key: string,
+  path: string,
+  body: Record<string, unknown>,
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  try {
+    const res = await fetch(`${APOLLO_BASE}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+      },
+      body: JSON.stringify({ api_key: key, ...body }),
+    });
+    const text = await res.text();
+    let data: any = null;
+    if (text) {
+      try { data = JSON.parse(text); } catch { data = text; }
+    }
+    if (!res.ok) {
+      const msg =
+        (data && typeof data === 'object' && 'error' in data && String(data.error)) ||
+        (data && typeof data === 'object' && 'message' in data && String(data.message)) ||
+        String(text).slice(0, 200) ||
+        `apollo ${res.status}`;
+      return { ok: false, status: res.status, data, error: msg };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function needsApolloKey(ctx: ToolCtx) {
+  if (!ctx.config.apollo_api_key) {
+    return { ok: false, error: 'set APOLLO_API_KEY in Settings → Integration keys' };
+  }
+  return null;
+}
+
+const apollo_search_people: ToolDef = {
+  name: 'apollo_search_people',
+  description:
+    'Search Apollo for people by title/seniority/organization. Returns a paged list with names, titles, LinkedIn URLs, and (credit-gated) emails.',
+  parameters: {
+    type: 'object',
+    properties: {
+      person_titles: { type: 'array', items: { type: 'string' } },
+      person_seniorities: { type: 'array', items: { type: 'string' } },
+      organization_domains: { type: 'array', items: { type: 'string' } },
+      organization_num_employees_ranges: { type: 'array', items: { type: 'string' } },
+      q_keywords: { type: 'string' },
+      page: { type: 'number' },
+      per_page: { type: 'number' },
+    },
+  },
+  handler: async (args, ctx) => {
+    const gate = needsApolloKey(ctx); if (gate) return gate;
+    const r = await apolloFetch(ctx.config.apollo_api_key!, '/v1/mixed_people/search', args);
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { total: r.data?.pagination?.total_entries ?? null, people: r.data?.people ?? [] } };
+  },
+};
+
+const apollo_enrich_person: ToolDef = {
+  name: 'apollo_enrich_person',
+  description:
+    'Enrich a single person by email OR (first_name + last_name + organization_name/domain). Returns firmographics + (credit-gated) work email + phone.',
+  parameters: {
+    type: 'object',
+    properties: {
+      email: { type: 'string' },
+      first_name: { type: 'string' },
+      last_name: { type: 'string' },
+      organization_name: { type: 'string' },
+      domain: { type: 'string' },
+      linkedin_url: { type: 'string' },
+      reveal_personal_emails: { type: 'boolean' },
+      reveal_phone_number: { type: 'boolean' },
+    },
+  },
+  handler: async (args, ctx) => {
+    const gate = needsApolloKey(ctx); if (gate) return gate;
+    const r = await apolloFetch(ctx.config.apollo_api_key!, '/v1/people/match', args);
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: r.data?.person ?? null };
+  },
+};
+
+const apollo_organization_search: ToolDef = {
+  name: 'apollo_organization_search',
+  description:
+    'Search Apollo for companies (firmographics). Returns a paged list with domain, employee count, industry, technologies.',
+  parameters: {
+    type: 'object',
+    properties: {
+      q_organization_name: { type: 'string' },
+      organization_num_employees_ranges: { type: 'array', items: { type: 'string' } },
+      organization_locations: { type: 'array', items: { type: 'string' } },
+      technology_uids: { type: 'array', items: { type: 'string' } },
+      organization_industry_tag_ids: { type: 'array', items: { type: 'string' } },
+      page: { type: 'number' },
+      per_page: { type: 'number' },
+    },
+  },
+  handler: async (args, ctx) => {
+    const gate = needsApolloKey(ctx); if (gate) return gate;
+    const r = await apolloFetch(ctx.config.apollo_api_key!, '/v1/mixed_companies/search', args);
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { total: r.data?.pagination?.total_entries ?? null, organizations: r.data?.organizations ?? [] } };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Attio CRM (bring-your-own API key). Bearer token. Base https://api.attio.com.
+// Attio models records generically — every write hits /v2/objects/<slug>/records.
+// ---------------------------------------------------------------------------
+
+const ATTIO_BASE = 'https://api.attio.com/v2';
+
+async function attioFetch(
+  key: string,
+  path: string,
+  init?: { method?: string; body?: unknown },
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  try {
+    const res = await fetch(`${ATTIO_BASE}${path}`, {
+      method: init?.method ?? 'GET',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    });
+    const text = await res.text();
+    let data: any = null;
+    if (text) {
+      try { data = JSON.parse(text); } catch { data = text; }
+    }
+    if (!res.ok) {
+      const msg =
+        (data?.error?.message && String(data.error.message)) ||
+        (data?.message && String(data.message)) ||
+        String(text).slice(0, 200) ||
+        `attio ${res.status}`;
+      return { ok: false, status: res.status, data, error: msg };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function needsAttioKey(ctx: ToolCtx) {
+  if (!ctx.config.attio_api_key) {
+    return { ok: false, error: 'set ATTIO_API_KEY in Settings → Integration keys' };
+  }
+  return null;
+}
+
+const attio_search_records: ToolDef = {
+  name: 'attio_search_records',
+  description:
+    'Query an Attio object (e.g. "people", "companies", or any custom object slug) by filter. Uses the /records/query endpoint. Pass filter as an Attio-style condition tree (leave empty for no filter).',
+  parameters: {
+    type: 'object',
+    properties: {
+      object: { type: 'string', description: 'Attio object slug (people | companies | deals | <custom>)' },
+      filter: { type: 'object' },
+      sorts: { type: 'array', items: { type: 'object' } },
+      limit: { type: 'number' },
+      offset: { type: 'number' },
+    },
+    required: ['object'],
+  },
+  handler: async (args, ctx) => {
+    const gate = needsAttioKey(ctx); if (gate) return gate;
+    const body: Record<string, unknown> = {};
+    if (args.filter) body.filter = args.filter;
+    if (args.sorts) body.sorts = args.sorts;
+    if (args.limit) body.limit = args.limit;
+    if (args.offset) body.offset = args.offset;
+    const r = await attioFetch(ctx.config.attio_api_key!, `/objects/${encodeURIComponent(String(args.object))}/records/query`, {
+      method: 'POST',
+      body,
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    const list = Array.isArray(r.data?.data) ? r.data.data : [];
+    return { ok: true, data: { count: list.length, records: list } };
+  },
+};
+
+const attio_create_record: ToolDef = {
+  name: 'attio_create_record',
+  description:
+    'Create a record in an Attio object. `values` is a map of attribute slug → value in Attio\'s expected shape (e.g. `name: [{ first_name, last_name }]`, `email_addresses: [{ email_address }]`, `domains: [{ domain }]`). Works for standard and custom objects.',
+  parameters: {
+    type: 'object',
+    properties: {
+      object: { type: 'string' },
+      values: { type: 'object' },
+      matching_attribute: { type: 'string', description: 'Optional: attribute slug to dedup on (upsert behaviour).' },
+    },
+    required: ['object', 'values'],
+  },
+  handler: async (args, ctx) => {
+    const gate = needsAttioKey(ctx); if (gate) return gate;
+    const slug = encodeURIComponent(String(args.object));
+    const body: Record<string, unknown> = { data: { values: args.values } };
+    const path = args.matching_attribute
+      ? `/objects/${slug}/records?matching_attribute=${encodeURIComponent(String(args.matching_attribute))}`
+      : `/objects/${slug}/records`;
+    const r = await attioFetch(ctx.config.attio_api_key!, path, {
+      method: args.matching_attribute ? 'PUT' : 'POST',
+      body,
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: r.data?.data ?? null };
+  },
+};
+
+const attio_update_record: ToolDef = {
+  name: 'attio_update_record',
+  description:
+    'Patch attributes on an existing Attio record by id. Only pass the attribute slugs you want to change.',
+  parameters: {
+    type: 'object',
+    properties: {
+      object: { type: 'string' },
+      record_id: { type: 'string' },
+      values: { type: 'object' },
+    },
+    required: ['object', 'record_id', 'values'],
+  },
+  handler: async (args, ctx) => {
+    const gate = needsAttioKey(ctx); if (gate) return gate;
+    const r = await attioFetch(
+      ctx.config.attio_api_key!,
+      `/objects/${encodeURIComponent(String(args.object))}/records/${encodeURIComponent(String(args.record_id))}`,
+      { method: 'PATCH', body: { data: { values: args.values } } },
+    );
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: r.data?.data ?? null };
+  },
+};
+
+const attio_create_note: ToolDef = {
+  name: 'attio_create_note',
+  description:
+    'Attach a note to an Attio record. `parent_object` + `parent_record_id` identify the target; `content_markdown` is the body.',
+  parameters: {
+    type: 'object',
+    properties: {
+      parent_object: { type: 'string' },
+      parent_record_id: { type: 'string' },
+      title: { type: 'string' },
+      content_markdown: { type: 'string' },
+    },
+    required: ['parent_object', 'parent_record_id', 'content_markdown'],
+  },
+  handler: async (args, ctx) => {
+    const gate = needsAttioKey(ctx); if (gate) return gate;
+    const r = await attioFetch(ctx.config.attio_api_key!, '/notes', {
+      method: 'POST',
+      body: {
+        data: {
+          parent_object: args.parent_object,
+          parent_record_id: args.parent_record_id,
+          title: args.title ?? 'Black Magic note',
+          format: 'markdown',
+          content: args.content_markdown,
+        },
+      },
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: r.data?.data ?? null };
+  },
+};
+
+const attio_add_to_list: ToolDef = {
+  name: 'attio_add_to_list',
+  description:
+    'Add a record to an Attio list by list id (or slug). `parent_record_id` is the record to enrol.',
+  parameters: {
+    type: 'object',
+    properties: {
+      list: { type: 'string', description: 'Attio list id or slug.' },
+      parent_object: { type: 'string' },
+      parent_record_id: { type: 'string' },
+      entry_values: { type: 'object' },
+    },
+    required: ['list', 'parent_object', 'parent_record_id'],
+  },
+  handler: async (args, ctx) => {
+    const gate = needsAttioKey(ctx); if (gate) return gate;
+    const r = await attioFetch(
+      ctx.config.attio_api_key!,
+      `/lists/${encodeURIComponent(String(args.list))}/entries`,
+      {
+        method: 'POST',
+        body: {
+          data: {
+            parent_object: args.parent_object,
+            parent_record_id: args.parent_record_id,
+            entry_values: args.entry_values ?? {},
+          },
+        },
+      },
+    );
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: r.data?.data ?? null };
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Slack — webhook-only (simplest integration, no OAuth). channel is a hint;
 // the real channel is fixed in the webhook configuration.
 // ---------------------------------------------------------------------------
@@ -824,6 +1146,14 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   hubspot_create_note,
   hubspot_create_task,
   hubspot_search,
+  apollo_search_people,
+  apollo_enrich_person,
+  apollo_organization_search,
+  attio_search_records,
+  attio_create_record,
+  attio_update_record,
+  attio_create_note,
+  attio_add_to_list,
   slack_notify,
   send_email,
   linkedin_enrich_company,

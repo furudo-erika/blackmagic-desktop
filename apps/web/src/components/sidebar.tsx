@@ -36,6 +36,7 @@ import {
   RotateCcw,
   Search,
   Settings as SettingsIcon,
+  Sparkles,
   SquarePen,
   Sun,
   Users,
@@ -216,6 +217,11 @@ export function Sidebar() {
         </SidebarSection>
 
         <SidebarSection label="System">
+          <SidebarNavItem
+            href="/onboarding/bootstrap"
+            label="Profile company"
+            icon={Sparkles}
+          />
           <SidebarNavItem href="/integrations" label="Integrations" icon={Plug} />
           <SidebarNavItem href="/agents" label="Agent roles" icon={Bot} />
           <SidebarNavItem href="/settings" label="Settings" icon={SettingsIcon} />

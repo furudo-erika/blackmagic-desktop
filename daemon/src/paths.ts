@@ -13,6 +13,8 @@ export interface Config {
   apify_api_key?: string;
   enrichlayer_api_key?: string;
   hubspot_api_key?: string;
+  apollo_api_key?: string;
+  attio_api_key?: string;
   slack_webhook_url?: string;
   resend_api_key?: string;
   from_email?: string;
