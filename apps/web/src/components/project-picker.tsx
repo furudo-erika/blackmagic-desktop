@@ -8,7 +8,7 @@
 // Uses inline style fallbacks everywhere so it renders even if tailwind
 // doesn't load (same pattern as the bridge-form on login-gate.tsx).
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Project } from '../lib/api';
 
@@ -25,6 +25,14 @@ export function ProjectPicker({
 }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['projects'], queryFn: api.listProjects });
+
+  // Escape closes the picker when in modal mode (QA BUG-005).
+  useEffect(() => {
+    if (mode !== 'modal' || !onClose) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode, onClose]);
 
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState('');

@@ -238,8 +238,18 @@ export default function CompaniesPage() {
     return map;
   }, [tree.data]);
 
+  // Accept bare hostnames like "acme.com" or "sub.acme.co.uk". Reject
+  // anything without a dot, with whitespace, or with scheme/path chunks.
+  // Mirrors the same rule enforced on /playbooks so Skills → Run cannot
+  // bypass it (QA BUG-001, BUG-007).
+  const domainValid = (d: string) =>
+    /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i.test(d.trim());
+
   const enrich = useMutation({
-    mutationFn: (d: string) => api.runAgent('researcher', `Enrich ${d} and save to companies/.`),
+    mutationFn: (d: string) => {
+      if (!domainValid(d)) throw new Error(`"${d}" is not a valid domain — use e.g. acme.com`);
+      return api.runAgent('researcher', `Enrich ${d} and save to companies/.`);
+    },
     onMutate: (d) => setMessage(`enriching ${d}…`),
     onSuccess: () => {
       setMessage('done');
@@ -302,11 +312,16 @@ export default function CompaniesPage() {
                   <div className="mt-3 flex items-center gap-2">
                     <Button
                       variant="primary"
-                      onClick={() => domain && enrich.mutate(domain)}
-                      disabled={!domain || enrich.isPending}
+                      onClick={() => domainValid(domain) && enrich.mutate(domain)}
+                      disabled={!domainValid(domain) || enrich.isPending}
                     >
                       {enrich.isPending ? 'Enriching…' : 'Run researcher'}
                     </Button>
+                    {domain && !domainValid(domain) && (
+                      <span className="text-[11px] text-flame">
+                        not a valid domain
+                      </span>
+                    )}
                     <Button variant="ghost" onClick={() => setShowEnrich(false)}>Cancel</Button>
                     {message && (
                       <span className="text-[11px] text-muted dark:text-[#8C837C]">{message}</span>

@@ -10,7 +10,7 @@
  */
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Bot, Plus, Wrench, ExternalLink } from 'lucide-react';
@@ -71,6 +71,12 @@ prompt the model will see. Reference files with wikilinks: [[us/CLAUDE.md]].
 
 export default function AgentsPage() {
   const router = useRouter();
+  // Inline "new agent" form. We used window.prompt() here but Electron
+  // disables it in packaged builds, so the button looked broken with no
+  // feedback (QA BUG-008).
+  const [showNew, setShowNew] = useState(false);
+  const [newSlug, setNewSlug] = useState('');
+  const [newErr, setNewErr] = useState<string | null>(null);
 
   const agents = useQuery({
     queryKey: ['agents'],
@@ -122,17 +128,21 @@ export default function AgentsPage() {
   }, [runs.data]);
 
   async function createAgent() {
-    const suggested = prompt('New agent slug (letters, digits, dashes):', 'my-agent');
-    if (!suggested) return;
-    const slug = suggested.trim().replace(/[^a-z0-9-]/gi, '-').toLowerCase();
-    if (!slug) return;
+    setNewErr(null);
+    const slug = newSlug.trim().replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+    if (!slug) {
+      setNewErr('Pick a slug (letters, digits, dashes).');
+      return;
+    }
     const path = `agents/${slug}.md`;
     const seeded = STARTER_AGENT.replace('new-agent', slug);
     try {
       await api.writeFile(path, seeded);
+      setShowNew(false);
+      setNewSlug('');
       router.push(`/vault?path=${encodeURIComponent(path)}`);
     } catch (e) {
-      alert(`Failed to create agent: ${(e as Error).message}`);
+      setNewErr((e as Error).message || 'failed to create agent');
     }
   }
 
@@ -145,13 +155,33 @@ export default function AgentsPage() {
         subtitle="Role definitions under agents/. Each .md is a system prompt the LLM sees. The researcher, writer, and pipeline-analyst live here."
         icon={Bot}
         trailing={
-          <Button variant="primary" onClick={createAgent}>
+          <Button variant="primary" onClick={() => setShowNew(true)}>
             <Plus className="w-3 h-3" /> New agent
           </Button>
         }
       />
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-5xl mx-auto">
+          {showNew && (
+            <form
+              onSubmit={(e) => { e.preventDefault(); createAgent(); }}
+              className="mb-4 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4 flex items-center gap-2"
+            >
+              <label className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C] shrink-0">
+                slug
+              </label>
+              <input
+                autoFocus
+                value={newSlug}
+                onChange={(e) => setNewSlug(e.target.value)}
+                placeholder="my-agent"
+                className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-3 py-1.5 text-sm font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+              />
+              <Button variant="primary" onClick={createAgent}>Create</Button>
+              <Button variant="ghost" onClick={() => { setShowNew(false); setNewErr(null); setNewSlug(''); }}>Cancel</Button>
+              {newErr && <span className="text-[11px] text-flame">{newErr}</span>}
+            </form>
+          )}
           {agents.isLoading && <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>}
           {agents.error && <div className="text-sm text-flame">{(agents.error as Error).message}</div>}
 
@@ -161,7 +191,7 @@ export default function AgentsPage() {
               title="No agents yet."
               hint="Drop a *.md file in agents/ or click + New agent to scaffold one."
               action={
-                <Button variant="primary" onClick={createAgent}>
+                <Button variant="primary" onClick={() => setShowNew(true)}>
                   <Plus className="w-3 h-3" /> New agent
                 </Button>
               }

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Repeat } from 'lucide-react';
+import { Repeat, Users, Sparkles, Building2 } from 'lucide-react';
 
 type Contact = { path: string; company: string; frontmatter: Record<string, unknown> };
 
@@ -58,6 +58,31 @@ export default function ContactsPage() {
       <div className="h-full overflow-y-auto px-6 py-6">
         {contacts.isLoading && <div className="text-sm text-muted">loading…</div>}
         {contacts.error && <div className="text-sm text-flame">{(contacts.error as Error).message}</div>}
+        {!contacts.isLoading && (contacts.data?.length ?? 0) === 0 && (
+          <div className="max-w-xl mx-auto mt-10 bg-white rounded-2xl border border-line p-8 text-center">
+            <Users className="w-8 h-8 mx-auto mb-3 text-muted opacity-60" />
+            <h2 className="text-base font-semibold text-ink mb-1">No contacts yet</h2>
+            <p className="text-sm text-muted mb-5">
+              Contacts live as markdown under <code className="text-[11px]">contacts/&lt;company&gt;/</code>.
+              Add one by enriching a company, or ask the agent in Chat to
+              pull a buying committee.
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <Link
+                href="/companies"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-flame text-white text-sm font-medium hover:opacity-90"
+              >
+                <Building2 className="w-3.5 h-3.5" /> Enrich a company
+              </Link>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-line text-sm text-ink hover:bg-cream-light"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Ask in Chat
+              </Link>
+            </div>
+          </div>
+        )}
         <div className="space-y-6 max-w-3xl">
           {Object.entries(grouped).map(([company, list]) => (
             <div key={company}>

@@ -1891,6 +1891,26 @@ export async function readVaultFile(relPath: string) {
 export async function writeVaultFile(relPath: string, content: string) {
   const abs = ensureInsideVault(relPath);
   await fs.mkdir(path.dirname(abs), { recursive: true });
+  // Before overwriting an existing company/contact/deal profile, stash a
+  // timestamped backup so a retry doesn't silently destroy manual edits.
+  // See QA BUG-002 — retry enrichment used to clobber vault edits.
+  const norm = relPath.replace(/\\/g, '/');
+  const isProfile = /^(companies|contacts|deals)\//.test(norm) && norm.endsWith('.md');
+  if (isProfile) {
+    try {
+      const prior = await fs.readFile(abs, 'utf-8');
+      if (prior && prior !== content) {
+        const root = ensureInsideVault('.');
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupRel = path.posix.join('.bm', 'backups', `${stamp}__${norm.replace(/\//g, '__')}`);
+        const backupAbs = path.join(root, backupRel);
+        await fs.mkdir(path.dirname(backupAbs), { recursive: true });
+        await fs.writeFile(backupAbs, prior, 'utf-8');
+      }
+    } catch {
+      /* no prior file — nothing to back up */
+    }
+  }
   await fs.writeFile(abs, content, 'utf-8');
 }
 

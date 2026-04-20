@@ -255,7 +255,14 @@ export default function OrgPage() {
   const [expanded, setExpanded] = useState<Set<string>>(defaultExpanded);
 
   const roots = useMemo(() => {
-    const paths = tree.data?.tree.map((f) => f.path) ?? [];
+    // Only feed file paths into the tree builder — dir entries would
+    // cause a single-segment top-level folder like "companies" to be
+    // treated as a file, which made totals.files equal roots.length and
+    // produced the "N files · N roots" label that didn't match reality
+    // (QA BUG-011).
+    const paths = (tree.data?.tree ?? [])
+      .filter((f) => f.type === 'file')
+      .map((f) => f.path);
     return buildTree(paths);
   }, [tree.data]);
 

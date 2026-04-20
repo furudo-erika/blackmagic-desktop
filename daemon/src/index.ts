@@ -275,7 +275,7 @@ async function main() {
   app.get('/api/health', (c) =>
     c.json({
       ok: true,
-      version: '0.1.0',
+      version: '0.3.0',
       vaultPath: getVaultRoot(),
       model: config.default_model,
       zennConfigured: Boolean(config.zenn_api_key),

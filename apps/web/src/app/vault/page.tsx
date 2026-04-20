@@ -58,6 +58,7 @@ function VaultContent() {
   const [draftBody, setDraftBody] = useState('');
 
   const tree = useQuery({ queryKey: ['vault-tree'], queryFn: api.vaultTree, staleTime: 5_000 });
+  const health = useQuery({ queryKey: ['health'], queryFn: api.health, staleTime: 60_000 });
 
   const file = useQuery({
     queryKey: ['vault-file', selected],
@@ -115,7 +116,7 @@ function VaultContent() {
         <div>
           <h1 className="text-lg font-semibold text-ink dark:text-[#F5F1EA]">Vault</h1>
           <p className="text-xs text-muted dark:text-[#8C837C]">
-            Everything on disk at <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1.5 py-0.5 rounded">~/BlackMagic/</code>
+            Everything on disk at <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1.5 py-0.5 rounded">{health.data?.vaultPath ?? '…'}</code>
           </p>
         </div>
         <div className="relative w-64">

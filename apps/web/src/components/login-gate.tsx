@@ -170,16 +170,26 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   }
 
   if (showPicker) {
-    return (
-      <ProjectPicker
-        mode="page"
-        onActivated={() => {
-          localStorage.setItem('bm-projects-seen', '1');
-          setSeenPicker(true);
-          setForcePicker(false);
-        }}
-      />
-    );
+    // If the picker was opened from the sidebar (forcePicker), render it
+    // as a modal overlay so the user can dismiss with Escape, outside
+    // click, or the ✕ button. On first-launch (seenPicker === false) we
+    // still fall back to the full-page layout because there's nothing
+    // behind to go back to (QA BUG-005).
+    const asModal = forcePicker && seenPicker;
+    const close = () => {
+      localStorage.setItem('bm-projects-seen', '1');
+      setSeenPicker(true);
+      setForcePicker(false);
+    };
+    if (asModal) {
+      return (
+        <>
+          {children}
+          <ProjectPicker mode="modal" onActivated={close} onClose={close} />
+        </>
+      );
+    }
+    return <ProjectPicker mode="page" onActivated={close} />;
   }
 
   if (health.isLoading || !health.data) {

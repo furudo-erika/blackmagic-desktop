@@ -143,8 +143,14 @@ export function ChatSurface({
             });
           } else if (type === 'done') {
             runId = data.runId ?? runId;
-            if (!assistantText && data.final) {
-              assistantText = String(data.final);
+            // Always reconcile the last message to the authoritative final
+            // text from the server. Earlier we only filled in when the
+            // streamed text was empty, which meant a completion that
+            // streamed no text deltas stayed stuck at "(empty)" even
+            // though the JSON on disk held the real answer (QA BUG-004).
+            const serverFinal = data.final != null ? String(data.final) : '';
+            if (serverFinal && serverFinal !== assistantText) {
+              assistantText = serverFinal;
               setMessages((prev) => {
                 const copy = prev.slice();
                 copy[copy.length - 1] = { role: 'assistant', content: assistantText };

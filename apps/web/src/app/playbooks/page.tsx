@@ -57,10 +57,19 @@ function PlaybookCard({ pb, color }: { pb: Playbook; color: string }) {
     return para.replace(/[#`*_]/g, '').slice(0, 240);
   }, [pb.body]);
 
+  const isDomainField = (n: string) => /domain|website|url/i.test(n);
+  const isDomainValid = (v: string) =>
+    /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i.test(v.trim());
+  const missingRequired = inputs.filter((i) => i.required && !values[i.name]?.trim()).map((i) => i.name);
+  const invalidDomain = inputs.find(
+    (i) => isDomainField(i.name) && values[i.name]?.trim() && !isDomainValid(values[i.name] ?? ''),
+  );
+  const canRun = missingRequired.length === 0 && !invalidDomain;
+
   const run = useMutation({
     mutationFn: () => {
-      const missing = inputs.filter((i) => i.required && !values[i.name]?.trim()).map((i) => i.name);
-      if (missing.length) throw new Error(`Need: ${missing.join(', ')}`);
+      if (missingRequired.length) throw new Error(`Need: ${missingRequired.join(', ')}`);
+      if (invalidDomain) throw new Error(`"${values[invalidDomain.name]}" is not a valid domain`);
       return api.runAgent(agent, render(pb.body, values));
     },
     onSuccess: (d) => setResult({ ok: true, runId: d.runId }),
@@ -133,10 +142,24 @@ function PlaybookCard({ pb, color }: { pb: Playbook; color: string }) {
           </details>
 
           <div className="flex items-center justify-between gap-3">
-            <Button variant="primary" size="md" onClick={() => run.mutate()} disabled={run.isPending}>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => run.mutate()}
+              disabled={run.isPending || !canRun}
+            >
               <Play className="w-3 h-3" />
               {run.isPending ? 'Running…' : 'Run Playbook'}
             </Button>
+            {!canRun && !run.isPending && (
+              <span className="text-[11px] text-muted dark:text-[#8C837C]">
+                {missingRequired.length
+                  ? `required: ${missingRequired.join(', ')}`
+                  : invalidDomain
+                    ? `invalid ${invalidDomain.name}`
+                    : ''}
+              </span>
+            )}
             {result?.ok && (
               <span className="text-[11px] text-muted dark:text-[#8C837C] font-mono">
                 ✓ run {result.runId}

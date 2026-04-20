@@ -365,12 +365,25 @@ export default function OntologyPage() {
       <header className="px-6 py-3 border-b border-line dark:border-[#2A241D] flex items-center justify-between gap-4">
         <h1 className="text-base font-semibold text-ink dark:text-[#F5F1EA]">Knowledge graph</h1>
         <div className="flex items-center gap-3">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Highlight…"
-            className="w-44 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md px-3 py-1.5 text-xs font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
-          />
+          <div className="flex items-center gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Highlight…"
+              className="w-44 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md px-3 py-1.5 text-xs font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+            />
+            {query.trim() && (() => {
+              const qs = query.trim().toLowerCase();
+              const n = graph.nodes.filter(
+                (nd) => nd.label.toLowerCase().includes(qs) || nd.path.toLowerCase().includes(qs),
+              ).length;
+              return (
+                <span className={'text-[11px] font-mono ' + (n === 0 ? 'text-flame' : 'text-muted dark:text-[#8C837C]')}>
+                  {n === 0 ? 'no match' : `${n} match${n === 1 ? '' : 'es'}`}
+                </span>
+              );
+            })()}
+          </div>
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
             {[...counts.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => (
               <span key={k} className="inline-flex items-center gap-1.5 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-full px-2 py-0.5 text-muted dark:text-[#8C837C]">

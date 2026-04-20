@@ -110,6 +110,7 @@ export function Sidebar() {
     return list.filter((d) => (d.status ?? 'pending') === 'pending').length;
   }, [drafts.data]);
 
+  const health = useQuery({ queryKey: ['health'], queryFn: api.health, staleTime: 60_000 });
   const runs = useQuery({
     queryKey: ['runs'],
     queryFn: api.listRuns,
@@ -117,15 +118,29 @@ export function Sidebar() {
   });
   const liveRunCount = useMemo(() => {
     const list = runs.data?.runs ?? [];
-    // "Live" = run hasn't produced a final.md yet. Cap by a 10-minute ceiling
-    // so an orphaned run from a crashed daemon doesn't display "live" forever.
-    const tenMinAgo = Date.now() - 10 * 60 * 1000;
+    // "Live" = run hasn't produced a final.md yet. Cap by a 2-minute
+    // ceiling and also treat any run with a non-zero `turns` counter as
+    // complete — an older ceiling (10m) + a missing `done` flag caused
+    // the badge to stick at "2 live" after every run had finished (QA
+    // BUG-003). We also refetch on focus so switching back clears stale
+    // state without requiring a project switch.
+    const liveCutoffMs = Date.now() - 2 * 60 * 1000;
     return list.filter((r) => {
       if (r.done) return false;
+      if ((r.turns ?? 0) > 0) return false;
+      if ((r.tokensOut ?? 0) > 0) return false;
       const started = runStartedMs(r.runId);
-      return started != null && started >= tenMinAgo;
+      return started != null && started >= liveCutoffMs;
     }).length;
   }, [runs.data]);
+
+  // Runs badge reconciliation — refetch when the window regains focus so
+  // the count clears promptly after a run finishes in the background.
+  useEffect(() => {
+    const onFocus = () => { runs.refetch(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [runs]);
 
   // Chat actions ----------------------------------------------------------
   function startNewThread() {
@@ -234,7 +249,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="px-3 py-2 border-t border-line dark:border-[#2A241D] flex items-center justify-between shrink-0">
         <span className="text-[10px] text-muted dark:text-[#6B625C] font-mono">
-          v0.2.6
+          v{health.data?.version ?? '0.3.0'}
         </span>
         <button
           type="button"

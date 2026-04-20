@@ -30,6 +30,7 @@ function KV({ k, v, mono = false }: { k: string; v: React.ReactNode; mono?: bool
 
 export default function SettingsPage() {
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 5_000 });
+  const vault = health.data?.vaultPath ?? '~/BlackMagic';
   const integrations = useQuery({ queryKey: ['integrations'], queryFn: api.listIntegrations });
   const intKeys = useQuery({ queryKey: ['integration-keys'], queryFn: api.integrationKeys });
   const bridge = getBridge();
@@ -161,14 +162,14 @@ export default function SettingsPage() {
               }
             />
             <p className="text-[11px] text-muted dark:text-[#8C837C]">
-              Model can be changed by editing <code className="text-[11px]">~/BlackMagic/.bm/config.toml</code>:
+              Model can be changed by editing <code className="text-[11px]">{vault}/.bm/config.toml</code>:
               {' '}<code className="text-[11px]">default_model = "gpt-5.3-codex"</code>
             </p>
           </Section>
 
           <Section icon={KeyRound} title="Account">
             <KV k="Signed in" v={health.data?.zennConfigured ? <span className="text-[#7E8C67]">yes</span> : <span className="text-flame">no</span>} />
-            <KV k="Key" v={<code className="text-[11px]">~/BlackMagic/.bm/config.toml</code>} mono />
+            <KV k="Key" v={<code className="text-[11px]">{vault}/.bm/config.toml</code>} mono />
             <p className="text-[11px] text-muted dark:text-[#8C837C]">
               Manage all keys at{' '}
               <a
@@ -192,7 +193,7 @@ export default function SettingsPage() {
             <p className="text-[11px] text-muted dark:text-[#8C837C]">
               Bring-your-own keys for EnrichLayer, Apify, HubSpot CRM, Slack,
               Resend email and LinkedIn session cookie. Stored locally in{' '}
-              <code className="text-[11px]">~/BlackMagic/.bm/config.toml</code> and
+              <code className="text-[11px]">{vault}/.bm/config.toml</code> and
               read directly by the built-in tools.
             </p>
             <div className="space-y-2">
@@ -458,7 +459,7 @@ export default function SettingsPage() {
           </details>
 
           <p className="text-[11px] text-muted dark:text-[#6B625C] text-center pt-4">
-            v{health.data?.version ?? '0.1.0'} · open source · MIT
+            v{health.data?.version ?? '0.3.0'} · open source · MIT
           </p>
         </div>
       </PageBody>

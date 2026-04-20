@@ -44,9 +44,16 @@ export default function SequencesPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sequences'] }),
   });
 
+  const [walkMsg, setWalkMsg] = useState<string | null>(null);
   const walk = useMutation({
     mutationFn: () => api.walkSequences(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sequences'] }),
+    onSuccess: (r) => {
+      setWalkMsg(
+        `${new Date().toLocaleTimeString()} · walked ${r.enrollments} enrollment${r.enrollments === 1 ? '' : 's'} · ${r.fired} fired · ${r.failed} failed`,
+      );
+      qc.invalidateQueries({ queryKey: ['sequences'] });
+    },
+    onError: (e: Error) => setWalkMsg(`error: ${e.message}`),
   });
 
   const enrollmentsBySeq = useMemo(() => {
@@ -68,13 +75,20 @@ export default function SequencesPage() {
         subtitle="Multi-touch drips that walk a contact through scheduled outreach over days or weeks."
         icon={Repeat}
         trailing={
-          <Button
-            variant="secondary"
-            onClick={() => walk.mutate()}
-            disabled={walk.isPending}
-          >
-            <Play className="w-3 h-3" /> {walk.isPending ? 'Walking…' : 'Run walker now'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {walkMsg && (
+              <span className={'text-[11px] font-mono ' + (walkMsg.startsWith('error') ? 'text-flame' : 'text-muted dark:text-[#8C837C]')}>
+                {walkMsg}
+              </span>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => walk.mutate()}
+              disabled={walk.isPending}
+            >
+              <Play className="w-3 h-3" /> {walk.isPending ? 'Walking…' : 'Run walker now'}
+            </Button>
+          </div>
         }
       />
       <PageBody maxWidth="3xl">
