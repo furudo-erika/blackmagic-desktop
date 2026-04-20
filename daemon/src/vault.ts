@@ -1161,6 +1161,83 @@ referencing their recent post. Queue via draft_create(channel=
 linkedin_connect). Log intent to the contact file.
 `,
 
+  // End-to-end LinkedIn outreach loop. Wired to the
+  // \`linkedin-daily-outreach\` preset trigger so a cron can run the full
+  // funnel (intel → contact pick → enrich → draft) without a human in
+  // the middle. Safe to call manually from Skills — every step is
+  // idempotent and writes one note per run.
+  'li-campaign-loop.md': `---
+kind: playbook
+name: li-campaign-loop
+group: linkedin-intent
+agent: sdr
+inputs: []
+---
+
+Run ONE full LinkedIn outreach loop. The whole point of this playbook
+is that the cron version produces real work (drafts on disk) without a
+human babysitting it. Bail loudly — never silently — if an input is
+missing so the trigger log makes the gap obvious.
+
+## Steps
+
+1. **Gather fresh LinkedIn intel.** Read
+   \`signals/linkedin/<YYYY-MM-DD>.md\` (today or most recent within 3
+   days). Expected frontmatter: \`kind: signal.linkedin\`. Body lists
+   engagements with columns \`prospect · profile_url · company · type
+   · content · ts\`. If no file exists, call \`web_search\` for
+   site:linkedin.com/posts "<us.company.name>" (last 24h) to pick up
+   post comments / reactions, and write the results to today's
+   \`signals/linkedin/\` file yourself.
+   If the scan legitimately finds nothing, write the empty signal file
+   with \`count: 0\` and reply "quiet day on LinkedIn — no drafts" —
+   do NOT invent prospects.
+2. **Filter to the top 5 prospects.** Prefer, in order:
+     - engagements on our own posts / company mentions
+     - prospects whose \`company\` matches an existing
+       \`companies/<slug>.md\` (we know the account)
+     - senior titles (VP, Head, Director, C-level)
+   Drop anyone with \`sequence_status: active\` in their contact file
+   or who already has a draft under \`drafts/\` from the last 14 days
+   (avoid double-touch).
+3. **Resolve or create a contact file** for each selected prospect.
+   Slug is \`<company-slug>/<firstname-lastname>\`. If the company
+   doesn't exist yet, call the \`enrich-company\` playbook first with
+   their domain (fall back to \`web_fetch\` of the profile for the
+   company name, then \`web_search\` for the domain). Write
+   \`contacts/<slug>.md\` with frontmatter
+   \`kind: contact, company, title, linkedin, source: linkedin-loop\`.
+4. **Enrich the profile** by calling \`enrich_contact_linkedin({
+   linkedinUrl })\`. On account-limit / failure, continue with whatever
+   signal you already have from the engagement content — don't skip
+   the draft step, just note \`enrichment: partial\` in the frontmatter.
+5. **Draft LinkedIn outreach.** For each prospect call:
+     - \`draft_create({ channel: "linkedin_connect", contact_path, body })\`
+       ONLY if they aren't already a 1st-degree connection. Connection
+       note <= 280 chars, references the specific engagement, no
+       hashtags, no pitch.
+     - \`draft_create({ channel: "linkedin_dm", contact_path, body })\`
+       unconditionally. DM <= 60 words. Hypothesis-based
+       ("noticed you reacted to X — curious whether that ties to
+       <hypothesis>?"). One clear question. No calendar link.
+   Every \`draft_create\` result needs to land under \`drafts/\` — if
+   the tool returned an error, retry once with a shorter body; if that
+   also fails, append a \`## Drafts that failed\` section to the run
+   summary so the human can see it.
+6. **Enroll** the contact into \`sequences/linkedin-post-signal.md\` via
+   \`enroll_contact_in_sequence\`. Log the enrollment to the contact
+   file under a \`## LinkedIn loop (ts)\` heading with a one-liner
+   describing the engagement that triggered it.
+7. **Write one summary note** at \`signals/linkedin/<YYYY-MM-DD>-loop.md\`
+   with frontmatter \`kind: signal.linkedin-loop, date, drafts, enrolled\`
+   and a table of (prospect, company, draft_path, sequence_enrolled,
+   notes). This is what the trigger log points at.
+8. **Reply** with a 3-bullet digest: how many prospects processed, how
+   many drafts queued, and the single most interesting signal. If step
+   1 found zero prospects, say so directly — do not pretend work
+   happened.
+`,
+
   // === Signal scans (cron-driven) ==========================================
   // These three back the "brand-monitor preset" triggers. Each is idempotent,
   // writes one note per run under signals/<kind>/, and only uses tools we
@@ -1658,6 +1735,52 @@ touches:
 Enroll a contact right after a discovery or demo call. Stops on reply.
 `,
 
+  'linkedin-post-signal.md': `---
+kind: sequence
+name: linkedin-post-signal
+description: >-
+  LinkedIn-first drip for contacts surfaced by li-campaign-loop. Starts
+  on LinkedIn (connect + DM), then pivots to email once they accept.
+enrollment_rule: linkedin signal in last 7d
+touches:
+  - day: 0
+    channel: linkedin_connect
+    playbook: li-send-request
+    prompt: >-
+      Connection-request note referencing the specific engagement that
+      triggered enrollment. <=280 characters. No pitch.
+  - day: 0
+    channel: linkedin_dm
+    playbook: li-draft-message
+    prompt: >-
+      Hypothesis-based DM <=60 words. Reference the engagement; ask one
+      question tied to our positioning.
+  - day: 3
+    channel: linkedin_dm
+    playbook: li-draft-message
+    prompt: >-
+      If no reply yet, send a second DM with a concrete data point from
+      us/product/ or us/customers/. <=50 words.
+  - day: 7
+    channel: email
+    playbook: signal-based-outbound
+    prompt: >-
+      Cross-channel bump — email the contact referencing the LinkedIn
+      thread. Short, value-first. <=80 words.
+  - day: 14
+    channel: email
+    playbook: signal-based-outbound
+    prompt: >-
+      Break-up. "Did this stay top of mind?" <=35 words.
+---
+
+# LinkedIn post-signal drip
+
+Lives next to post-signal-5-touch but starts on LinkedIn because the
+trigger itself is a LinkedIn engagement. li-campaign-loop enrolls
+contacts here automatically.
+`,
+
   'post-signal-5-touch.md': `---
 kind: sequence
 name: post-signal-5-touch
@@ -1792,6 +1915,27 @@ enabled: true
 Monday 08:00 pipeline-health report. Flags stuck deals, missing
 next-steps, and at-risk ARR. Writes a dated report under
 \`signals/pipeline-health/<date>.md\`.
+`,
+
+  // LinkedIn outreach — runs the full intel → pick → enrich → draft
+  // loop every weekday morning. Drives \`li-campaign-loop\`, which
+  // writes drafts under \`drafts/\` and a summary under
+  // \`signals/linkedin/<date>-loop.md\`. Universal across projects; no
+  // Apidog-specific wiring.
+  'linkedin-daily-outreach.md': `---
+kind: trigger
+name: linkedin-daily-outreach
+schedule: '0 9 * * 1-5'
+playbook: li-campaign-loop
+enabled: true
+---
+
+Weekday 09:00 LinkedIn outreach loop. Pulls today's engagement signal
+(\`signals/linkedin/<date>.md\`, scraped if missing), picks the top 5
+prospects, enriches + drafts connect/DM messages under \`drafts/\`, and
+enrolls each contact into \`sequences/linkedin-post-signal.md\`. Writes
+a per-run summary at \`signals/linkedin/<date>-loop.md\` so the trigger
+log always points at something real (fixes the old usage-only run).
 `,
 };
 

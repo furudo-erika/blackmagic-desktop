@@ -2,6 +2,28 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.3.8 — 2026-04-20
+
+### Added
+- **End-to-end LinkedIn outreach loop** — new universal skill
+  `li-campaign-loop` + sequence `linkedin-post-signal` + preset
+  trigger `linkedin-daily-outreach` (weekday 09:00). The loop
+  gathers LinkedIn engagement signal, picks the top prospects,
+  enriches each contact, calls `draft_create` for both
+  `linkedin_connect` and `linkedin_dm`, enrolls the contact into the
+  LinkedIn sequence, and writes a summary note to
+  `signals/linkedin/<date>-loop.md`. Replaces the Apidog-era
+  LinkedIn trigger that only printed usage output. Available in
+  every project — seeded on vault creation and installable into
+  existing vaults via Triggers → Install presets.
+
+### Fixed
+- **Chat tool stream** — `→ list_dir` / `✓ read_file` lines now
+  include the load-bearing argument (path, url, domain, query, …)
+  so users can see what the agent is actually touching instead of
+  staring at an opaque list of tool names. The daemon forwards the
+  call arguments on both pending + completed events.
+
 ## 0.3.7 — 2026-04-20
 
 ### Fixed

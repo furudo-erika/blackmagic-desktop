@@ -33,6 +33,42 @@ function newThreadId(): string {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
+// Render a tool-call line that actually tells the user what is happening.
+// Previously we showed "→ list_dir" / "✓ read_file" with no hint about which
+// file, URL, or domain the tool was hitting, which looked like the agent was
+// churning through opaque work. Pull the most load-bearing argument (path,
+// url, domain, query, …) and append it so each line reads like
+// "→ read_file companies/apidog.md" instead.
+function formatToolLine(data: any): string {
+  const name: string = data?.name ?? 'tool';
+  let args: any = {};
+  const raw = data?.arguments ?? data?.args ?? data?.input;
+  if (typeof raw === 'string') {
+    try { args = JSON.parse(raw); } catch { return `${name} ${raw.slice(0, 60)}`.trim(); }
+  } else if (raw && typeof raw === 'object') {
+    args = raw;
+  }
+  const pick = (...keys: string[]) => {
+    for (const k of keys) {
+      const v = args?.[k];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+      if (typeof v === 'number') return String(v);
+    }
+    return '';
+  };
+  const hint =
+    pick('path', 'file', 'file_path') ||
+    pick('url', 'link') ||
+    pick('domain') ||
+    pick('linkedinUrl', 'linkedin_url') ||
+    pick('query', 'q', 'search') ||
+    pick('contact_path', 'sequence_path') ||
+    pick('channel', 'to', 'subject') ||
+    pick('old_path', 'new_path');
+  const short = hint.length > 80 ? hint.slice(0, 77) + '…' : hint;
+  return short ? `${name} ${short}` : name;
+}
+
 export function ChatSurface({
   agent,
   threadKey = 'bm-last-thread',
@@ -129,9 +165,9 @@ export function ChatSurface({
               return copy;
             });
           } else if (type === 'tool_pending') {
-            setStreamingTools((t) => [...t, `→ ${data.name}`]);
+            setStreamingTools((t) => [...t, `→ ${formatToolLine(data)}`]);
           } else if (type === 'tool') {
-            setStreamingTools((t) => [...t, `✓ ${data.name}`]);
+            setStreamingTools((t) => [...t, `✓ ${formatToolLine(data)}`]);
           } else if (type === 'error') {
             assistantText = assistantText
               ? assistantText + '\n\n_error_: ' + data.message

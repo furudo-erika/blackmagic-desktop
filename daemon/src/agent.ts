@@ -272,7 +272,7 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
         }
         const outputStr = typeof output === 'string' ? output : JSON.stringify(output);
         toolLog.push({ turn, name, arguments: parsedArgs, output, ts: new Date().toISOString() });
-        onEvent({ type: 'tool_result', data: { name, output } });
+        onEvent({ type: 'tool_result', data: { name, arguments: argStr, output } });
 
         // Append the call + its result back to input for next turn
         input.push({ type: 'function_call', call_id, name, arguments: argStr });
