@@ -318,10 +318,26 @@ for i in $(seq 1 60); do
   if ! kill -0 ${pid} 2>/dev/null; then break; fi
   sleep 0.5
 done
-echo "[$(date -u +%FT%TZ)] running: ${brewPath} upgrade --cask blackmagic-ai"
-"${brewPath}" upgrade --cask blackmagic-ai
+echo "[$(date -u +%FT%TZ)] refreshing tap: ${brewPath} update --quiet"
+"${brewPath}" update --quiet
+echo "[$(date -u +%FT%TZ)] running: ${brewPath} upgrade --cask blackmagic-ai --greedy"
+"${brewPath}" upgrade --cask blackmagic-ai --greedy
 status=$?
 echo "[$(date -u +%FT%TZ)] brew exit=$status"
+# brew refuses to upgrade if it thinks we're already at latest (stale tap
+# cache, cask auto-updates disabled, etc). Detect that and force a
+# reinstall so the relaunch loop actually breaks.
+if [ "$status" -eq 0 ]; then
+  installed=$("${brewPath}" list --cask --versions blackmagic-ai 2>/dev/null | awk '{print $2}')
+  latest=$("${brewPath}" info --cask --json=v2 blackmagic-ai 2>/dev/null | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["casks"][0]["version"])' 2>/dev/null)
+  echo "[$(date -u +%FT%TZ)] post-upgrade: installed=$installed latest=$latest"
+  if [ -n "$installed" ] && [ -n "$latest" ] && [ "$installed" != "$latest" ]; then
+    echo "[$(date -u +%FT%TZ)] forcing reinstall to pick up $latest"
+    "${brewPath}" reinstall --cask blackmagic-ai
+    status=$?
+    echo "[$(date -u +%FT%TZ)] reinstall exit=$status"
+  fi
+fi
 if [ "$status" -eq 0 ]; then
   open -a "BlackMagic AI"
 else

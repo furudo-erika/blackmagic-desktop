@@ -2,6 +2,21 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.4 — 2026-04-21
+
+### Fixed
+- **"Upgrade and relaunch" relaunch loop.** The auto-upgrade script
+  ran `brew upgrade --cask blackmagic-ai` without first refreshing
+  brew's tap cache, so brew saw no newer version, exited 0, and the
+  app relaunched into the same "out of date" dialog forever. The
+  script now runs `brew update --quiet` first, passes `--greedy`
+  (bypass brew's cask-auto-update heuristics), and if the installed
+  version still doesn't match the latest after the upgrade, force a
+  `brew reinstall --cask blackmagic-ai`. Log at
+  `~/Library/Logs/BlackMagic AI/auto-upgrade-*.log` keeps a diff of
+  installed vs latest so the next stuck upgrade is visible at a
+  glance.
+
 ## 0.4.3 — 2026-04-21
 
 ### Added
