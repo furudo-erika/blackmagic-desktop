@@ -5,6 +5,14 @@ All notable changes to BlackMagic AI. Dates in UTC.
 ## 0.4.22 — 2026-04-21
 
 ### Fixed
+- **`/automations` was 404.** The 0.4.21 sidebar rewrite added an
+  Automations row linking to `/automations`, but that route didn't
+  exist — I referenced it without creating the page. The new hub
+  page shows four cards (Skills / Triggers / GEO / Runs) linking to
+  the dedicated pages that already existed, with a live-run pulse
+  on the Runs card when agents are actively working. Verified every
+  other sidebar link resolves (`/`, `/outreach`, `/dashboard`,
+  `/vault`, `/automations`, `/settings` + the palette jumps).
 - **Auto-upgrade no longer hangs at "Waiting for previous process to
   exit…".** The upgrader shell script still had the pre-0.4.19 design's
   opening step: wait up to 30s for the main Electron pid to exit, then
