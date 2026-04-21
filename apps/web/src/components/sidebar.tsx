@@ -137,18 +137,41 @@ export function Sidebar() {
           const slug = f.path.replace(/^agents\//, '').replace(/\.md$/, '');
           const name = typeof fm.name === 'string' && fm.name ? fm.name : slug;
           const icon = typeof fm.icon === 'string' ? fm.icon : '';
-          return { slug, name, icon };
+          const href = typeof fm.href === 'string' ? fm.href : '';
+          // Agents with `pin: first` in frontmatter float to the top
+          // of the Team list. Company Profiler uses this because it's
+          // the prerequisite for every other agent.
+          const pin = typeof fm.pin === 'string' ? fm.pin : '';
+          return { slug, name, icon, href, pin };
         }),
       );
-      rows.sort((a, b) => a.name.localeCompare(b.name));
+      rows.sort((a, b) => {
+        const rank = (x: { pin: string }) => (x.pin === 'first' ? 0 : 1);
+        if (rank(a) !== rank(b)) return rank(a) - rank(b);
+        return a.name.localeCompare(b.name);
+      });
       return rows;
     },
     staleTime: 30_000,
   });
   const teamItems = useMemo(() => {
     const real = vaultAgents.data ?? [];
-    if (real.length > 0) return real.map((a) => ({ slug: a.slug, name: a.name, icon: a.icon || 'Bot', vault: true }));
-    return AGENTS.map((a) => ({ slug: a.slug, name: a.name, icon: a.icon, vault: false }));
+    if (real.length > 0) {
+      return real.map((a) => ({
+        slug: a.slug,
+        name: a.name,
+        icon: a.icon || 'Bot',
+        href: a.href || `/team?slug=${encodeURIComponent(a.slug)}`,
+        vault: true,
+      }));
+    }
+    return AGENTS.map((a) => ({
+      slug: a.slug,
+      name: a.name,
+      icon: a.icon,
+      href: `/team/${a.slug}`,
+      vault: false,
+    }));
   }, [vaultAgents.data]);
 
   const runs = useQuery({
@@ -258,7 +281,7 @@ export function Sidebar() {
             return (
               <SidebarNavItem
                 key={agent.slug}
-                href={`/team?slug=${encodeURIComponent(agent.slug)}`}
+                href={agent.href}
                 label={agent.name}
                 icon={Icon}
                 breathing={liveAgentSlugs.has(agent.slug.toLowerCase())}
@@ -290,11 +313,6 @@ export function Sidebar() {
         </SidebarSection>
 
         <SidebarSection label="System">
-          <SidebarNavItem
-            href="/onboarding/bootstrap"
-            label="Profile company"
-            icon={Sparkles}
-          />
           <SidebarNavItem href="/integrations" label="Integrations" icon={Plug} />
           <SidebarNavItem href="/agents" label="Agent roles" icon={Bot} />
           <SidebarNavItem href="/settings" label="Settings" icon={SettingsIcon} />

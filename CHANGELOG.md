@@ -2,6 +2,26 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.11 — 2026-04-21
+
+### Changed
+- **Company Profiler is now a first-class Team agent.** Moved out of
+  Sidebar → System → "Profile company" (where it was buried under
+  Integrations / Agent roles / Settings) into the **Team** section at
+  the top of the list. Seeded as `agents/company-profiler.md` with
+  `pin: first` frontmatter so it always sorts above the other nine
+  agents. Icon is Sparkles.
+- **Sidebar agent rows respect `href:` frontmatter.** Agents with
+  an explicit `href` in frontmatter route there instead of the
+  generic `/team?slug=X` cockpit. Company Profiler uses this to
+  jump straight to `/onboarding/bootstrap` (the bootstrap-self
+  playbook that crawls your domain + docs and populates the `us/`
+  tree) — clicking it in Team takes you to the form, not a chat.
+  Other agents still land on the chat cockpit.
+- **Sort by `pin` then name.** Team list sort now honors a
+  `pin: first` frontmatter field before alpha-sorting, so pinned
+  agents never get bumped down as new ones are added.
+
 ## 0.4.10 — 2026-04-21
 
 ### Changed
