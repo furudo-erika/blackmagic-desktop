@@ -2,6 +2,15 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.6 — 2026-04-21
+
+### Fixed
+- **Agent cockpit client-side exception.** The scenarios `useMemo`
+  lived after the early-return guards in `AgentCockpit`, so hook
+  order changed between "loading" and "loaded" renders and React
+  crashed the page with "a client-side exception has occurred".
+  Moved the memo above the guards so hook order stays stable.
+
 ## 0.4.5 — 2026-04-21
 
 ### Changed

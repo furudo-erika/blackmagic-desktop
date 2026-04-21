@@ -172,6 +172,26 @@ export default function AgentCockpit() {
   const lastRunMs = lastRun ? runStartedMs(lastRun.runId) : null;
   const isLive = !!lastRun && !lastRun.done && lastRunMs != null && Date.now() - lastRunMs < 2 * 60_000;
 
+  // Derive scenarios BEFORE any conditional early return so hook order
+  // stays stable across renders. Falls back to a single "Kick off…"
+  // starter when the agent file has no starter_prompts frontmatter.
+  const scenarios: ChatScenario[] = useMemo(() => {
+    const a = agentQ.data;
+    if (!a) return [];
+    if (a.starterPrompts.length > 0) {
+      return a.starterPrompts.map((p) => ({
+        title: p.length > 48 ? p.slice(0, 45) + '…' : p,
+        prompt: p,
+      }));
+    }
+    return [
+      {
+        title: `Kick off ${a.name}`,
+        prompt: `You are the ${a.name}. Walk me through the first thing you would do for my project. Read what you need from the vault (us/, companies/, contacts/, signals/) and reply with: (1) the concrete first step, (2) the tools you would call, (3) what output I should expect. No pitches — be specific.`,
+      },
+    ];
+  }, [agentQ.data]);
+
   if (!slug) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -204,24 +224,6 @@ export default function AgentCockpit() {
   const agent = agentQ.data;
   const Icon = ICONS[agent.icon] ?? Bot;
   const playbooks = playbooksQ.data ?? [];
-
-  // Build chat scenarios from the agent's own starter_prompts (if any).
-  // Falls back to a single contextual starter so the chat-empty state
-  // never looks bare — the user always has ONE obvious next action.
-  const scenarios: ChatScenario[] = useMemo(() => {
-    if (agent.starterPrompts.length > 0) {
-      return agent.starterPrompts.map((p) => ({
-        title: p.length > 48 ? p.slice(0, 45) + '…' : p,
-        prompt: p,
-      }));
-    }
-    return [
-      {
-        title: `Kick off ${agent.name}`,
-        prompt: `You are the ${agent.name}. Walk me through the first thing you would do for my project. Read what you need from the vault (us/, companies/, contacts/, signals/) and reply with: (1) the concrete first step, (2) the tools you would call, (3) what output I should expect. No pitches — be specific.`,
-      },
-    ];
-  }, [agent.name, agent.starterPrompts]);
 
   return (
     <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A] min-h-0">
