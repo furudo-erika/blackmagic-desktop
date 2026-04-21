@@ -2,6 +2,39 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.7 — 2026-04-21
+
+### Added
+- **GEO is now native.** Drops the Peec AI integration and replaces it
+  with a daily sweep that runs your seed-prompt pool through ChatGPT
+  (gpt-5.2 + web_search), Perplexity Sonar, and Google AI Overview
+  (via SerpAPI) — all proxied through blackmagic.run, so you never
+  manage upstream keys. Credits are charged at OpenAI / Perplexity /
+  SerpAPI list price + 10% markup (8¢ / 2¢ / 2¢ per call). Results
+  land in `signals/geo/runs/<date>/<model>/<prompt>.json`.
+- **`/geo` dashboard.** Four "biggest mover" cards at the top (SoV
+  up/down, new/lost domain). Brand SoV bars render the prior-period
+  ghost behind the current bar + a signed Δ column with up/down/flat
+  arrows. SoV line chart overlays the prior period as a dashed line
+  so you see the week-over-week shape, not just the absolute. Domain
+  data split into four tables: biggest gains, biggest losses, new
+  this period, lost this period. Gap sources (domains cited when
+  competitors are mentioned but not when you are) keep their own
+  panel.
+- **Twelve new `geo_*` tools** wired into the rewritten GEO Analyst
+  agent: `geo_list_prompts`, `geo_add_prompt`, `geo_remove_prompt`,
+  `geo_list_brands`, `geo_set_brands`, `geo_run_prompt`,
+  `geo_run_daily`, `geo_report_brands`, `geo_report_domains`,
+  `geo_gap_sources`, `geo_sov_trend`, `geo_list_runs`.
+- **Two triggers.** `geo-daily` fires `POST /api/geo/run` at 07:00
+  every day to refresh the pool; `geo-weekly` runs the GEO Analyst
+  agent every Monday 09:00 against the week's stored snapshots.
+
+### Removed
+- **Peec AI integration.** The nine `peec_*` tools are gone. The
+  `peec_api_key` setting is retired — proxying through
+  blackmagic.run means no per-user third-party key to manage.
+
 ## 0.4.6 — 2026-04-21
 
 ### Fixed
