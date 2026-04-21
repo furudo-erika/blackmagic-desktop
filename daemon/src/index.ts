@@ -28,6 +28,7 @@ import { mcpServerList, McpRegistry } from './mcp.js';
 import { buildOntology } from './ontology.js';
 import { pushTriggers, pushDrafts } from './sync.js';
 import { runCodex, codexAvailable, CodexNotInstalled } from './codex.js';
+import matter from 'gray-matter';
 import * as geo from './geo.js';
 import { seedVercelDemo } from './us-demo.js';
 import {
@@ -43,6 +44,20 @@ import {
   oauthStartUrl,
   type IntegrationProvider,
 } from './integrations.js';
+
+function stampHumanEditIfProfile(relPath: string, content: string): string {
+  const norm = relPath.replace(/\\/g, '/');
+  const isProfile = /^(companies|contacts|deals)\//.test(norm) && norm.endsWith('.md');
+  if (!isProfile) return content;
+  try {
+    const parsed = matter(content);
+    const fm = (parsed.data ?? {}) as Record<string, unknown>;
+    fm.human_edited_at = new Date().toISOString();
+    return matter.stringify(parsed.content, fm);
+  } catch {
+    return content;
+  }
+}
 
 const LOCAL_TOKEN = process.env.BM_LOCAL_TOKEN ?? crypto.randomBytes(24).toString('base64url');
 
@@ -770,8 +785,42 @@ async function main() {
 
   app.put('/api/vault/file', async (c) => {
     const body = await c.req.json<{ path: string; content: string }>();
-    await writeVaultFile(body.path, body.content);
+    // Stamp a `human_edited_at` marker into the frontmatter of any
+    // companies/contacts/deals profile saved via the editor UI. This
+    // lets the Companies list flag the row as "has manual edits — will
+    // be backed up on re-enrichment" so users aren't surprised when the
+    // researcher overwrites their notes (QA BUG-03). Non-profile files
+    // and .json are left alone.
+    const content = stampHumanEditIfProfile(body.path, body.content);
+    await writeVaultFile(body.path, content);
     return c.json({ ok: true });
+  });
+
+  // Lists timestamped backups the vault has stashed for a given path
+  // before agent-driven overwrites. Used by the Companies detail drawer
+  // to offer a restore path (QA BUG-03).
+  app.get('/api/vault/backups', async (c) => {
+    const p = c.req.query('path');
+    if (!p) return c.json({ error: 'path required' }, 400);
+    try {
+      const root = getVaultRoot();
+      const backupsDir = path.join(root, '.bm', 'backups');
+      const prefix = p.replace(/\\/g, '/').replace(/\//g, '__');
+      let entries: string[];
+      try {
+        entries = await fs.readdir(backupsDir);
+      } catch {
+        return c.json({ backups: [] });
+      }
+      const matched = entries
+        .filter((name) => name.includes(`__${prefix}`) || name.endsWith(prefix))
+        .sort()
+        .reverse()
+        .slice(0, 20);
+      return c.json({ backups: matched.map((name) => ({ name, path: path.posix.join('.bm', 'backups', name) })) });
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
   });
 
   app.post('/api/agent/run', async (c) => {

@@ -71,6 +71,10 @@ export const api = {
     request<{ ok: true }>('/api/vault/file', { method: 'PUT', body: JSON.stringify({ path, content }) }),
   backlinks: (p: string) =>
     request<{ backlinks: string[] }>(`/api/vault/backlinks?path=${encodeURIComponent(p)}`),
+  listBackups: (p: string) =>
+    request<{ backups: Array<{ name: string; path: string }> }>(
+      `/api/vault/backups?path=${encodeURIComponent(p)}`,
+    ),
   integrationKeys: () =>
     request<{
       apify_api_key: boolean;

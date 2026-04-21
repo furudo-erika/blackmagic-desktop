@@ -41,6 +41,7 @@ type Company = {
   lastActivity?: string;
   notesStatus?: string;
   missingFields: string[];
+  humanEditedAt?: string;
   frontmatter: Record<string, unknown>;
 };
 
@@ -105,6 +106,11 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
   });
   const tree = useQuery({ queryKey: ['vault-tree'], queryFn: api.vaultTree, staleTime: 30_000 });
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.listRuns, staleTime: 30_000 });
+  const backups = useQuery({
+    queryKey: ['vault-backups', company.path],
+    queryFn: () => api.listBackups(company.path),
+    staleTime: 30_000,
+  });
 
   const slug = company.slug.toLowerCase();
   const domain = (company.domain ?? '').toLowerCase();
@@ -182,6 +188,29 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
             ))}
           </ul>
         </DrawerSection>
+        {(backups.data?.backups?.length ?? 0) > 0 && (
+          <section>
+            <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-2">
+              Backups · {backups.data!.backups.length}
+            </div>
+            <p className="text-[11px] text-muted dark:text-[#8C837C] mb-2">
+              Snapshots saved under <code className="font-mono">.bm/backups/</code> before each
+              agent overwrite. Open one in the vault to restore or diff.
+            </p>
+            <ul className="space-y-0.5">
+              {backups.data!.backups.slice(0, 5).map((b) => (
+                <li key={b.path}>
+                  <Link
+                    href={`/vault?path=${encodeURIComponent(b.path)}`}
+                    className="block text-[11px] font-mono text-muted dark:text-[#8C837C] hover:text-flame truncate"
+                  >
+                    {b.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <section className="pt-2 border-t border-line dark:border-[#2A241D]">
           <Link href={`/vault?path=${encodeURIComponent(company.path)}`} className="inline-flex items-center gap-1 text-[12px] text-muted dark:text-[#8C837C] hover:text-flame">
             <ExternalLink className="w-3 h-3" /> Open in vault editor
@@ -218,6 +247,7 @@ export default function CompaniesPage() {
             const v = fm[k];
             return v == null || v === '' || v === 'unknown' || v === 'null';
           });
+          const humanEditedAt = fm.human_edited_at != null ? String(fm.human_edited_at) : undefined;
           return {
             path: f.path,
             slug,
@@ -230,6 +260,7 @@ export default function CompaniesPage() {
             lastActivity: fm.last_activity != null ? String(fm.last_activity) : undefined,
             notesStatus: fm.notes_status != null ? String(fm.notes_status) : undefined,
             missingFields,
+            humanEditedAt,
             frontmatter: fm,
           };
         }),
@@ -398,6 +429,14 @@ export default function CompaniesPage() {
                                   className="text-[10px] px-1.5 py-0 rounded font-mono uppercase tracking-wide shrink-0 bg-[#F5C24D]/20 text-[#8A6A1A] dark:text-[#E8C063]"
                                 >
                                   partial{c.missingFields.length ? ` · ${c.missingFields.length} missing` : ''}
+                                </span>
+                              )}
+                              {c.humanEditedAt && (
+                                <span
+                                  title={`Manual edit on ${c.humanEditedAt}. Re-enrichment stashes a backup under .bm/backups/ before overwriting.`}
+                                  className="text-[10px] px-1.5 py-0 rounded font-mono uppercase tracking-wide shrink-0 bg-flame/15 text-flame"
+                                >
+                                  edited
                                 </span>
                               )}
                             </span>

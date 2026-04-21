@@ -2,6 +2,24 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.12 — 2026-04-21
+
+### Fixed
+- **Manual edits to company/contact/deal profiles are now
+  discoverable and restorable.** Saving a profile from the vault
+  editor stamps `human_edited_at:` into the frontmatter; the
+  Companies list surfaces a flame-colored `edited` badge on those
+  rows with a tooltip explaining that re-enrichment stashes a
+  backup under `.bm/backups/` before overwriting. The company
+  detail drawer now also lists the last 20 backups for that file
+  with links into the vault viewer, so recovering a clobbered
+  manual note is one click instead of a terminal dive (QA
+  BUG-03).
+- **New `GET /api/vault/backups?path=...`** endpoint that returns
+  the list of timestamped backups the daemon has already been
+  writing under `.bm/backups/` for profile files. Used by the
+  Companies detail drawer; also handy for external tooling.
+
 ## 0.4.11 — 2026-04-21
 
 ### Added
