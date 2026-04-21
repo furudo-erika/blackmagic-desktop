@@ -2,6 +2,43 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.0 — 2026-04-21
+
+### Added
+- **GEO Analyst agent** (`agents/geo-analyst.md`), seeded to every
+  vault. Executes the 12-step Generative Engine Optimization loop
+  from the internal GEO PRD — ICP lock → Seed Query audit → prompt
+  expansion → (Peec fan-out) → 6-field response parsing → 6-metric
+  scoring → Gap Source analysis → Owned/Earned/Paid recommendations
+  → draft distribution → 48h source-drop alerts → pipeline
+  attribution → weekly report. English-only scope (ChatGPT, Google
+  AI Overviews, Perplexity, Gemini, Claude, Copilot, Grok). Model:
+  `gpt-5.4`.
+- **Peec AI integration** (BYOK, `X-API-Key`, base
+  `https://api.peec.ai/customer/v1`). Nine tools wired into the
+  daemon: `peec_list_brands`, `peec_list_prompts`,
+  `peec_create_prompt`, `peec_prompt_suggestions`,
+  `peec_accept_prompt_suggestion`, `peec_report_brands` (SoV /
+  Citation Rank / sentiment / visibility), `peec_report_domains`
+  (cited sources — the highest-leverage GEO data, drives Gap
+  analysis), `peec_report_urls`, `peec_source_content`. Key goes in
+  Settings → Integrations → Peec AI. Peec's API is Enterprise-tier
+  + beta per their docs; errors surface verbatim.
+- **`geo-weekly` trigger** (Monday 07:00 cron). Fires the
+  geo-analyst, pulls the week's Peec snapshot, diffs against last
+  week's run, writes the weekly report to
+  `signals/geo/weekly/<iso-week>.md`, and drops 48h source-drop
+  alerts into `signals/geo/alerts/`.
+- **`signals/geo/{runs,weekly,actions,alerts}`** directories in the
+  vault skeleton so weekly snapshots, reports, action lists, and
+  source-drop alerts each have their own home.
+
+### Changed
+- **Triggers now accept an `agent:` frontmatter field.** Previously
+  triggers either ran a shell command, a playbook, or fell back to
+  the hardcoded `researcher` agent. With `agent: geo-analyst` (or
+  any agent slug) a cron can now fire any agent directly.
+
 ## 0.4.2 — 2026-04-21
 
 ### Removed

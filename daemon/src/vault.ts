@@ -834,6 +834,7 @@ tools:
   - peec_report_domains
   - peec_report_urls
   - peec_source_content
+  - draft_create
 temperature: 0.25
 ---
 
