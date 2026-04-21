@@ -2,6 +2,31 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.20 — 2026-04-21
+
+### Changed
+- **Sidebar rewritten Multica-style.** 14 always-on rows collapsed
+  down to 6 grouped sections: Chat, Inbox, Dashboard, Vault,
+  Automations, Settings. Every section starts collapsed; click the
+  chevron to expand its children. Collapse state persists per-user
+  in localStorage so you come back to what you had open. New chat
+  + ⌘K Search pinned to the top of the nav.
+
+### Added
+- **⌘K command palette.** Jumps between routes with a single
+  keystroke. Searches on the section label or hint text (e.g. type
+  "geo" to jump to the GEO dashboard, or "int" for Integrations).
+  Enter selects the top match; Esc dismisses.
+- **`/dashboard` page — Multica Runtimes clone.** Two-panel layout:
+  runtimes list on the left (This Mac / Cloud proxy / each project
+  vault), detail on the right with 7d/30d/90d toggle, four metric
+  cards (input tokens, output tokens, runs, spend), an activity
+  heatmap (7 rows × N weeks, flame-intensity scaled), and a daily-
+  cost bar chart. Pure SVG charts, no new dependencies. First-pass
+  attribution is single-runtime (This Mac gets the full count);
+  per-runtime tagging lands in a follow-up once the daemon
+  surfaces a `runtime:` field on each run.
+
 ## 0.4.19 — 2026-04-21
 
 ### Added
