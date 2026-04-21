@@ -30,21 +30,9 @@ import {
   Button,
 } from '../../../components/ui/primitives';
 import { api, ApiError } from '../../../lib/api';
+import { isValidDomain, normaliseDomain } from '../../../lib/validators';
 
 type Phase = 'idle' | 'running' | 'done' | 'error';
-
-function normaliseDomain(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return '';
-  try {
-    const url = new URL(
-      trimmed.startsWith('http') ? trimmed : `https://${trimmed}`,
-    );
-    return url.hostname.replace(/^www\./, '');
-  } catch {
-    return trimmed.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
-  }
-}
 
 export default function OnboardingBootstrapPage() {
   const [domain, setDomain] = useState('');
@@ -55,7 +43,10 @@ export default function OnboardingBootstrapPage() {
   const [final, setFinal] = useState<string>('');
   const [runId, setRunId] = useState<string>('');
 
-  const canSubmit = domain.trim().length > 0 && phase !== 'running';
+  const normalised = normaliseDomain(domain);
+  const domainOk = isValidDomain(normalised);
+  const canSubmit = domainOk && phase !== 'running';
+  const showDomainError = domain.trim().length > 0 && !domainOk;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,8 +88,9 @@ export default function OnboardingBootstrapPage() {
           <form onSubmit={submit} className="flex flex-col gap-4">
             <Field
               label="Domain"
-              hint="Your marketing site. e.g. apidog.com"
+              hint={showDomainError ? 'Enter a valid domain like apidog.com — no scheme, no path.' : 'Your marketing site. e.g. apidog.com'}
               required
+              error={showDomainError}
             >
               <div className="relative">
                 <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" />
@@ -234,11 +226,13 @@ function Field({
   label,
   hint,
   required,
+  error,
   children,
 }: {
   label: string;
   hint?: string;
   required?: boolean;
+  error?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -248,7 +242,11 @@ function Field({
         {required && <span className="text-flame ml-1">*</span>}
       </span>
       {children}
-      {hint && <span className="text-[11px] text-muted">{hint}</span>}
+      {hint && (
+        <span className={'text-[11px] ' + (error ? 'text-flame' : 'text-muted')}>
+          {hint}
+        </span>
+      )}
     </label>
   );
 }

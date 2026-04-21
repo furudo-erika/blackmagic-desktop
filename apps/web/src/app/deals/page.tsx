@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { Briefcase, Building2, MessageCircle, ArrowRight } from 'lucide-react';
 import { api } from '../../lib/api';
 
 type Deal = { path: string; state: string; frontmatter: Record<string, unknown> };
@@ -46,6 +47,32 @@ export default function DealsPage() {
       <div className="h-full overflow-y-auto px-6 py-6">
         {deals.isLoading && <div className="text-sm text-muted">loading…</div>}
         {deals.error && <div className="text-sm text-flame">{(deals.error as Error).message}</div>}
+        {!deals.isLoading && (deals.data?.length ?? 0) === 0 && (
+          <div className="mx-auto max-w-lg mt-8 rounded-xl border border-dashed border-line bg-white p-6 text-center">
+            <Briefcase className="mx-auto mb-3 h-6 w-6 text-muted" />
+            <div className="text-sm font-semibold text-ink">No deals yet.</div>
+            <p className="mt-1 text-xs text-muted">
+              Deals land in <code className="font-mono">deals/open/</code>,{' '}
+              <code className="font-mono">deals/closed-won/</code>, and{' '}
+              <code className="font-mono">deals/closed-lost/</code>. Start by enriching a
+              company or asking the chat to draft a deal note.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs">
+              <Link
+                href="/companies"
+                className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-ink hover:border-flame"
+              >
+                <Building2 className="h-3 w-3" /> Enrich a company <ArrowRight className="h-3 w-3" />
+              </Link>
+              <Link
+                href="/chat"
+                className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-ink hover:border-flame"
+              >
+                <MessageCircle className="h-3 w-3" /> Ask chat to draft one
+              </Link>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {STATES.map((st) => {
             const list = (deals.data ?? []).filter((d) => d.state === st);

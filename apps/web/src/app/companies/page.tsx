@@ -16,6 +16,7 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Building2, Search, Sparkles, ExternalLink, Users, Briefcase, History } from 'lucide-react';
 import { api } from '../../lib/api';
+import { isValidDomain } from '../../lib/validators';
 import { Markdown } from '../../components/markdown';
 import {
   PageShell,
@@ -38,8 +39,15 @@ type Company = {
   size?: string;
   icpScore?: string;
   lastActivity?: string;
+  notesStatus?: string;
+  missingFields: string[];
   frontmatter: Record<string, unknown>;
 };
+
+// Firmographic fields the researcher is expected to fill. Null/empty
+// values across any of these surface as "partial" on the list row so
+// users don't mistake a thin enrichment for a complete one (QA BUG-06).
+const CRITICAL_FIELDS = ['size', 'revenue', 'hq', 'icp_score', 'funding', 'enriched_at'] as const;
 
 const TIER_COLORS: Record<string, string> = {
   A: 'bg-flame text-white',
@@ -206,6 +214,10 @@ export default function CompaniesPage() {
           const r = await api.readFile(f.path);
           const fm = r.frontmatter;
           const slug = f.path.replace(/^companies\//, '').replace(/\.md$/, '');
+          const missingFields = CRITICAL_FIELDS.filter((k) => {
+            const v = fm[k];
+            return v == null || v === '' || v === 'unknown' || v === 'null';
+          });
           return {
             path: f.path,
             slug,
@@ -216,6 +228,8 @@ export default function CompaniesPage() {
             size: fm.size != null ? String(fm.size) : undefined,
             icpScore: fm.icp_score != null ? String(fm.icp_score) : undefined,
             lastActivity: fm.last_activity != null ? String(fm.last_activity) : undefined,
+            notesStatus: fm.notes_status != null ? String(fm.notes_status) : undefined,
+            missingFields,
             frontmatter: fm,
           };
         }),
@@ -238,12 +252,7 @@ export default function CompaniesPage() {
     return map;
   }, [tree.data]);
 
-  // Accept bare hostnames like "acme.com" or "sub.acme.co.uk". Reject
-  // anything without a dot, with whitespace, or with scheme/path chunks.
-  // Mirrors the same rule enforced on /playbooks so Skills → Run cannot
-  // bypass it (QA BUG-001, BUG-007).
-  const domainValid = (d: string) =>
-    /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i.test(d.trim());
+  const domainValid = isValidDomain;
 
   const enrich = useMutation({
     mutationFn: (d: string) => {
@@ -381,6 +390,14 @@ export default function CompaniesPage() {
                                   }
                                 >
                                   {c.tier}
+                                </span>
+                              )}
+                              {(c.notesStatus === 'partial' || c.missingFields.length >= 2) && (
+                                <span
+                                  title={c.missingFields.length ? `Missing: ${c.missingFields.join(', ')}` : 'Profile marked partial'}
+                                  className="text-[10px] px-1.5 py-0 rounded font-mono uppercase tracking-wide shrink-0 bg-[#F5C24D]/20 text-[#8A6A1A] dark:text-[#E8C063]"
+                                >
+                                  partial{c.missingFields.length ? ` · ${c.missingFields.length} missing` : ''}
                                 </span>
                               )}
                             </span>

@@ -4,6 +4,18 @@ All notable changes to BlackMagic AI. Dates in UTC.
 
 ## 0.4.11 — 2026-04-21
 
+### Added
+- **Feishu, Metabase, Supabase** now show up as cards on the
+  Integrations page. The daemon already accepted keys for all three
+  (Settings → Integration keys), but the card UI was missing so
+  users couldn't see that Feishu/Metabase/Supabase were wired. Feishu
+  joins the Messaging group; Metabase + Supabase get their own new
+  "Data" group.
+- **Brand tile for every integration card.** Each provider now
+  shows a colored square with its short glyph (H / A / SF / G / U /
+  S / M / 飞 / MB) next to the name, so cards are visually
+  distinguishable at a glance instead of all looking the same.
+
 ### Changed
 - **Company Profiler is now a first-class Team agent.** Moved out of
   Sidebar → System → "Profile company" (where it was buried under

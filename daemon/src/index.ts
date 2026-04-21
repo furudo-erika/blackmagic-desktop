@@ -142,8 +142,38 @@ async function loadRunListEntry(runsDir: string, runId: string) {
   });
   // final.md is written only after the agent exits the turn loop, so it's a
   // reliable "this run has completed" marker for the runs list UI.
-  entry.done = typeof finalMd === 'string' && finalMd.trim().length > 0;
+  const done = typeof finalMd === 'string' && finalMd.trim().length > 0;
+  entry.done = done;
+  entry.status = deriveRunStatus({ done, meta, finalMd, stderr: stdout });
   return entry;
+}
+
+// Map a run's on-disk state to a user-facing status (QA BUG-02). The
+// run folder is written piecemeal: meta.json + final.md + stdout.log
+// + stderr.log. "running" = no final.md yet. "failed" = exitCode !== 0.
+// "blocked" = finished with exit 0 but final.md contains refusal / "I
+// can't" / "I'm not able" phrasing, i.e. the model refused or ran out
+// of tools before producing useful output. Everything else is
+// "completed".
+function deriveRunStatus(args: {
+  done: boolean;
+  meta: any;
+  finalMd: string;
+  stderr: string;
+}): 'running' | 'failed' | 'blocked' | 'completed' {
+  const { done, meta, finalMd } = args;
+  if (!done) return 'running';
+  const exit = typeof meta?.exitCode === 'number' ? meta.exitCode : 0;
+  if (exit !== 0) return 'failed';
+  const lower = (finalMd ?? '').toLowerCase().slice(0, 2000);
+  const blockedCues = [
+    "i can't", "i cannot", "i am not able", "i'm not able",
+    "unable to access", "unable to reach", "not a valid domain",
+    "doesn't resolve", "does not resolve", "dns resolution failed",
+    "blocked on", "i was blocked", 'refusing to', 'cannot continue without',
+  ];
+  if (blockedCues.some((c) => lower.includes(c))) return 'blocked';
+  return 'completed';
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };

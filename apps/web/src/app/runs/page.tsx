@@ -23,6 +23,27 @@ function timeAgo(iso: string | undefined): string {
   return `${Math.floor(d / 86400)}d ago`;
 }
 
+const STATUS_STYLES: Record<string, string> = {
+  running: 'bg-[#7E8C67]/15 text-[#5D6E4D] dark:text-[#A3B38A]',
+  completed: 'bg-[#7E8C67]/15 text-[#5D6E4D] dark:text-[#A3B38A]',
+  failed: 'bg-flame/15 text-flame',
+  blocked: 'bg-[#F5C24D]/20 text-[#8A6A1A] dark:text-[#E8C063]',
+};
+
+function StatusBadge({ status, done }: { status?: string; done?: boolean }) {
+  const s = status ?? (done ? 'completed' : 'running');
+  return (
+    <span
+      className={
+        'inline-flex items-center h-4 px-1.5 rounded text-[9px] font-mono uppercase tracking-wide ' +
+        (STATUS_STYLES[s] ?? 'bg-muted/30 text-muted')
+      }
+    >
+      {s}
+    </span>
+  );
+}
+
 function runStarted(runId: string): string | undefined {
   if (runId.startsWith('codex-')) {
     const ms = Number(runId.slice('codex-'.length));
@@ -154,6 +175,7 @@ export default function RunsPage() {
                     leading={<Bot className="w-4 h-4 text-muted dark:text-[#8C837C]" />}
                     title={
                       <span className="flex items-center gap-2 min-w-0">
+                        <StatusBadge status={r.status} done={r.done} />
                         <span className="truncate">{r.preview || r.agent || '—'}</span>
                         {r.model && (
                           <span className="text-[10px] font-mono text-muted dark:text-[#8C837C] truncate">

@@ -99,6 +99,19 @@ export function ProjectPicker({
 
   const reg = q.data;
 
+  // Preview the real destination path so users know where the vault
+  // will land instead of a hardcoded "/Users/you/…" placeholder
+  // (QA BUG-05). We infer $HOME from any existing project's parent
+  // directory; fall back to ~ if the registry is empty.
+  const slugify = (s: string) =>
+    s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'project';
+  const sample = reg?.projects?.[0]?.path ?? '';
+  const homeGuess =
+    sample && /^\/(Users|home)\/[^/]+/.test(sample)
+      ? (sample.match(/^\/(Users|home)\/[^/]+/)?.[0] ?? '~')
+      : '~';
+  const pathPreview = newPath.trim() || `${homeGuess}/BlackMagic-${slugify(newName || 'project')}`;
+
   const card = (
     <div
       style={{
@@ -272,13 +285,16 @@ export function ProjectPicker({
             }}
           />
           <label style={{ display: 'block', fontSize: 12, color: '#605A57', marginBottom: 4 }}>
-            Folder <span style={{ color: '#8C837C' }}>(optional — defaults to ~/BlackMagic-&lt;slug&gt;)</span>
+            Folder{' '}
+            <span style={{ color: '#8C837C' }}>
+              (optional — will be created at <code style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{pathPreview}</code>)
+            </span>
           </label>
           <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
             <input
               value={newPath}
               onChange={(e) => setNewPath(e.target.value)}
-              placeholder="/Users/you/BlackMagic-apidog"
+              placeholder={pathPreview}
               style={{
                 flex: 1,
                 minWidth: 0,

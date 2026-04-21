@@ -193,9 +193,17 @@ export default function TriggersPage() {
               const subtitleParts: string[] = [];
               if (schedule) subtitleParts.push(`cron: ${schedule}`);
               else if (fm.webhook) subtitleParts.push('webhook');
-              subtitleParts.push(
-                isShell ? `shell: ${String(fm.shell)}` : `playbook: ${String(fm.playbook ?? '')}`,
-              );
+              // Triggers can target a shell cmd, a playbook, or an agent
+              // directly (see daemon/triggers.ts). Label whichever binding
+              // is present instead of always printing a blank `playbook:`
+              // (QA BUG-07).
+              const playbookName = typeof fm.playbook === 'string' ? fm.playbook : '';
+              const agentName = typeof fm.agent === 'string' ? fm.agent : '';
+              if (isShell) subtitleParts.push(`shell: ${String(fm.shell)}`);
+              else if (playbookName) subtitleParts.push(`playbook: ${playbookName}`);
+              else if (agentName) subtitleParts.push(`agent: ${agentName}`);
+              else subtitleParts.push('⚠ no binding');
+              const broken = !isShell && !playbookName && !agentName;
               return (
                 <EntityRow
                   key={t.path}
@@ -253,14 +261,16 @@ export default function TriggersPage() {
                         />
                         <span>{enabled ? 'enabled' : 'disabled'}</span>
                       </label>
-                      <Button
-                        variant="secondary"
-                        onClick={() => fire.mutate(name)}
-                        disabled={fire.isPending}
-                      >
-                        <Play className="w-3 h-3" />
-                        {fire.isPending && fire.variables === name ? 'Firing…' : 'Fire now'}
-                      </Button>
+                      <span title={broken ? 'Trigger has no playbook/agent/shell binding — edit the .md' : undefined}>
+                        <Button
+                          variant="secondary"
+                          onClick={() => fire.mutate(name)}
+                          disabled={fire.isPending || broken}
+                        >
+                          <Play className="w-3 h-3" />
+                          {fire.isPending && fire.variables === name ? 'Firing…' : 'Fire now'}
+                        </Button>
+                      </span>
                     </div>
                   }
                 />

@@ -18,7 +18,29 @@ type ProviderDef = {
   description: string;
   oauth: boolean;
   endpointField?: boolean;
+  brandColor: string;
+  /** Glyph shown in the brand tile — usually the first letter of the
+   *  brand name. Short forms like "SF" or CJK glyphs work too. */
+  brandGlyph: string;
 };
+
+/**
+ * Square brand tile — colored background + short initial glyph. A
+ * lightweight stand-in for real brand SVGs that keeps bundle size
+ * flat and still gives each card visual identity instead of the old
+ * name-only header.
+ */
+function BrandTile({ color, glyph }: { color: string; glyph: string }) {
+  return (
+    <div
+      aria-hidden
+      className="w-9 h-9 rounded-md flex items-center justify-center shrink-0 text-white font-semibold text-[13px] tracking-tight"
+      style={{ background: color }}
+    >
+      {glyph}
+    </div>
+  );
+}
 
 type Group = {
   label: string;
@@ -34,6 +56,8 @@ const GROUPS: Group[] = [
         name: 'HubSpot',
         description: 'Sync contacts, companies, deals. Write enrichment back.',
         oauth: true,
+        brandColor: '#FF7A59',
+        brandGlyph: 'H',
       },
       {
         provider: 'attio',
@@ -41,12 +65,16 @@ const GROUPS: Group[] = [
         description: 'Two-way sync with Attio objects and lists.',
         oauth: false,
         endpointField: true,
+        brandColor: '#1F2937',
+        brandGlyph: 'A',
       },
       {
         provider: 'salesforce',
         name: 'Salesforce',
         description: 'Pull accounts, contacts, opportunities. Push updates to records.',
         oauth: true,
+        brandColor: '#00A1E0',
+        brandGlyph: 'SF',
       },
     ],
   },
@@ -58,6 +86,8 @@ const GROUPS: Group[] = [
         name: 'Gong',
         description: 'Ingest call recordings and transcripts for research.',
         oauth: false,
+        brandColor: '#8017D8',
+        brandGlyph: 'G',
       },
       {
         provider: 'unipile',
@@ -65,6 +95,8 @@ const GROUPS: Group[] = [
         description: 'LinkedIn and multi-channel messaging via Unipile API.',
         oauth: false,
         endpointField: true,
+        brandColor: '#0066FF',
+        brandGlyph: 'U',
       },
     ],
   },
@@ -76,12 +108,47 @@ const GROUPS: Group[] = [
         name: 'Slack',
         description: 'Post agent updates and receive slash commands in your workspace.',
         oauth: true,
+        brandColor: '#611F69',
+        brandGlyph: 'S',
       },
       {
         provider: 'gmail',
         name: 'Gmail',
         description: 'Send first-touch emails and read replies from an authorized inbox.',
         oauth: true,
+        brandColor: '#EA4335',
+        brandGlyph: 'M',
+      },
+      {
+        provider: 'feishu',
+        name: 'Feishu',
+        description: 'Post notifications, send DMs/group messages, and read Bitable rows via custom bot or tenant token.',
+        oauth: false,
+        brandColor: '#3370FF',
+        brandGlyph: '飞',
+      },
+    ],
+  },
+  {
+    label: 'Data',
+    providers: [
+      {
+        provider: 'metabase',
+        name: 'Metabase',
+        description: 'Run saved questions and ad-hoc SQL against your Metabase instance.',
+        oauth: false,
+        endpointField: true,
+        brandColor: '#509EE3',
+        brandGlyph: 'MB',
+      },
+      {
+        provider: 'supabase',
+        name: 'Supabase',
+        description: 'Read/write Postgres rows and call RPC functions via service_role key.',
+        oauth: false,
+        endpointField: true,
+        brandColor: '#3ECF8E',
+        brandGlyph: 'S',
       },
     ],
   },
@@ -189,9 +256,12 @@ function IntegrationCard({
 
   return (
     <Panel className="flex flex-col gap-3 p-5">
-      <div>
-        <div className="text-[15px] font-semibold text-ink dark:text-[#F5F1EA]">{def.name}</div>
-        <p className="text-xs text-muted dark:text-[#8C837C] mt-0.5">{def.description}</p>
+      <div className="flex items-start gap-3">
+        <BrandTile color={def.brandColor} glyph={def.brandGlyph} />
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold text-ink dark:text-[#F5F1EA]">{def.name}</div>
+          <p className="text-xs text-muted dark:text-[#8C837C] mt-0.5">{def.description}</p>
+        </div>
       </div>
 
       <div className="text-xs">

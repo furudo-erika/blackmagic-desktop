@@ -163,8 +163,12 @@ export default function SettingsPage() {
               }
             />
             <p className="text-[11px] text-muted dark:text-[#8C837C]">
-              Model can be changed by editing <code className="text-[11px]">{vault}/.bm/config.toml</code>:
-              {' '}<code className="text-[11px]">default_model = "gpt-5.3-codex"</code>
+              Model can be changed by editing{' '}
+              <code className="text-[11px]">{vault}/.bm/config.toml</code>:
+              {' '}
+              <code className="text-[11px]">
+                default_model = "{health.data?.model ?? 'gpt-5.3-codex'}"
+              </code>
             </p>
           </Section>
 
