@@ -2,6 +2,20 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.3.9 — 2026-04-21
+
+### Changed
+- **Auto-upgrade on out-of-date launch.** The launch-time version
+  gate used to offer only "Copy command and quit". It now offers
+  **Upgrade and relaunch** when Homebrew is on disk — the app spawns
+  a detached shell that waits for the current process to exit, runs
+  `brew upgrade --cask blackmagic-ai`, then `open -a "BlackMagic AI"`
+  to reopen automatically. Output goes to
+  `~/Library/Logs/BlackMagic AI/auto-upgrade-*.log` so a failed
+  upgrade leaves a breadcrumb. Homebrew path is probed at
+  `/opt/homebrew/bin/brew` and `/usr/local/bin/brew`; on systems
+  without brew we fall back to the previous copy-command dialog.
+
 ## 0.3.8 — 2026-04-20
 
 ### Added

@@ -246,19 +246,33 @@ async function enforceMinVersion() {
     if (cmpVersion(current, target) >= 0) return;
 
     const brewCmd = 'brew upgrade --cask blackmagic-ai';
+    const brewPath = resolveBrewPath();
+    const canAutoUpgrade = !!brewPath;
+
+    const buttons = canAutoUpgrade
+      ? ['Upgrade and relaunch', 'Copy command and quit', 'Quit']
+      : ['Copy command and quit', 'Quit'];
     const choice = dialog.showMessageBoxSync({
       type: 'warning',
       title: 'Update required',
       message: `BlackMagic AI ${current} is out of date.`,
-      detail:
-        `The latest version is ${target}. Run this in Terminal, then reopen:\n\n  ${brewCmd}\n\n` +
-        `"Copy command" puts it on your clipboard; "Quit" closes the app so the upgrade can replace it.`,
-      buttons: ['Copy command and quit', 'Quit'],
+      detail: canAutoUpgrade
+        ? `The latest version is ${target}. "Upgrade and relaunch" runs \`${brewCmd}\` for you and reopens the app when it finishes. Or copy the command and upgrade yourself.`
+        : `The latest version is ${target}. Homebrew wasn't found on PATH — run this in Terminal, then reopen:\n\n  ${brewCmd}`,
+      buttons,
       defaultId: 0,
-      cancelId: 1,
+      cancelId: buttons.length - 1,
       noLink: true,
     });
-    if (choice === 0) {
+
+    if (canAutoUpgrade && choice === 0) {
+      launchBrewUpgradeAndRelaunch(brewPath);
+      // launchBrewUpgradeAndRelaunch quits the app itself after spawning
+      // the detached upgrader, so brew can replace the .app bundle.
+      return;
+    }
+
+    if ((canAutoUpgrade ? choice === 1 : choice === 0)) {
       try {
         require('electron').clipboard.writeText(brewCmd);
       } catch {}
@@ -267,6 +281,62 @@ async function enforceMinVersion() {
   } catch (err) {
     console.warn('[main] version-gate check failed:', err?.message || err);
   }
+}
+
+// Homebrew installs to /opt/homebrew (Apple Silicon) or /usr/local (Intel).
+// Spawned processes from a .app bundle don't inherit the user's shell PATH,
+// so we have to probe the known locations directly.
+function resolveBrewPath() {
+  if (process.platform !== 'darwin') return null;
+  const fs = require('node:fs');
+  for (const p of ['/opt/homebrew/bin/brew', '/usr/local/bin/brew']) {
+    try { if (fs.existsSync(p)) return p; } catch {}
+  }
+  return null;
+}
+
+// Spawn a detached upgrader shell script, then quit this app so brew can
+// move the new .app bundle into /Applications. The script waits for the
+// current process to exit, runs `brew upgrade`, and re-opens the app.
+// Output is captured to a log in the user's Library/Logs so a failed
+// upgrade leaves a breadcrumb instead of vanishing silently.
+function launchBrewUpgradeAndRelaunch(brewPath) {
+  const { spawn } = require('node:child_process');
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const os = require('node:os');
+  const logDir = path.join(os.homedir(), 'Library', 'Logs', 'BlackMagic AI');
+  try { fs.mkdirSync(logDir, { recursive: true }); } catch {}
+  const logPath = path.join(logDir, `auto-upgrade-${Date.now()}.log`);
+  const pid = process.pid;
+  const script = `#!/bin/sh
+set -u
+exec >>"${logPath}" 2>&1
+echo "[$(date -u +%FT%TZ)] auto-upgrade starting; waiting for pid ${pid}"
+# Wait up to 30s for the old app to fully exit so brew can replace it.
+for i in $(seq 1 60); do
+  if ! kill -0 ${pid} 2>/dev/null; then break; fi
+  sleep 0.5
+done
+echo "[$(date -u +%FT%TZ)] running: ${brewPath} upgrade --cask blackmagic-ai"
+"${brewPath}" upgrade --cask blackmagic-ai
+status=$?
+echo "[$(date -u +%FT%TZ)] brew exit=$status"
+if [ "$status" -eq 0 ]; then
+  open -a "BlackMagic AI"
+else
+  /usr/bin/osascript -e 'display notification "brew upgrade failed — see ~/Library/Logs/BlackMagic AI" with title "BlackMagic AI"'
+fi
+`;
+  const scriptPath = path.join(os.tmpdir(), `blackmagic-auto-upgrade-${Date.now()}.sh`);
+  fs.writeFileSync(scriptPath, script, { mode: 0o755 });
+  const child = spawn('/bin/sh', [scriptPath], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+  console.log('[main] auto-upgrader spawned; log:', logPath);
+  app.exit(0);
 }
 
 // Soft "newer version available" check. We no longer ship auto-updates via
