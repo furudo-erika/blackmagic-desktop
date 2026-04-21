@@ -12,6 +12,7 @@ interface TriggerSpec {
   schedule?: string;
   webhook?: boolean;
   playbook?: string;
+  agent?: string;
   shell?: string;
   cwd?: string;
   env?: Record<string, string>;
@@ -48,6 +49,7 @@ async function listTriggers(): Promise<TriggerSpec[]> {
         schedule,
         webhook: fm.webhook === true,
         playbook: fm.playbook,
+        agent: typeof fm.agent === 'string' ? fm.agent : undefined,
         shell: typeof fm.shell === 'string' ? fm.shell : undefined,
         cwd: typeof fm.cwd === 'string' ? fm.cwd : undefined,
         env: fm.env && typeof fm.env === 'object' ? fm.env as Record<string, string> : undefined,
@@ -203,7 +205,7 @@ export async function fireTrigger(name: string, config: Config, input: Record<st
     return result;
   }
   if (spec.playbook) return runPlaybook(spec.playbook, input, config);
-  return runAgent({ agent: 'researcher', task: spec.body, config });
+  return runAgent({ agent: spec.agent ?? 'researcher', task: spec.body, config });
 }
 
 export async function loadCronTriggers(config: Config) {

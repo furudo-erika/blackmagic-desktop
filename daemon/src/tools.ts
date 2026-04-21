@@ -289,6 +289,243 @@ const scrape_apify_actor: ToolDef = {
 };
 
 // ---------------------------------------------------------------------------
+// Peec AI (GEO / AI-search visibility). BYOK — user drops their X-API-Key in
+// Settings → Integrations. Base: https://api.peec.ai/customer/v1. Auth header:
+// X-API-Key. API is beta + Enterprise-only per peec's docs.
+// ---------------------------------------------------------------------------
+
+const PEEC_BASE = 'https://api.peec.ai/customer/v1';
+
+async function peecFetch(
+  key: string,
+  path: string,
+  init?: { method?: string; body?: unknown },
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  try {
+    const res = await fetch(`${PEEC_BASE}${path}`, {
+      method: init?.method ?? 'GET',
+      headers: {
+        'X-API-Key': key,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: init?.body ? JSON.stringify(init.body) : undefined,
+    });
+    const text = await res.text();
+    let data: unknown;
+    try { data = JSON.parse(text); } catch { data = text; }
+    if (!res.ok) {
+      return { ok: false, status: res.status, data, error: `peec ${res.status}: ${String(text).slice(0, 400)}` };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function peecKey(ctx: ToolCtx): string | { error: string } {
+  const key = ctx.config.peec_api_key;
+  if (!key) {
+    return { error: 'No PEEC_API_KEY configured. Set it in Settings → Integrations, or add peec_api_key to ~/BlackMagic/.bm/config.toml. Peec AI API is Enterprise-only; generate one at https://app.peec.ai/api-keys.' };
+  }
+  return key;
+}
+
+const peec_list_prompts: ToolDef = {
+  name: 'peec_list_prompts',
+  description:
+    'Peec AI: list tracked GEO prompts in your project. Supports filtering by tag_id, topic_id, country_code. Use to audit Seed Query coverage.',
+  parameters: {
+    type: 'object',
+    properties: {
+      limit: { type: 'number', description: '1–10000, default 1000' },
+      offset: { type: 'number', default: 0 },
+      tag_id: { type: 'string' },
+      topic_id: { type: 'string' },
+      country_code: { type: 'string', description: 'ISO country, e.g. US, GB, DE' },
+    },
+  },
+  handler: async (args, ctx) => {
+    const k = peecKey(ctx);
+    if (typeof k !== 'string') return k;
+    const qs = new URLSearchParams();
+    for (const [key, val] of Object.entries(args ?? {})) {
+      if (val !== undefined && val !== null && val !== '') qs.set(key, String(val));
+    }
+    const q = qs.toString();
+    return peecFetch(k, `/prompts${q ? `?${q}` : ''}`);
+  },
+};
+
+const peec_create_prompt: ToolDef = {
+  name: 'peec_create_prompt',
+  description:
+    'Peec AI: add a new GEO prompt to the tracked pool. Use to expand the Seed Query set (PRD steps 2–3).',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'The prompt string as a real user would type it into an AI search tool.' },
+      country_code: { type: 'string', description: 'ISO country code, e.g. US' },
+      topic_id: { type: 'string' },
+      tag_ids: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['text'],
+  },
+  handler: async (args, ctx) => {
+    const k = peecKey(ctx);
+    if (typeof k !== 'string') return k;
+    return peecFetch(k, '/prompts', { method: 'POST', body: args });
+  },
+};
+
+const peec_prompt_suggestions: ToolDef = {
+  name: 'peec_prompt_suggestions',
+  description:
+    'Peec AI: list AI-generated prompt suggestions (for Seed Query expansion). Returns ids you can accept/reject via peec_accept_prompt_suggestion.',
+  parameters: {
+    type: 'object',
+    properties: {
+      limit: { type: 'number' },
+      offset: { type: 'number' },
+    },
+  },
+  handler: async (args, ctx) => {
+    const k = peecKey(ctx);
+    if (typeof k !== 'string') return k;
+    const qs = new URLSearchParams();
+    for (const [key, val] of Object.entries(args ?? {})) {
+      if (val !== undefined && val !== null && val !== '') qs.set(key, String(val));
+    }
+    const q = qs.toString();
+    return peecFetch(k, `/prompts/suggestions${q ? `?${q}` : ''}`);
+  },
+};
+
+const peec_accept_prompt_suggestion: ToolDef = {
+  name: 'peec_accept_prompt_suggestion',
+  description: 'Peec AI: accept a suggested prompt so it enters the tracked pool.',
+  parameters: {
+    type: 'object',
+    properties: { id: { type: 'string' } },
+    required: ['id'],
+  },
+  handler: async (args, ctx) => {
+    const k = peecKey(ctx);
+    if (typeof k !== 'string') return k;
+    return peecFetch(k, `/prompts/suggestions/${encodeURIComponent(args.id)}/accept`, { method: 'POST' });
+  },
+};
+
+const peec_report_brands: ToolDef = {
+  name: 'peec_report_brands',
+  description:
+    'Peec AI: brand-level GEO metrics — Share of Voice, visibility, Citation Rank (position), sentiment, mention_count. Core metric for PRD steps 5–6. Break down by prompt_id / model_id / tag_id / topic_id / date / country_code / chat_id.',
+  parameters: {
+    type: 'object',
+    properties: {
+      start_date: { type: 'string', description: 'YYYY-MM-DD' },
+      end_date: { type: 'string', description: 'YYYY-MM-DD' },
+      dimensions: {
+        type: 'array',
+        items: { type: 'string', enum: ['prompt_id', 'model_id', 'tag_id', 'topic_id', 'date', 'country_code', 'chat_id'] },
+        description: 'Group-by dimensions. Empty = overall aggregate.',
+      },
+      filters: {
+        type: 'object',
+        description: 'Filter object. Per dim, use operators in/not_in/gt/gte/lt/lte, e.g. { "model_id": { "in": ["perplexity","chatgpt"] } }.',
+      },
+      brand_ids: { type: 'array', items: { type: 'string' } },
+      limit: { type: 'number' },
+      offset: { type: 'number' },
+    },
+  },
+  handler: async (args, ctx) => {
+    const k = peecKey(ctx);
+    if (typeof k !== 'string') return k;
+    return peecFetch(k, '/reports/brands', { method: 'POST', body: args ?? {} });
+  },
+};
+
+const peec_report_domains: ToolDef = {
+  name: 'peec_report_domains',
+  description:
+    "Peec AI: source-domain citation report — which domains AI models are citing. THIS IS THE MOST IMPORTANT DATA for PRD step 5 (Cited Sources) and step 7 (Gap analysis: what domains cite competitors but not us). Returns citation_rate, retrieval_count, UGC/CORPORATE/EDITORIAL classifications.",
+  parameters: {
+    type: 'object',
+    properties: {
+      start_date: { type: 'string', description: 'YYYY-MM-DD' },
+      end_date: { type: 'string', description: 'YYYY-MM-DD' },
+      dimensions: {
+        type: 'array',
+        items: { type: 'string', enum: ['prompt_id', 'model_id', 'tag_id', 'topic_id', 'date', 'country_code', 'chat_id'] },
+      },
+      filters: { type: 'object' },
+      brand_ids: { type: 'array', items: { type: 'string' }, description: 'Scope to which brand(s) cited this domain. Pass competitor brand_ids to get competitor source lists for Gap analysis.' },
+      limit: { type: 'number' },
+      offset: { type: 'number' },
+    },
+  },
+  handler: async (args, ctx) => {
+    const k = peecKey(ctx);
+    if (typeof k !== 'string') return k;
+    return peecFetch(k, '/reports/domains', { method: 'POST', body: args ?? {} });
+  },
+};
+
+const peec_report_urls: ToolDef = {
+  name: 'peec_report_urls',
+  description:
+    'Peec AI: URL-level citation performance. Use to drill from a high-performing domain to the specific articles driving citations — tells content team exactly which article formats land.',
+  parameters: {
+    type: 'object',
+    properties: {
+      start_date: { type: 'string' },
+      end_date: { type: 'string' },
+      dimensions: { type: 'array', items: { type: 'string' } },
+      filters: { type: 'object' },
+      brand_ids: { type: 'array', items: { type: 'string' } },
+      limit: { type: 'number' },
+      offset: { type: 'number' },
+    },
+  },
+  handler: async (args, ctx) => {
+    const k = peecKey(ctx);
+    if (typeof k !== 'string') return k;
+    return peecFetch(k, '/reports/urls', { method: 'POST', body: args ?? {} });
+  },
+};
+
+const peec_source_content: ToolDef = {
+  name: 'peec_source_content',
+  description:
+    'Peec AI: fetch the scraped markdown of a cited source URL. Use to understand how AI sees competitor content and figure out what to publish to close the gap.',
+  parameters: {
+    type: 'object',
+    properties: {
+      urls: { type: 'array', items: { type: 'string' }, description: 'URLs to fetch scraped markdown for.' },
+    },
+    required: ['urls'],
+  },
+  handler: async (args, ctx) => {
+    const k = peecKey(ctx);
+    if (typeof k !== 'string') return k;
+    return peecFetch(k, '/sources/urls/content', { method: 'POST', body: args });
+  },
+};
+
+const peec_list_brands: ToolDef = {
+  name: 'peec_list_brands',
+  description:
+    'Peec AI: list brands tracked in your project (your brand + configured competitors). Use to resolve brand_ids for the reports.',
+  parameters: { type: 'object', properties: {} },
+  handler: async (_args, ctx) => {
+    const k = peecKey(ctx);
+    if (typeof k !== 'string') return k;
+    return peecFetch(k, '/brands');
+  },
+};
+
+// ---------------------------------------------------------------------------
 // HubSpot CRM (bring-your-own API key). Private App token goes in
 // hubspot_api_key (or HUBSPOT_API_KEY env). Base: https://api.hubapi.com.
 // Every handler does low-level fetch — no SDK, no extra deps.
@@ -1608,6 +1845,15 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   enrich_contact,
   enrich_contact_linkedin,
   scrape_apify_actor,
+  peec_list_brands,
+  peec_list_prompts,
+  peec_create_prompt,
+  peec_prompt_suggestions,
+  peec_accept_prompt_suggestion,
+  peec_report_brands,
+  peec_report_domains,
+  peec_report_urls,
+  peec_source_content,
   draft_create,
   enroll_contact_in_sequence,
   hubspot_create_contact,
