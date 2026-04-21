@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.3.11 — 2026-04-21
+
+### Changed
+- **Sidebar Team is now vault-backed.** The Team section used to be
+  a hardcoded Swan-style GTM list (Website Visitor Agent, LinkedIn
+  Outreach Agent, …). It now reads `agents/*.md` from the active
+  project's vault and lists whatever role files exist there. Each
+  entry links to the agent's definition in the vault editor so you
+  can inspect/edit the system prompt directly. Falls back to the
+  old hardcoded list only if the vault has no agents at all.
+
 ## 0.3.10 — 2026-04-21
 
 ### Added

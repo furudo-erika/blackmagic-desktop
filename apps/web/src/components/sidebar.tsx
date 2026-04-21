@@ -111,6 +111,40 @@ export function Sidebar() {
   }, [drafts.data]);
 
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, staleTime: 60_000 });
+
+  // Team section — read the actual agents/*.md files from the active
+  // vault so the sidebar reflects the user's project instead of the
+  // hardcoded Swan-style GTM demo list. Falls back to AGENTS (the old
+  // canned list) only when the vault read fails or the folder is empty,
+  // so a broken API response never leaves the Team section blank.
+  const vaultAgents = useQuery({
+    queryKey: ['vault-agents-sidebar'],
+    queryFn: async () => {
+      const tree = await api.vaultTree();
+      const files = tree.tree.filter(
+        (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
+      );
+      const rows = await Promise.all(
+        files.map(async (f) => {
+          const r = await api.readFile(f.path);
+          const fm = r.frontmatter ?? {};
+          const slug = f.path.replace(/^agents\//, '').replace(/\.md$/, '');
+          const name = typeof fm.name === 'string' && fm.name ? fm.name : slug;
+          const icon = typeof fm.icon === 'string' ? fm.icon : '';
+          return { slug, name, icon };
+        }),
+      );
+      rows.sort((a, b) => a.name.localeCompare(b.name));
+      return rows;
+    },
+    staleTime: 30_000,
+  });
+  const teamItems = useMemo(() => {
+    const real = vaultAgents.data ?? [];
+    if (real.length > 0) return real.map((a) => ({ slug: a.slug, name: a.name, icon: a.icon || 'Bot', vault: true }));
+    return AGENTS.map((a) => ({ slug: a.slug, name: a.name, icon: a.icon, vault: false }));
+  }, [vaultAgents.data]);
+
   const runs = useQuery({
     queryKey: ['runs'],
     queryFn: api.listRuns,
@@ -206,12 +240,19 @@ export function Sidebar() {
         </div>
 
         <SidebarSection label="Team">
-          {AGENTS.map((agent) => {
+          {teamItems.map((agent) => {
             const Icon = SIDEBAR_AGENT_ICONS[agent.icon] ?? Bot;
+            // Vault-backed agents link to their .md in the vault editor —
+            // dynamic `/team/[slug]` routes aren't prerendered for user
+            // slugs in the static export, so that page would 404. The
+            // hardcoded AGENTS fallback still uses /team/[slug].
+            const href = agent.vault
+              ? `/vault?path=${encodeURIComponent(`agents/${agent.slug}.md`)}`
+              : `/team/${agent.slug}`;
             return (
               <SidebarNavItem
                 key={agent.slug}
-                href={`/team/${agent.slug}`}
+                href={href}
                 label={agent.name}
                 icon={Icon}
                 breathing={isBreathing}
