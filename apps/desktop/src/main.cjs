@@ -315,11 +315,108 @@ function resolveBrewPath() {
 // Once true, further version-gate prompts no-op.
 let upgradeInProgress = false;
 
-// Spawn a detached upgrader shell script, then quit this app so brew can
-// move the new .app bundle into /Applications. The script waits for the
-// current process to exit, runs `brew upgrade`, and re-opens the app.
-// Output is captured to a log in the user's Library/Logs so a failed
-// upgrade leaves a breadcrumb instead of vanishing silently.
+// Show a real Electron progress window tracking the brew upgrade. Keeps
+// the user looking at something with a progress bar + scrolling log tail
+// until brew finishes, then exits + relaunches. Previous versions either
+// silently exited (0.4.14 and earlier) or spawned a Terminal.app tail
+// (0.4.17) — both looked broken to users. A proper BrowserWindow with a
+// native progress bar ships actual feedback.
+let progressWindow = null;
+
+function openProgressWindow(logPath) {
+  try {
+    const win = new BrowserWindow({
+      width: 560,
+      height: 420,
+      resizable: false,
+      minimizable: true,
+      maximizable: false,
+      title: 'Upgrading BlackMagic AI',
+      backgroundColor: '#17140F',
+      titleBarStyle: 'hiddenInset',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload-upgrade.cjs'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        additionalArguments: [`--bm-upgrade-log=${logPath}`],
+      },
+    });
+    const htmlPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'upgrade-progress.html')
+      : path.join(__dirname, '..', 'resources', 'upgrade-progress.html');
+    win.loadFile(htmlPath);
+    win.setAlwaysOnTop(true, 'floating');
+    win.show();
+    return win;
+  } catch (err) {
+    console.warn('[main] progress window failed to open:', err?.message || err);
+    return null;
+  }
+}
+
+function pollLogAndPush(win, logPath, flagPath) {
+  let lastSize = 0;
+  const start = Date.now();
+  const interval = setInterval(() => {
+    if (win.isDestroyed()) { clearInterval(interval); return; }
+    try {
+      const stat = fs.statSync(logPath);
+      if (stat.size !== lastSize) {
+        lastSize = stat.size;
+        const raw = fs.readFileSync(logPath, 'utf-8');
+        const tail = raw.slice(-6000);
+        // Coarse stage detection — keep the HTML script and this in sync.
+        const lower = tail.toLowerCase();
+        let pct = null;
+        let stage = null;
+        if (lower.includes('brew exit=') || lower.includes('reinstall exit=')) { pct = 95; stage = 'Finishing…'; }
+        else if (lower.includes('purging')) { pct = 85; stage = 'Installing the new version…'; }
+        else if (lower.includes('moving') || lower.includes('linking')) { pct = 80; stage = 'Moving app into place…'; }
+        else if (lower.includes('fetching') || lower.includes('downloading')) { pct = 40; stage = 'Downloading the DMG…'; }
+        else if (lower.includes('refreshing tap') || lower.includes('updating homebrew')) { pct = 15; stage = 'Refreshing Homebrew tap…'; }
+        else if (lower.includes('auto-upgrade starting')) { pct = 5; stage = 'Waiting for previous process to exit…'; }
+        win.webContents.send('bm:upgrade-update', { log: tail, pct, stage });
+      }
+    } catch {}
+    // Flag file appears when brew script finishes. Read its contents for
+    // exit status — "ok" or a non-zero number.
+    if (fs.existsSync(flagPath)) {
+      clearInterval(interval);
+      let ok = true;
+      try {
+        const flag = fs.readFileSync(flagPath, 'utf-8').trim();
+        ok = flag === 'ok' || flag === '0';
+      } catch {}
+      try { win.webContents.send('bm:upgrade-update', { done: true, ok }); } catch {}
+      // Give the user ~2s to read the final state, then exit. If the
+      // upgrade succeeded the shell script will re-open the app after
+      // it sees the main process is gone.
+      setTimeout(() => {
+        try { if (!win.isDestroyed()) win.close(); } catch {}
+        app.exit(0);
+      }, 2200);
+    }
+    // Safety net: if the log never grows for 4 minutes, bail out.
+    if (Date.now() - start > 4 * 60 * 1000 && lastSize === 0) {
+      clearInterval(interval);
+      try { win.webContents.send('bm:upgrade-update', { done: true, ok: false }); } catch {}
+      setTimeout(() => app.exit(0), 2500);
+    }
+  }, 500);
+}
+
+// IPC for the progress window — lets the user hit "Reveal log" in Finder.
+ipcMain.handle('bm:upgrade-reveal-log', (_e, logPath) => {
+  try { shell.showItemInFolder(logPath); } catch {}
+});
+
+// Spawn a detached upgrader shell script. The shell waits for the main
+// window to exit (we keep it alive only while the progress window is
+// open — brew's atomic `.app` replacement happens at the very end after
+// the download, so keeping a second Electron window up during download
+// is safe), runs `brew upgrade`, writes a flag file when done, and then
+// re-opens the app. Output is captured to a log that the progress
+// window tails in real time.
 function launchBrewUpgradeAndRelaunch(brewPath) {
   if (upgradeInProgress) return;
   upgradeInProgress = true;
@@ -330,52 +427,35 @@ function launchBrewUpgradeAndRelaunch(brewPath) {
   const logDir = path.join(os.homedir(), 'Library', 'Logs', 'BlackMagic AI');
   try { fs.mkdirSync(logDir, { recursive: true }); } catch {}
   const logPath = path.join(logDir, `auto-upgrade-${Date.now()}.log`);
+  const flagPath = path.join(logDir, `upgrade-done-${Date.now()}.flag`);
 
-  // Pre-create the log file so the progress Terminal has something to
-  // tail — otherwise `tail -f` would spin on a non-existent path.
+  // Pre-create the log so the progress window's tail has something to
+  // read from frame zero.
   try { fs.writeFileSync(logPath, `[upgrade log] ${new Date().toISOString()}\n`, 'utf-8'); } catch {}
 
-  // Open a Terminal.app window that tails the upgrade log. This gives the
-  // user a real visible window showing brew's download progress + install
-  // steps in real time, so the "I clicked upgrade and nothing happened"
-  // experience is gone. Terminal auto-closes when the tail's sentinel file
-  // appears (upgrade-complete.flag), then relaunches the app.
-  const flagPath = path.join(logDir, `upgrade-done-${Date.now()}.flag`);
-  const progressCmd = [
-    `clear`,
-    `printf '\\e]0;BlackMagic AI — Upgrading\\a'`,
-    `echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'`,
-    `echo '   BlackMagic AI — Upgrading via Homebrew'`,
-    `echo '   This window will close + reopen the app when done.'`,
-    `echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'`,
-    `echo`,
-    // Follow the log file, but also exit the tail as soon as the flag
-    // file appears. The subshell running tail watches the flag in the
-    // background and kills itself when it sees it.
-    `( tail -f "${logPath}" & tpid=$!; while [ ! -f "${flagPath}" ]; do sleep 0.5; done; sleep 2; kill $tpid 2>/dev/null )`,
-    `echo`,
-    `echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'`,
-    `echo '   Upgrade finished. Reopening BlackMagic AI…'`,
-    `echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'`,
-    `sleep 1`,
-    // Close this Terminal tab/window. `osascript` runs outside the bundle
-    // being replaced so it's safe.
-    `osascript -e 'tell application "Terminal" to close (every window whose name contains "Upgrading")' 2>/dev/null || true`,
-  ].join('; ').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  try {
-    spawn('/usr/bin/osascript', [
-      '-e',
-      `tell application "Terminal" to do script "${progressCmd}"`,
-      '-e',
-      'tell application "Terminal" to activate',
-    ], { detached: true, stdio: 'ignore' }).unref();
-  } catch {
-    // Fallback: silent notification. User won't see progress but at least
-    // knows something is happening.
+  // Hide all existing windows so the user focuses on the progress UI.
+  // The main window stays alive until we app.exit() below — we don't
+  // close it here to avoid firing the "window-all-closed → quit" path.
+  for (const w of BrowserWindow.getAllWindows()) {
+    try { w.hide(); } catch {}
+  }
+
+  // Pop the progress window.
+  progressWindow = openProgressWindow(logPath);
+  if (progressWindow) {
+    // Drive the log-to-UI plumbing.
+    pollLogAndPush(progressWindow, logPath, flagPath);
+    // Hand the real log path to the renderer so "Reveal log" can open
+    // the right file (additionalArguments is preload-visible only).
+    progressWindow.webContents.on('did-finish-load', () => {
+      try { progressWindow.webContents.send('bm:upgrade-init', { logPath }); } catch {}
+    });
+  } else {
+    // Fallback: notification if the window couldn't open.
     try {
       spawn('/usr/bin/osascript', [
         '-e',
-        'display notification "Downloading the latest version. Watch ~/Library/Logs/BlackMagic AI/auto-upgrade-*.log for progress." with title "BlackMagic AI" subtitle "Upgrade started"',
+        'display notification "Downloading the latest version. Watch ~/Library/Logs/BlackMagic AI/ for progress." with title "BlackMagic AI" subtitle "Upgrade started"',
       ], { detached: true, stdio: 'ignore' }).unref();
     } catch {}
   }
@@ -418,14 +498,24 @@ if [ "$status" -eq 0 ]; then
     echo "[$(date -u +%FT%TZ)] reinstall exit=$status"
   fi
 fi
-echo "[$(date -u +%FT%TZ)] done; signalling progress Terminal to close"
-# Signal the progress Terminal (tail -f) that we're done. It watches for
-# this file and kills its tail + closes the window.
-touch "${flagPath}"
+echo "[$(date -u +%FT%TZ)] done; signalling progress window"
+# Write a status marker so the Electron progress window can branch on
+# ok vs fail. Polls every 500ms waiting for this file.
+if [ "$status" -eq 0 ]; then echo ok > "${flagPath}"; else echo "$status" > "${flagPath}"; fi
+
+# Wait for the progress window's parent Electron process to exit before
+# relaunching. If we run open -a while the old app is still alive, macOS
+# just foregrounds the old process instead of launching the replaced
+# binary. Cap at 20s.
+for i in $(seq 1 40); do
+  if ! pgrep -f "/Applications/BlackMagic AI.app/Contents/MacOS/BlackMagic AI" >/dev/null 2>&1; then break; fi
+  sleep 0.5
+done
+# Extra belt-and-suspenders: kill any lingering app/daemon processes so
+# the re-open comes up clean.
+pkill -9 -f "/Applications/BlackMagic AI.app" 2>/dev/null || true
+sleep 1
 if [ "$status" -eq 0 ]; then
-  # Brief pause so the Terminal has time to show the "Upgrade finished"
-  # banner before we relaunch the app on top of it.
-  sleep 2
   open -a "BlackMagic AI"
 else
   /usr/bin/osascript -e 'display notification "brew upgrade failed — see ~/Library/Logs/BlackMagic AI" with title "BlackMagic AI"'
@@ -439,7 +529,11 @@ fi
   });
   child.unref();
   console.log('[main] auto-upgrader spawned; log:', logPath);
-  app.exit(0);
+  // Intentionally NOT calling app.exit() here. The progress window needs
+  // the main Electron process alive to receive IPC updates. pollLogAndPush
+  // will call app.exit(0) once brew has written the flag file and the user
+  // has seen the "complete" state for ~2s. The shell script then reopens
+  // the replaced app bundle.
 }
 
 // Soft "newer version available" check. Distribution is brew-only. On

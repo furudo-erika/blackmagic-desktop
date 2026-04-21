@@ -2,6 +2,23 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.19 — 2026-04-21
+
+### Added
+- **Real upgrade progress window.** Clicking "Upgrade and relaunch"
+  now opens a small native Electron window with a live progress
+  bar, a staged status line ("Downloading the DMG…", "Moving app
+  into place…", "Finishing…"), an elapsed-time counter, and a
+  tailing log panel so the user can see brew's actual output
+  scrolling in real time. A "Reveal log" button opens the full log
+  file in Finder. When brew finishes, the window flips to
+  "Upgrade complete — reopening…" for two seconds before the main
+  app exits; the shell script waits for every process in
+  `/Applications/BlackMagic AI.app` to die, kills stragglers, and
+  re-opens the replaced bundle. No more "I clicked upgrade and
+  nothing happened" — there's always something on screen until the
+  new version comes up.
+
 ## 0.4.18 — 2026-04-21
 
 ### Changed

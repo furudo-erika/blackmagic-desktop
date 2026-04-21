@@ -1,6 +1,6 @@
 {
   "name": "@bm/desktop",
-  "version": "0.4.18",
+  "version": "0.4.19",
   "private": true,
   "main": "src/main.cjs",
   "scripts": {
@@ -44,6 +44,10 @@
       {
         "from": "../../CHANGELOG.md",
         "to": "CHANGELOG.md"
+      },
+      {
+        "from": "resources/upgrade-progress.html",
+        "to": "upgrade-progress.html"
       }
     ],
     "mac": {

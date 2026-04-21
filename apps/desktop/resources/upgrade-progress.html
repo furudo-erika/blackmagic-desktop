@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Upgrading BlackMagic AI…</title>
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #17140F;
+    --panel: #1F1B15;
+    --ink: #F5F1EA;
+    --muted: #8C837C;
+    --line: #2A241D;
+    --flame: #E85D3B;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #FAF6EF;
+      --panel: #FFFFFF;
+      --ink: #2A241D;
+      --muted: #6B625C;
+      --line: #E6E0D6;
+    }
+  }
+  html, body { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  body { display: flex; align-items: center; justify-content: center; padding: 32px; -webkit-app-region: drag; }
+  .card { width: 100%; max-width: 520px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px 28px; -webkit-app-region: no-drag; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 6px; display: flex; align-items: center; gap: 10px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--flame); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.85); } }
+  p.sub { font-size: 12px; color: var(--muted); margin: 0 0 18px; }
+  .bar { height: 8px; background: color-mix(in srgb, var(--line) 70%, transparent); border-radius: 999px; overflow: hidden; margin-bottom: 14px; position: relative; }
+  .bar-fill { height: 100%; background: var(--flame); border-radius: 999px; width: 0%; transition: width 0.25s ease; }
+  .bar.indeterminate .bar-fill { width: 40% !important; animation: indet 1.6s ease-in-out infinite; }
+  @keyframes indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+  .stage { font-size: 12px; color: var(--ink); margin-bottom: 6px; font-weight: 500; }
+  .elapsed { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .log {
+    margin-top: 16px;
+    max-height: 140px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10.5px;
+    line-height: 1.55;
+    color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .log:empty::before { content: 'waiting for brew output…'; opacity: 0.6; }
+  .ok { color: #7E8C67; }
+  .err { color: var(--flame); }
+  .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 11px; color: var(--muted); }
+  button { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; }
+  button:hover { color: var(--ink); border-color: var(--flame); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1><span class="dot" id="dot"></span><span id="title">Upgrading BlackMagic AI…</span></h1>
+    <p class="sub" id="sub">Downloading the latest version via Homebrew. The app will reopen automatically when this finishes.</p>
+    <div class="bar indeterminate" id="bar"><div class="bar-fill" id="fill"></div></div>
+    <div class="stage" id="stage">Starting…</div>
+    <div class="elapsed" id="elapsed">0s elapsed</div>
+    <div class="log" id="log"></div>
+    <div class="footer">
+      <span id="footnote">Log: ~/Library/Logs/BlackMagic AI/</span>
+      <button id="showLog" type="button">Reveal log</button>
+    </div>
+  </div>
+<script>
+  const started = Date.now();
+  const logEl = document.getElementById('log');
+  const stageEl = document.getElementById('stage');
+  const elapsedEl = document.getElementById('elapsed');
+  const barEl = document.getElementById('bar');
+  const fillEl = document.getElementById('fill');
+  const titleEl = document.getElementById('title');
+  const subEl = document.getElementById('sub');
+  const dotEl = document.getElementById('dot');
+
+  function fmtElapsed(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    if (s < 60) return s + 's elapsed';
+    return Math.floor(s/60) + 'm ' + (s%60) + 's elapsed';
+  }
+  setInterval(() => { elapsedEl.textContent = fmtElapsed(Date.now() - started); }, 500);
+
+  function stageFromLog(text) {
+    const t = text.toLowerCase();
+    if (t.includes('brew exit=') || t.includes('reinstall exit=')) return { stage: 'Finishing…', pct: 95 };
+    if (t.includes('purging')) return { stage: 'Installing the new version…', pct: 85 };
+    if (t.includes('moving') || t.includes('linking')) return { stage: 'Moving app into place…', pct: 80 };
+    if (t.includes('fetching') || t.includes('downloading')) return { stage: 'Downloading the DMG…', pct: 40 };
+    if (t.includes('refreshing tap') || t.includes('update --quiet') || t.includes('==> Updating Homebrew')) return { stage: 'Refreshing Homebrew tap…', pct: 15 };
+    if (t.includes('auto-upgrade starting')) return { stage: 'Waiting for previous process to exit…', pct: 5 };
+    return null;
+  }
+
+  if (window.bmUpgrade?.onUpdate) {
+    window.bmUpgrade.onUpdate((payload) => {
+      if (payload.log) {
+        // Keep last ~8 lines visible
+        const lines = String(payload.log).split('\n').filter(Boolean);
+        logEl.textContent = lines.slice(-8).join('\n');
+      }
+      if (payload.stage) stageEl.textContent = payload.stage;
+      if (typeof payload.pct === 'number') {
+        barEl.classList.remove('indeterminate');
+        fillEl.style.width = Math.min(100, Math.max(0, payload.pct)) + '%';
+      }
+      if (payload.done) {
+        barEl.classList.remove('indeterminate');
+        fillEl.style.width = '100%';
+        stageEl.textContent = payload.ok ? 'Upgrade complete — reopening…' : 'Upgrade failed';
+        titleEl.textContent = payload.ok ? 'Done' : 'Something went wrong';
+        subEl.textContent = payload.ok
+          ? 'BlackMagic AI will reopen in a moment.'
+          : 'Check the log for details. You can also run `brew upgrade --cask blackmagic-ai` in Terminal.';
+        dotEl.style.background = payload.ok ? '#7E8C67' : '#E85D3B';
+        dotEl.style.animation = 'none';
+      }
+    });
+  }
+
+  document.getElementById('showLog').addEventListener('click', () => {
+    if (window.bmUpgrade?.revealLog) window.bmUpgrade.revealLog();
+  });
+</script>
+</body>
+</html>
