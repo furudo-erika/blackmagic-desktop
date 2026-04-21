@@ -2,6 +2,20 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.30 — 2026-04-22
+
+### Fixed
+- **Shell triggers failing with `ModuleNotFoundError` / `env: node: No such
+  file or directory`.** The daemon runs inside the Electron app, which
+  launches with a minimal PATH (no `/opt/homebrew/bin`, no
+  `/usr/local/bin`). Any trigger that shelled out to Homebrew python or
+  nvm/Homebrew node bombed before the script even imported its
+  dependencies. Shell triggers now prepend `/opt/homebrew/{bin,sbin}` and
+  `/usr/local/{bin,sbin}` to PATH before spawning, so `/usr/bin/env
+  python3` finds Homebrew's python (with user site-packages) and
+  `/usr/bin/env node` finds nvm/Homebrew node. Fire-now and cron-driven
+  runs are both affected.
+
 ## 0.4.28 — 2026-04-21
 
 ### Added

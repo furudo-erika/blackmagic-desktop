@@ -99,7 +99,26 @@ async function runShellTrigger(spec: TriggerSpec): Promise<{
   const logAbs = path.join(vaultRoot, logRel);
 
   const cwd = spec.cwd && path.isAbsolute(spec.cwd) ? spec.cwd : vaultRoot;
-  const mergedEnv = { ...process.env, ...(spec.env ?? {}) } as NodeJS.ProcessEnv;
+  // The daemon runs inside the Electron app, which launches with a minimal
+  // PATH (no /opt/homebrew/bin, no /usr/local/bin, no user shell rc). That
+  // breaks any trigger that shells out to `python3` or `node` installed via
+  // Homebrew or nvm — they fail with ModuleNotFoundError or
+  // `env: node: No such file or directory`. Prepend the common developer
+  // bin dirs so `/usr/bin/env python3` finds Homebrew's python (with user
+  // site-packages) and `/usr/bin/env node` finds nvm/homebrew node.
+  const EXTRA_PATH = [
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/local/sbin',
+  ].join(':');
+  const basePath = process.env.PATH ?? '';
+  const augmentedPath = basePath ? `${EXTRA_PATH}:${basePath}` : EXTRA_PATH;
+  const mergedEnv = {
+    ...process.env,
+    PATH: augmentedPath,
+    ...(spec.env ?? {}),
+  } as NodeJS.ProcessEnv;
 
   // Use `sh -c` so users can write full command strings (pipes, flags, etc.)
   // in the trigger md without having to JSON-quote an argv array.
