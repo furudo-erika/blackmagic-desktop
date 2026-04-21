@@ -8,6 +8,24 @@ import { readVaultFile, writeVaultFile, editVaultFile, renameVaultFile, listDir,
 import type { Config } from './paths.js';
 import { McpRegistry } from './mcp.js';
 import { enrollContact } from './sequences.js';
+import {
+  ensureGeoSkeleton,
+  loadGeoConfig,
+  saveGeoConfig,
+  listPrompts as geoListPrompts,
+  addPrompt as geoAddPrompt,
+  removePrompt as geoRemovePrompt,
+  runPrompt as geoRunPrompt,
+  writeRun as geoWriteRun,
+  runDaily as geoRunDaily,
+  reportBrands as geoReportBrands,
+  reportDomains as geoReportDomains,
+  gapSources as geoGapSources,
+  sovTrend as geoSovTrend,
+  listDailySummaries as geoListDailySummaries,
+  type GeoModel,
+  type Brand,
+} from './geo.js';
 
 export interface ToolCtx {
   config: Config;
@@ -289,240 +307,251 @@ const scrape_apify_actor: ToolDef = {
 };
 
 // ---------------------------------------------------------------------------
-// Peec AI (GEO / AI-search visibility). BYOK — user drops their X-API-Key in
-// Settings → Integrations. Base: https://api.peec.ai/customer/v1. Auth header:
-// X-API-Key. API is beta + Enterprise-only per peec's docs.
+// GEO (Generative Engine Optimization). Native replacement for Peec AI — runs
+// the seed prompt pool daily across ChatGPT / Perplexity / Google AI Overview
+// and stores raw results + extracted citations in signals/geo/. Handlers are
+// thin: the real work lives in geo.ts. All state is vault-local.
 // ---------------------------------------------------------------------------
 
-const PEEC_BASE = 'https://api.peec.ai/customer/v1';
+const GEO_MODEL_ENUM = ['chatgpt', 'perplexity', 'google_ai_overview'] as const;
 
-async function peecFetch(
-  key: string,
-  path: string,
-  init?: { method?: string; body?: unknown },
-): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
-  try {
-    const res = await fetch(`${PEEC_BASE}${path}`, {
-      method: init?.method ?? 'GET',
-      headers: {
-        'X-API-Key': key,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: init?.body ? JSON.stringify(init.body) : undefined,
-    });
-    const text = await res.text();
-    let data: unknown;
-    try { data = JSON.parse(text); } catch { data = text; }
-    if (!res.ok) {
-      return { ok: false, status: res.status, data, error: `peec ${res.status}: ${String(text).slice(0, 400)}` };
-    }
-    return { ok: true, status: res.status, data };
-  } catch (err) {
-    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-function peecKey(ctx: ToolCtx): string | { error: string } {
-  const key = ctx.config.peec_api_key;
-  if (!key) {
-    return { error: 'No PEEC_API_KEY configured. Set it in Settings → Integrations, or add peec_api_key to ~/BlackMagic/.bm/config.toml. Peec AI API is Enterprise-only; generate one at https://app.peec.ai/api-keys.' };
-  }
-  return key;
-}
-
-const peec_list_prompts: ToolDef = {
-  name: 'peec_list_prompts',
+const geo_list_prompts: ToolDef = {
+  name: 'geo_list_prompts',
   description:
-    'Peec AI: list tracked GEO prompts in your project. Supports filtering by tag_id, topic_id, country_code. Use to audit Seed Query coverage.',
-  parameters: {
-    type: 'object',
-    properties: {
-      limit: { type: 'number', description: '1–10000, default 1000' },
-      offset: { type: 'number', default: 0 },
-      tag_id: { type: 'string' },
-      topic_id: { type: 'string' },
-      country_code: { type: 'string', description: 'ISO country, e.g. US, GB, DE' },
-    },
-  },
-  handler: async (args, ctx) => {
-    const k = peecKey(ctx);
-    if (typeof k !== 'string') return k;
-    const qs = new URLSearchParams();
-    for (const [key, val] of Object.entries(args ?? {})) {
-      if (val !== undefined && val !== null && val !== '') qs.set(key, String(val));
-    }
-    const q = qs.toString();
-    return peecFetch(k, `/prompts${q ? `?${q}` : ''}`);
+    'GEO: list all tracked seed prompts in the pool (signals/geo/prompts.json). Use to audit coverage before adding more.',
+  parameters: { type: 'object', properties: {} },
+  handler: async () => {
+    await ensureGeoSkeleton();
+    const prompts = await geoListPrompts();
+    return { prompts, count: prompts.length };
   },
 };
 
-const peec_create_prompt: ToolDef = {
-  name: 'peec_create_prompt',
+const geo_add_prompt: ToolDef = {
+  name: 'geo_add_prompt',
   description:
-    'Peec AI: add a new GEO prompt to the tracked pool. Use to expand the Seed Query set (PRD steps 2–3).',
+    'GEO: add a new seed prompt to the tracked pool. Write prompts the way a real buyer would type them into ChatGPT — natural language, first-person, not keyword-stuffed.',
   parameters: {
     type: 'object',
     properties: {
-      text: { type: 'string', description: 'The prompt string as a real user would type it into an AI search tool.' },
-      country_code: { type: 'string', description: 'ISO country code, e.g. US' },
-      topic_id: { type: 'string' },
-      tag_ids: { type: 'array', items: { type: 'string' } },
+      text: { type: 'string', description: 'Natural-language prompt.' },
+      tags: { type: 'array', items: { type: 'string' }, description: 'Free-form: brand/category/competitor/pain/long-tail/reverse, persona names, etc.' },
+      country_code: { type: 'string', description: 'ISO country, e.g. US. Informational only — execution is always en-US for now.' },
     },
     required: ['text'],
   },
-  handler: async (args, ctx) => {
-    const k = peecKey(ctx);
-    if (typeof k !== 'string') return k;
-    return peecFetch(k, '/prompts', { method: 'POST', body: args });
+  handler: async (args) => {
+    await ensureGeoSkeleton();
+    const p = await geoAddPrompt({ text: args.text, tags: args.tags, country_code: args.country_code });
+    return { ok: true, prompt: p };
   },
 };
 
-const peec_prompt_suggestions: ToolDef = {
-  name: 'peec_prompt_suggestions',
-  description:
-    'Peec AI: list AI-generated prompt suggestions (for Seed Query expansion). Returns ids you can accept/reject via peec_accept_prompt_suggestion.',
-  parameters: {
-    type: 'object',
-    properties: {
-      limit: { type: 'number' },
-      offset: { type: 'number' },
-    },
-  },
-  handler: async (args, ctx) => {
-    const k = peecKey(ctx);
-    if (typeof k !== 'string') return k;
-    const qs = new URLSearchParams();
-    for (const [key, val] of Object.entries(args ?? {})) {
-      if (val !== undefined && val !== null && val !== '') qs.set(key, String(val));
-    }
-    const q = qs.toString();
-    return peecFetch(k, `/prompts/suggestions${q ? `?${q}` : ''}`);
-  },
-};
-
-const peec_accept_prompt_suggestion: ToolDef = {
-  name: 'peec_accept_prompt_suggestion',
-  description: 'Peec AI: accept a suggested prompt so it enters the tracked pool.',
+const geo_remove_prompt: ToolDef = {
+  name: 'geo_remove_prompt',
+  description: 'GEO: remove a seed prompt by id from the tracked pool.',
   parameters: {
     type: 'object',
     properties: { id: { type: 'string' } },
     required: ['id'],
   },
-  handler: async (args, ctx) => {
-    const k = peecKey(ctx);
-    if (typeof k !== 'string') return k;
-    return peecFetch(k, `/prompts/suggestions/${encodeURIComponent(args.id)}/accept`, { method: 'POST' });
+  handler: async (args) => {
+    const removed = await geoRemovePrompt(args.id);
+    return { ok: removed };
   },
 };
 
-const peec_report_brands: ToolDef = {
-  name: 'peec_report_brands',
+const geo_list_brands: ToolDef = {
+  name: 'geo_list_brands',
   description:
-    'Peec AI: brand-level GEO metrics — Share of Voice, visibility, Citation Rank (position), sentiment, mention_count. Core metric for PRD steps 5–6. Break down by prompt_id / model_id / tag_id / topic_id / date / country_code / chat_id.',
+    'GEO: list tracked brands (your brand + competitors) from signals/geo/config.json. Each brand has id, name, aliases, and owned domains used for mention / citation matching.',
+  parameters: { type: 'object', properties: {} },
+  handler: async () => {
+    await ensureGeoSkeleton();
+    const cfg = await loadGeoConfig();
+    return { brands: cfg.brands, models: cfg.models };
+  },
+};
+
+const geo_set_brands: ToolDef = {
+  name: 'geo_set_brands',
+  description:
+    'GEO: replace the full brand list. Exactly one brand should have is_us=true — that is you. Aliases + domains drive response parsing, so include common misspellings and all owned domains.',
+  parameters: {
+    type: 'object',
+    properties: {
+      brands: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            aliases: { type: 'array', items: { type: 'string' } },
+            domains: { type: 'array', items: { type: 'string' } },
+            is_us: { type: 'boolean' },
+          },
+          required: ['id', 'name'],
+        },
+      },
+      models: {
+        type: 'array',
+        items: { type: 'string', enum: GEO_MODEL_ENUM as unknown as string[] },
+        description: 'Which models to run in the daily sweep. Default: all three.',
+      },
+    },
+    required: ['brands'],
+  },
+  handler: async (args) => {
+    await ensureGeoSkeleton();
+    const cfg = await loadGeoConfig();
+    cfg.brands = (args.brands ?? []) as Brand[];
+    if (Array.isArray(args.models)) cfg.models = args.models as GeoModel[];
+    await saveGeoConfig(cfg);
+    return { ok: true, brands: cfg.brands.length, models: cfg.models };
+  },
+};
+
+const geo_run_prompt: ToolDef = {
+  name: 'geo_run_prompt',
+  description:
+    'GEO: run a single prompt through one model right now and store the result under signals/geo/runs/<today>/<model>/. Use for ad-hoc checks; the daily sweep handles the full pool.',
+  parameters: {
+    type: 'object',
+    properties: {
+      prompt_id: { type: 'string', description: 'id from geo_list_prompts. Mutually exclusive with text.' },
+      text: { type: 'string', description: 'Raw prompt text (not persisted to the pool).' },
+      model: { type: 'string', enum: GEO_MODEL_ENUM as unknown as string[] },
+    },
+    required: ['model'],
+  },
+  handler: async (args, ctx) => {
+    await ensureGeoSkeleton();
+    const cfg = await loadGeoConfig();
+    let prompt = args.prompt_id
+      ? (await geoListPrompts()).find((p) => p.id === args.prompt_id)
+      : undefined;
+    if (!prompt && args.text) {
+      prompt = {
+        id: `adhoc-${Date.now().toString(36)}`,
+        text: String(args.text),
+        created_at: new Date().toISOString(),
+      };
+    }
+    if (!prompt) return { error: 'provide prompt_id or text' };
+    const rec = await geoRunPrompt(prompt, args.model as GeoModel, ctx.config, cfg.brands);
+    const p = await geoWriteRun(rec);
+    return { ok: !rec.error, path: p, record: rec };
+  },
+};
+
+const geo_run_daily: ToolDef = {
+  name: 'geo_run_daily',
+  description:
+    'GEO: run the entire seed prompt pool across every configured model and write results under signals/geo/runs/<date>/. Normally fired by the daily cron trigger — call manually to backfill a day or kick off a run on demand.',
+  parameters: {
+    type: 'object',
+    properties: {
+      date: { type: 'string', description: 'Override the run date (YYYY-MM-DD). Default: today.' },
+      models: {
+        type: 'array',
+        items: { type: 'string', enum: GEO_MODEL_ENUM as unknown as string[] },
+        description: 'Subset of models to run (default: all configured).',
+      },
+      concurrency: { type: 'number', description: '1–16. Default 4.' },
+    },
+  },
+  handler: async (args, ctx) => {
+    const summary = await geoRunDaily(ctx.config, {
+      date: args.date,
+      models: args.models,
+      concurrency: args.concurrency,
+    });
+    return summary;
+  },
+};
+
+const geo_report_brands: ToolDef = {
+  name: 'geo_report_brands',
+  description:
+    'GEO: brand-level metrics — Share of Voice, mention count, prompt coverage, avg mention position, citation count. Use to quantify visibility vs competitors over a date range.',
   parameters: {
     type: 'object',
     properties: {
       start_date: { type: 'string', description: 'YYYY-MM-DD' },
       end_date: { type: 'string', description: 'YYYY-MM-DD' },
-      dimensions: {
-        type: 'array',
-        items: { type: 'string', enum: ['prompt_id', 'model_id', 'tag_id', 'topic_id', 'date', 'country_code', 'chat_id'] },
-        description: 'Group-by dimensions. Empty = overall aggregate.',
-      },
-      filters: {
-        type: 'object',
-        description: 'Filter object. Per dim, use operators in/not_in/gt/gte/lt/lte, e.g. { "model_id": { "in": ["perplexity","chatgpt"] } }.',
-      },
-      brand_ids: { type: 'array', items: { type: 'string' } },
-      limit: { type: 'number' },
-      offset: { type: 'number' },
+      model: { type: 'string', enum: GEO_MODEL_ENUM as unknown as string[] },
     },
   },
-  handler: async (args, ctx) => {
-    const k = peecKey(ctx);
-    if (typeof k !== 'string') return k;
-    return peecFetch(k, '/reports/brands', { method: 'POST', body: args ?? {} });
+  handler: async (args) => {
+    const rows = await geoReportBrands(args ?? {});
+    return { rows };
   },
 };
 
-const peec_report_domains: ToolDef = {
-  name: 'peec_report_domains',
+const geo_report_domains: ToolDef = {
+  name: 'geo_report_domains',
   description:
-    "Peec AI: source-domain citation report — which domains AI models are citing. THIS IS THE MOST IMPORTANT DATA for PRD step 5 (Cited Sources) and step 7 (Gap analysis: what domains cite competitors but not us). Returns citation_rate, retrieval_count, UGC/CORPORATE/EDITORIAL classifications.",
-  parameters: {
-    type: 'object',
-    properties: {
-      start_date: { type: 'string', description: 'YYYY-MM-DD' },
-      end_date: { type: 'string', description: 'YYYY-MM-DD' },
-      dimensions: {
-        type: 'array',
-        items: { type: 'string', enum: ['prompt_id', 'model_id', 'tag_id', 'topic_id', 'date', 'country_code', 'chat_id'] },
-      },
-      filters: { type: 'object' },
-      brand_ids: { type: 'array', items: { type: 'string' }, description: 'Scope to which brand(s) cited this domain. Pass competitor brand_ids to get competitor source lists for Gap analysis.' },
-      limit: { type: 'number' },
-      offset: { type: 'number' },
-    },
-  },
-  handler: async (args, ctx) => {
-    const k = peecKey(ctx);
-    if (typeof k !== 'string') return k;
-    return peecFetch(k, '/reports/domains', { method: 'POST', body: args ?? {} });
-  },
-};
-
-const peec_report_urls: ToolDef = {
-  name: 'peec_report_urls',
-  description:
-    'Peec AI: URL-level citation performance. Use to drill from a high-performing domain to the specific articles driving citations — tells content team exactly which article formats land.',
+    'GEO: cited-domain report — which third-party domains AI models are citing across the tracked prompt pool. Highest-leverage GEO data: drives gap-source analysis and content strategy.',
   parameters: {
     type: 'object',
     properties: {
       start_date: { type: 'string' },
       end_date: { type: 'string' },
-      dimensions: { type: 'array', items: { type: 'string' } },
-      filters: { type: 'object' },
-      brand_ids: { type: 'array', items: { type: 'string' } },
+      model: { type: 'string', enum: GEO_MODEL_ENUM as unknown as string[] },
       limit: { type: 'number' },
-      offset: { type: 'number' },
     },
   },
-  handler: async (args, ctx) => {
-    const k = peecKey(ctx);
-    if (typeof k !== 'string') return k;
-    return peecFetch(k, '/reports/urls', { method: 'POST', body: args ?? {} });
+  handler: async (args) => {
+    const rows = await geoReportDomains(args ?? {});
+    return { rows };
   },
 };
 
-const peec_source_content: ToolDef = {
-  name: 'peec_source_content',
+const geo_gap_sources: ToolDef = {
+  name: 'geo_gap_sources',
   description:
-    'Peec AI: fetch the scraped markdown of a cited source URL. Use to understand how AI sees competitor content and figure out what to publish to close the gap.',
+    'GEO: domains cited when competitors are mentioned but NOT when we are. This is the canonical "what content gets us cited?" list — sorted by citation_count desc.',
   parameters: {
     type: 'object',
     properties: {
-      urls: { type: 'array', items: { type: 'string' }, description: 'URLs to fetch scraped markdown for.' },
+      start_date: { type: 'string' },
+      end_date: { type: 'string' },
+      model: { type: 'string', enum: GEO_MODEL_ENUM as unknown as string[] },
+      limit: { type: 'number' },
     },
-    required: ['urls'],
   },
-  handler: async (args, ctx) => {
-    const k = peecKey(ctx);
-    if (typeof k !== 'string') return k;
-    return peecFetch(k, '/sources/urls/content', { method: 'POST', body: args });
+  handler: async (args) => {
+    const rows = await geoGapSources(args ?? {});
+    return { rows };
   },
 };
 
-const peec_list_brands: ToolDef = {
-  name: 'peec_list_brands',
+const geo_sov_trend: ToolDef = {
+  name: 'geo_sov_trend',
   description:
-    'Peec AI: list brands tracked in your project (your brand + configured competitors). Use to resolve brand_ids for the reports.',
-  parameters: { type: 'object', properties: {} },
-  handler: async (_args, ctx) => {
-    const k = peecKey(ctx);
-    if (typeof k !== 'string') return k;
-    return peecFetch(k, '/brands');
+    'GEO: per-day Share of Voice trend for one brand across stored daily runs. Use to show whether visibility is moving up or down week over week.',
+  parameters: {
+    type: 'object',
+    properties: {
+      brand_id: { type: 'string' },
+      start_date: { type: 'string' },
+      end_date: { type: 'string' },
+      model: { type: 'string', enum: GEO_MODEL_ENUM as unknown as string[] },
+    },
+    required: ['brand_id'],
   },
+  handler: async (args) => {
+    const points = await geoSovTrend(args);
+    return { points };
+  },
+};
+
+const geo_list_runs: ToolDef = {
+  name: 'geo_list_runs',
+  description: 'GEO: list daily-run summaries (date, model count, ok/error counts).',
+  parameters: { type: 'object', properties: {} },
+  handler: async () => ({ runs: await geoListDailySummaries() }),
 };
 
 // ---------------------------------------------------------------------------
@@ -1845,15 +1874,18 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   enrich_contact,
   enrich_contact_linkedin,
   scrape_apify_actor,
-  peec_list_brands,
-  peec_list_prompts,
-  peec_create_prompt,
-  peec_prompt_suggestions,
-  peec_accept_prompt_suggestion,
-  peec_report_brands,
-  peec_report_domains,
-  peec_report_urls,
-  peec_source_content,
+  geo_list_prompts,
+  geo_add_prompt,
+  geo_remove_prompt,
+  geo_list_brands,
+  geo_set_brands,
+  geo_run_prompt,
+  geo_run_daily,
+  geo_report_brands,
+  geo_report_domains,
+  geo_gap_sources,
+  geo_sov_trend,
+  geo_list_runs,
   draft_create,
   enroll_contact_in_sequence,
   hubspot_create_contact,

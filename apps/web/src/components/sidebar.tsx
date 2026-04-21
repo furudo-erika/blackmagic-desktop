@@ -32,6 +32,7 @@ import {
   Moon,
   Network,
   Plug,
+  Radar,
   Repeat,
   RotateCcw,
   Search,
@@ -267,6 +268,7 @@ export function Sidebar() {
           <SidebarNavItem href="/playbooks" label="Skills" icon={BookOpen} breathing={isBreathing} />
           <SidebarNavItem href="/sequences" label="Sequences" icon={Repeat} breathing={isBreathing} />
           <SidebarNavItem href="/triggers" label="Triggers" icon={Zap} breathing={isBreathing} />
+          <SidebarNavItem href="/geo" label="GEO" icon={Radar} breathing={isBreathing} />
           <SidebarNavItem
             href="/runs"
             label="Runs"

@@ -75,7 +75,6 @@ export const api = {
     request<{
       apify_api_key: boolean;
       enrichlayer_api_key: boolean;
-      peec_api_key: boolean;
       hubspot_api_key: boolean;
       apollo_api_key: boolean;
       attio_api_key: boolean;
@@ -94,7 +93,6 @@ export const api = {
   setIntegrationKeys: (body: {
     apify_api_key?: string;
     enrichlayer_api_key?: string;
-    peec_api_key?: string;
     hubspot_api_key?: string;
     apollo_api_key?: string;
     attio_api_key?: string;
@@ -327,6 +325,88 @@ export const api = {
     }),
   deleteProject: (id: string) =>
     request<ProjectsRegistry>(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  // --- GEO (Generative Engine Optimization) ---
+  geoConfig: () => request<GeoConfig>('/api/geo/config'),
+  geoSaveConfig: (cfg: GeoConfig) =>
+    request<{ ok: true }>('/api/geo/config', { method: 'PUT', body: JSON.stringify(cfg) }),
+  geoPrompts: () => request<{ prompts: GeoPrompt[] }>('/api/geo/prompts'),
+  geoAddPrompt: (body: { text: string; tags?: string[]; country_code?: string }) =>
+    request<{ ok: true; prompt: GeoPrompt }>('/api/geo/prompts', { method: 'POST', body: JSON.stringify(body) }),
+  geoDeletePrompt: (id: string) =>
+    request<{ ok: boolean }>(`/api/geo/prompts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  geoRun: (body: { date?: string; models?: GeoModel[]; concurrency?: number } = {}) =>
+    request<GeoRunSummary>('/api/geo/run', { method: 'POST', body: JSON.stringify(body) }),
+  geoRuns: () => request<{ runs: GeoRunSummary[] }>('/api/geo/runs'),
+  geoReportBrands: (q: { start_date?: string; end_date?: string; model?: GeoModel } = {}) =>
+    request<{ rows: GeoBrandRow[] }>(`/api/geo/reports/brands?${qs(q)}`),
+  geoReportDomains: (q: { start_date?: string; end_date?: string; model?: GeoModel; limit?: number } = {}) =>
+    request<{ rows: GeoDomainRow[] }>(`/api/geo/reports/domains?${qs(q)}`),
+  geoGapSources: (q: { start_date?: string; end_date?: string; model?: GeoModel; limit?: number } = {}) =>
+    request<{ rows: GeoGapRow[] }>(`/api/geo/reports/gap-sources?${qs(q)}`),
+  geoSovTrend: (q: { brand_id: string; start_date?: string; end_date?: string; model?: GeoModel }) =>
+    request<{ points: Array<{ date: string; sov: number; mentions: number }> }>(`/api/geo/reports/sov-trend?${qs(q)}`),
+  geoDelta: (q: { start_date?: string; end_date?: string; model?: GeoModel } = {}) =>
+    request<GeoDeltaReport>(`/api/geo/reports/delta?${qs(q)}`),
+  geoSovTrendOverlay: (q: { brand_id: string; start_date?: string; end_date?: string; model?: GeoModel }) =>
+    request<GeoTrendOverlay>(`/api/geo/reports/sov-trend-overlay?${qs(q)}`),
+};
+
+function qs(obj: Record<string, unknown>): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined && v !== null && v !== '') p.set(k, String(v));
+  }
+  return p.toString();
+}
+
+export type GeoModel = 'chatgpt' | 'perplexity' | 'google_ai_overview';
+export type GeoBrand = { id: string; name: string; aliases?: string[]; domains?: string[]; is_us?: boolean };
+export type GeoConfig = { brands: GeoBrand[]; models: GeoModel[] };
+export type GeoPrompt = { id: string; text: string; tags?: string[]; country_code?: string; created_at: string };
+export type GeoBrandRow = {
+  brand_id: string;
+  name: string;
+  sov: number;
+  mention_count: number;
+  prompt_coverage: number;
+  avg_position_char: number | null;
+  citation_count: number;
+};
+export type GeoDomainRow = { domain: string; citation_count: number; prompt_count: number; models: GeoModel[] };
+export type GeoGapRow = GeoDomainRow & { cited_for_brands: string[] };
+export type GeoBrandDeltaRow = GeoBrandRow & { sov_prev: number; sov_delta: number; mention_delta: number };
+export type GeoDomainDeltaRow = GeoDomainRow & { prev_citation_count: number; delta: number; status: 'new' | 'lost' | 'up' | 'down' | 'flat' };
+export type GeoDeltaReport = {
+  window: { start: string; end: string; days: number };
+  prev_window: { start: string; end: string };
+  brands: GeoBrandDeltaRow[];
+  domains_top_up: GeoDomainDeltaRow[];
+  domains_top_down: GeoDomainDeltaRow[];
+  domains_new: GeoDomainDeltaRow[];
+  domains_lost: GeoDomainDeltaRow[];
+  movers: {
+    brand_sov_up: GeoBrandDeltaRow | null;
+    brand_sov_down: GeoBrandDeltaRow | null;
+    new_domain: GeoDomainDeltaRow | null;
+    lost_domain: GeoDomainDeltaRow | null;
+  };
+};
+export type GeoTrendOverlay = {
+  current: Array<{ day_index: number; date: string; sov: number; mentions: number }>;
+  prior: Array<{ day_index: number; date: string; sov: number; mentions: number }>;
+  window: { start: string; end: string; days: number };
+  prev_window: { start: string; end: string };
+};
+export type GeoRunSummary = {
+  date: string;
+  models: GeoModel[];
+  prompts_total: number;
+  runs_total: number;
+  runs_ok: number;
+  runs_error: number;
+  errors: Array<{ prompt_id: string; model: GeoModel; error: string }>;
+  duration_ms: number;
 };
 
 export type Project = { id: string; name: string; path: string };

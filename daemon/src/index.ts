@@ -28,6 +28,7 @@ import { mcpServerList, McpRegistry } from './mcp.js';
 import { buildOntology } from './ontology.js';
 import { pushTriggers, pushDrafts } from './sync.js';
 import { runCodex, codexAvailable, CodexNotInstalled } from './codex.js';
+import * as geo from './geo.js';
 import { seedVercelDemo } from './us-demo.js';
 import {
   deriveRunPreview,
@@ -181,6 +182,7 @@ async function main() {
   await initProjectsRegistry();
   const config = loadConfig();
   await ensureVault();
+  await geo.ensureGeoSkeleton();
   await loadOAuthStates();
   await McpRegistry.start().catch((err) => console.error('[mcp] registry start failed:', err));
 
@@ -331,7 +333,6 @@ async function main() {
   const INTEGRATION_KEYS = [
     'apify_api_key',
     'enrichlayer_api_key',
-    'peec_api_key',
     'hubspot_api_key',
     'apollo_api_key',
     'attio_api_key',
@@ -352,7 +353,6 @@ async function main() {
     c.json({
       apify_api_key: Boolean(config.apify_api_key),
       enrichlayer_api_key: Boolean(config.enrichlayer_api_key),
-      peec_api_key: Boolean(config.peec_api_key),
       hubspot_api_key: Boolean(config.hubspot_api_key),
       apollo_api_key: Boolean(config.apollo_api_key),
       attio_api_key: Boolean(config.attio_api_key),
@@ -390,6 +390,69 @@ async function main() {
     }
     await fs.writeFile(cfgPath, lines.join('\n').trim() + '\n', 'utf-8');
     return c.json({ ok: true });
+  });
+
+  // GEO dashboard API. Thin wrappers around daemon/src/geo.ts — the web UI
+  // calls these to render charts and run ad-hoc sweeps without routing through
+  // the agent loop.
+  app.get('/api/geo/config', async (c) => {
+    await geo.ensureGeoSkeleton();
+    return c.json(await geo.loadGeoConfig());
+  });
+  app.put('/api/geo/config', async (c) => {
+    const body = await c.req.json<geo.GeoConfig>();
+    await geo.ensureGeoSkeleton();
+    await geo.saveGeoConfig(body);
+    return c.json({ ok: true });
+  });
+  app.get('/api/geo/prompts', async (c) => {
+    await geo.ensureGeoSkeleton();
+    return c.json({ prompts: await geo.listPrompts() });
+  });
+  app.post('/api/geo/prompts', async (c) => {
+    const body = await c.req.json<{ text: string; tags?: string[]; country_code?: string }>();
+    await geo.ensureGeoSkeleton();
+    const p = await geo.addPrompt(body);
+    return c.json({ ok: true, prompt: p });
+  });
+  app.delete('/api/geo/prompts/:id', async (c) => {
+    const id = c.req.param('id');
+    const removed = await geo.removePrompt(id);
+    return c.json({ ok: removed });
+  });
+  app.post('/api/geo/run', async (c) => {
+    const body = await c.req.json<{ date?: string; models?: geo.GeoModel[]; concurrency?: number }>().catch(() => ({}));
+    const summary = await geo.runDaily(config, body);
+    return c.json(summary);
+  });
+  app.get('/api/geo/runs', async (c) => {
+    return c.json({ runs: await geo.listDailySummaries() });
+  });
+  app.get('/api/geo/reports/brands', async (c) => {
+    const q = c.req.query();
+    return c.json({ rows: await geo.reportBrands({ start_date: q.start_date, end_date: q.end_date, model: q.model as geo.GeoModel }) });
+  });
+  app.get('/api/geo/reports/domains', async (c) => {
+    const q = c.req.query();
+    return c.json({ rows: await geo.reportDomains({ start_date: q.start_date, end_date: q.end_date, model: q.model as geo.GeoModel, limit: q.limit ? Number(q.limit) : undefined }) });
+  });
+  app.get('/api/geo/reports/gap-sources', async (c) => {
+    const q = c.req.query();
+    return c.json({ rows: await geo.gapSources({ start_date: q.start_date, end_date: q.end_date, model: q.model as geo.GeoModel, limit: q.limit ? Number(q.limit) : undefined }) });
+  });
+  app.get('/api/geo/reports/sov-trend', async (c) => {
+    const q = c.req.query();
+    if (!q.brand_id) return c.json({ error: 'brand_id required' }, 400);
+    return c.json({ points: await geo.sovTrend({ brand_id: q.brand_id, start_date: q.start_date, end_date: q.end_date, model: q.model as geo.GeoModel }) });
+  });
+  app.get('/api/geo/reports/delta', async (c) => {
+    const q = c.req.query();
+    return c.json(await geo.reportDelta({ start_date: q.start_date, end_date: q.end_date, model: q.model as geo.GeoModel }));
+  });
+  app.get('/api/geo/reports/sov-trend-overlay', async (c) => {
+    const q = c.req.query();
+    if (!q.brand_id) return c.json({ error: 'brand_id required' }, 400);
+    return c.json(await geo.sovTrendWithPrior({ brand_id: q.brand_id, start_date: q.start_date, end_date: q.end_date, model: q.model as geo.GeoModel }));
   });
 
   app.get('/api/tools', async (c) => {
