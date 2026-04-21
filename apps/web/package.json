@@ -1,6 +1,6 @@
 {
   "name": "@bm/web",
-  "version": "0.4.31",
+  "version": "0.4.32",
   "private": true,
   "scripts": {
     "dev": "sh -c 'next dev -p \"${BM_WEB_PORT:-7823}\"'",

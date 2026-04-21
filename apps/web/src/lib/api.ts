@@ -17,7 +17,9 @@ export type IntegrationProvider =
   | 'notion'
   | 'linear'
   | 'github'
-  | 'stripe';
+  | 'stripe'
+  | 'apify'
+  | 'amazon_ses';
 
 export type Integration = {
   provider: IntegrationProvider;

@@ -62,6 +62,16 @@ const BRAND_PATHS: Record<IntegrationProvider, string> = {
     'M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12',
   stripe:
     'M13.479 9.883c-1.626-.604-2.512-1.067-2.512-1.803 0-.622.511-.977 1.423-.977 1.667 0 3.379.642 4.558 1.22l.666-4.111c-.935-.446-2.847-1.177-5.49-1.177-1.87 0-3.425.489-4.536 1.401-1.157.957-1.755 2.34-1.755 4.005 0 3.018 1.843 4.309 4.852 5.403 1.935.691 2.585 1.18 2.585 1.935 0 .732-.625 1.155-1.756 1.155-1.398 0-3.704-.686-5.218-1.566l-.672 4.16c1.302.736 3.705 1.476 6.195 1.476 1.97 0 3.615-.467 4.726-1.353 1.246-.99 1.888-2.45 1.888-4.394 0-3.087-1.867-4.376-4.908-5.485z',
+  // Apify — bracketed "A" evoking their [a.] brand mark. Simple Icons
+  // doesn't publish an Apify glyph, so we draw a clean geometric stand-in:
+  // left/right square brackets flanking an uppercase A.
+  apify:
+    'M3 3h4v2H5v14h2v2H3V3zm18 0v18h-4v-2h2V5h-2V3h4zM12 6l-5 12h2.2l1.05-2.6h3.5L14.8 18H17L12 6zm0 4.1l1.2 3.1h-2.4L12 10.1z',
+  // Amazon SES — envelope-in-box. AWS trademark isn't in Simple Icons; we
+  // render a clean envelope silhouette so the card is recognizable as an
+  // email-sending service.
+  amazon_ses:
+    'M3 5h18a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1zm.8 2l8.2 5.3L20.2 7H3.8zM3 8.35V17h18V8.35l-8.45 5.5a1 1 0 01-1.1 0L3 8.35z',
 };
 
 function BrandLogo({ provider, color }: { provider: IntegrationProvider; color: string }) {
@@ -229,6 +239,31 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    label: 'Scraping',
+    providers: [
+      {
+        provider: 'apify',
+        name: 'Apify',
+        description: 'Run actors for Google/Reddit/X scraping. Outreach pipelines pull leads through Apify instead of hitting each site directly.',
+        oauth: false,
+        brandColor: '#00B04F',
+      },
+    ],
+  },
+  {
+    label: 'Email infrastructure',
+    providers: [
+      {
+        provider: 'amazon_ses',
+        name: 'Amazon SES',
+        description: 'Send outreach email through Amazon SES with your own verified domain — replaces Resend for cold-email sequences.',
+        oauth: false,
+        endpointField: true,
+        brandColor: '#FF9900',
+      },
+    ],
+  },
+  {
     label: 'Data',
     providers: [
       {
@@ -346,8 +381,31 @@ function IntegrationCard({
   function save() {
     const trimmed = token.trim();
     if (!trimmed) return;
-    const creds: Record<string, string> = { token: trimmed };
-    if (def.endpointField && endpoint.trim()) creds.endpoint = endpoint.trim();
+    // Amazon SES needs four fields (access key, secret, region, from).
+    // Rather than adding a special multi-field form, we accept a JSON
+    // object in the main paste box — if it parses as `{...}`, spread it
+    // into the credentials record verbatim. Any other provider keeps the
+    // existing single-token flow.
+    let creds: Record<string, string>;
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          creds = Object.fromEntries(
+            Object.entries(parsed).map(([k, v]) => [k, String(v)]),
+          );
+        } else {
+          creds = { token: trimmed };
+        }
+      } catch {
+        creds = { token: trimmed };
+      }
+    } else {
+      creds = { token: trimmed };
+    }
+    if (def.endpointField && endpoint.trim() && !creds.endpoint) {
+      creds.endpoint = endpoint.trim();
+    }
     saveMut.mutate(creds);
   }
 
@@ -407,8 +465,14 @@ function IntegrationCard({
           <textarea
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            rows={3}
-            placeholder="Paste API token"
+            rows={def.provider === 'amazon_ses' ? 6 : 3}
+            placeholder={
+              def.provider === 'amazon_ses'
+                ? '{\n  "access_key_id": "AKIA…",\n  "secret_access_key": "…",\n  "region": "us-east-1",\n  "from": "Lynn <lynn@inc.apidog.com>"\n}'
+                : def.provider === 'apify'
+                  ? 'apify_api_…'
+                  : 'Paste API token'
+            }
             className="resize-none bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-3 py-2 text-xs font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
           />
           {def.endpointField && (

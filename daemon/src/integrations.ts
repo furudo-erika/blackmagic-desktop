@@ -23,12 +23,15 @@ export type IntegrationProvider =
   | 'notion'
   | 'linear'
   | 'github'
-  | 'stripe';
+  | 'stripe'
+  | 'apify'
+  | 'amazon_ses';
 
 export const PROVIDERS: IntegrationProvider[] = [
   'hubspot', 'attio', 'salesforce', 'gong', 'unipile', 'slack', 'gmail',
   'feishu', 'metabase', 'supabase',
   'calcom', 'discord', 'telegram', 'notion', 'linear', 'github', 'stripe',
+  'apify', 'amazon_ses',
 ];
 
 export interface IntegrationRecord {

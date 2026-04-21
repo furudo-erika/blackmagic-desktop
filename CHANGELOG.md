@@ -2,6 +2,35 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.32 — 2026-04-22
+
+### Added
+- **Apify and Amazon SES integrations.** Two new cards on the
+  Integrations page: Apify (Scraping group) and Amazon SES (Email
+  infrastructure group). Apify takes a single `apify_api_…` token.
+  Amazon SES accepts a JSON blob with `access_key_id`,
+  `secret_access_key`, `region`, and `from` so a single least-privilege
+  `ses:SendEmail` key covers the whole outreach loop; the paste box
+  auto-detects a leading `{` and spreads the parsed object into the
+  credential record. Creds land in the same
+  `~/BlackMagic/.bm/integrations.json` vault as every other provider
+  and never leave the machine.
+
+### Changed
+- **Outreach switched from Resend to Amazon SES.** `doc-leads.py`'s
+  `send_email()` now calls SES v2 `SendEmail` via boto3 with the keys
+  from the amazon_ses integration record (env vars still win). Sends
+  record an `ses_message_id` in `email-log.json` instead of the old
+  `resend_id`, with the same List-Unsubscribe header + HTML/Text
+  multipart body.
+- **Apify-using scripts read from the integrations vault.**
+  `brand-monitor.py`, `reddit-marketing.py`, `linkedin-intel.py`,
+  `apify_monitor.py`, and `doc-leads.py` now resolve
+  `APIFY_API_TOKEN` from `apify` integration credentials (env var
+  takes priority). Paste the token once in the UI and every trigger
+  picks it up — no more per-script .env juggling. Shared via a new
+  `scripts/_bm_integrations.py` helper.
+
 ## 0.4.31 — 2026-04-22
 
 ### Changed
