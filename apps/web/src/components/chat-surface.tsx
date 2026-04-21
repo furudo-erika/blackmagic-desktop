@@ -18,7 +18,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Send, Bot } from 'lucide-react';
+import { Send, Bot, Check, Loader2, AlertCircle, Copy as CopyIcon, ExternalLink, Sparkles } from 'lucide-react';
 
 import { api } from '../lib/api';
 import { Markdown } from './markdown';
@@ -27,18 +27,93 @@ export type ChatScenario = { title: string; prompt: string };
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
+// Activity stream rendered inside the thinking bubble. Each tool call is one
+// row (icon · name · chip · command tail); reasoning summary deltas land as
+// a separate dimmed text block so the user sees WHY the next tool will run
+// rather than just a parade of tool names. Mirrors the Tukwork / CoWork
+// design reference the user pointed at.
+type ActivityItem =
+  | {
+      kind: 'tool';
+      id: string;
+      status: 'pending' | 'done' | 'error';
+      name: string;
+      primary?: string;   // chip — filename, domain, etc.
+      tail?: string;      // command / arg tail displayed after the chip
+      startedAt: number;
+      endedAt?: number;
+    }
+  | { kind: 'reasoning'; id: string; text: string };
+
+// Extract a short, load-bearing argument to display as a chip next to the
+// tool name — CoWork-style "Read Root CLAUDE.md" → chip `CLAUDE.md`.
+function extractToolParts(data: any): { primary?: string; tail?: string } {
+  let args: any = {};
+  const raw = data?.arguments ?? data?.args ?? data?.input;
+  if (typeof raw === 'string') {
+    try { args = JSON.parse(raw); } catch { return { tail: raw.slice(0, 120) }; }
+  } else if (raw && typeof raw === 'object') {
+    args = raw;
+  }
+  const pick = (...keys: string[]) => {
+    for (const k of keys) {
+      const v = args?.[k];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+      if (typeof v === 'number') return String(v);
+    }
+    return '';
+  };
+  const full =
+    pick('path', 'file', 'file_path') ||
+    pick('url', 'link') ||
+    pick('domain') ||
+    pick('linkedinUrl', 'linkedin_url') ||
+    pick('query', 'q', 'search') ||
+    pick('contact_path', 'sequence_path') ||
+    pick('channel', 'to', 'subject') ||
+    pick('old_path', 'new_path') ||
+    pick('text', 'prompt') ||
+    '';
+  if (!full) return {};
+  // Show the basename as the chip, full path as the tail — lets the user
+  // see "CLAUDE.md" at a glance while still getting full provenance.
+  const basename = full.split('/').pop() || full;
+  const short = basename.length > 40 ? basename.slice(0, 37) + '…' : basename;
+  const tail = full.length > basename.length + 1 ? full : undefined;
+  return { primary: short, tail };
+}
+
+function friendlyToolName(name: string): string {
+  // snake_case → Title Case, but keep domain-specific prefixes readable.
+  return name
+    .split('_')
+    .map((w) => w.length ? w[0]!.toUpperCase() + w.slice(1) : w)
+    .join(' ');
+}
+
+function Elapsed({ startedAt }: { startedAt: number }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(iv);
+  }, []);
+  void tick;
+  const s = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  if (s < 60) return <>{s}s</>;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return <>{m}m {rem}s</>;
+}
+
 function newThreadId(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
-// Render a tool-call line that actually tells the user what is happening.
-// Previously we showed "→ list_dir" / "✓ read_file" with no hint about which
-// file, URL, or domain the tool was hitting, which looked like the agent was
-// churning through opaque work. Pull the most load-bearing argument (path,
-// url, domain, query, …) and append it so each line reads like
-// "→ read_file companies/apidog.md" instead.
+// Retained for any future plaintext dump (used only internally now — the UI
+// uses extractToolParts above to render structured rows). Leaving it in place
+// so downstream code that imports it doesn't break during the transition.
 function formatToolLine(data: any): string {
   const name: string = data?.name ?? 'tool';
   let args: any = {};
@@ -90,7 +165,8 @@ export function ChatSurface({
   const [threadId, setThreadId] = useState<string>('');
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
-  const [streamingTools, setStreamingTools] = useState<string[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   // Agent picker — lets the user swap the routing agent inside Chat
   // instead of having to open /team?slug=X first. When the parent
   // passes an `agent` prop (e.g. from a deep link) we initialize with
@@ -188,9 +264,16 @@ export function ChatSurface({
   const sendMut = useMutation({
     mutationFn: async (msgs: Msg[]) => {
       setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
-      setStreamingTools([]);
+      setActivity([]);
+      setRunStartedAt(Date.now());
       let assistantText = '';
       let runId = '';
+      // Track in-flight tool calls by name so the matching `tool` completion
+      // event can upgrade the right pending row to done. We key on name +
+      // oldest pending because the stream doesn't carry a call_id through to
+      // the UI layer.
+      let toolSeq = 0;
+      const pendingByName = new Map<string, string[]>();
       await api.chatStream(msgs, {
         agent: effectiveAgent,
         threadId,
@@ -204,24 +287,39 @@ export function ChatSurface({
               return copy;
             });
           } else if (type === 'tool_pending') {
-            setStreamingTools((t) => [...t, `→ ${formatToolLine(data)}`]);
+            const id = `t-${++toolSeq}`;
+            const name = String(data?.name ?? 'tool');
+            const { primary, tail } = extractToolParts(data);
+            const list = pendingByName.get(name) ?? [];
+            list.push(id);
+            pendingByName.set(name, list);
+            setActivity((a) => [
+              ...a,
+              { kind: 'tool', id, status: 'pending', name, primary, tail, startedAt: Date.now() },
+            ]);
           } else if (type === 'tool') {
-            setStreamingTools((t) => [...t, `✓ ${formatToolLine(data)}`]);
+            const name = String(data?.name ?? 'tool');
+            const list = pendingByName.get(name) ?? [];
+            const id = list.shift();
+            pendingByName.set(name, list);
+            setActivity((a) =>
+              a.map((it) =>
+                it.kind === 'tool' && it.id === id
+                  ? { ...it, status: 'done', endedAt: Date.now() }
+                  : it,
+              ),
+            );
           } else if (type === 'reasoning' || type === 'reasoning_pending') {
-            // Model is narrating its own next step between tool calls. Render
-            // it like a dimmed tool line so the user sees the "why" instead
-            // of just a parade of tool names.
             const delta = typeof data?.delta === 'string' ? data.delta : typeof data?.text === 'string' ? data.text : '';
-            if (delta) {
-              setStreamingTools((t) => {
-                const last = t[t.length - 1] ?? '';
-                if (last.startsWith('… ')) {
-                  const merged = last + delta;
-                  return [...t.slice(0, -1), merged.length > 240 ? merged.slice(0, 237) + '…' : merged];
-                }
-                return [...t, `… ${delta}`];
-              });
-            }
+            if (!delta) return;
+            setActivity((a) => {
+              const last = a[a.length - 1];
+              if (last && last.kind === 'reasoning') {
+                const merged = { ...last, text: last.text + delta };
+                return [...a.slice(0, -1), merged];
+              }
+              return [...a, { kind: 'reasoning', id: `r-${Date.now()}`, text: delta }];
+            });
           } else if (type === 'error') {
             assistantText = assistantText
               ? assistantText + '\n\n_error_: ' + data.message
@@ -233,11 +331,6 @@ export function ChatSurface({
             });
           } else if (type === 'done') {
             runId = data.runId ?? runId;
-            // Always reconcile the last message to the authoritative final
-            // text from the server. Earlier we only filled in when the
-            // streamed text was empty, which meant a completion that
-            // streamed no text deltas stayed stuck at "(empty)" even
-            // though the JSON on disk held the real answer (QA BUG-004).
             const serverFinal = data.final != null ? String(data.final) : '';
             if (serverFinal && serverFinal !== assistantText) {
               assistantText = serverFinal;
@@ -253,11 +346,13 @@ export function ChatSurface({
       return { runId };
     },
     onSuccess: () => {
-      setStreamingTools([]);
+      setActivity([]);
+      setRunStartedAt(null);
       if (isGlobal) qc.invalidateQueries({ queryKey: ['sidebar-chats'] });
     },
     onError: (e: Error) => {
-      setStreamingTools([]);
+      setActivity([]);
+      setRunStartedAt(null);
       setMessages((prev) => {
         const copy = prev.slice();
         const last = copy[copy.length - 1];
@@ -354,44 +449,27 @@ export function ChatSurface({
         )}
         <div className="max-w-3xl mx-auto space-y-4">
           {messages.map((m, i) => {
-            // Skip the empty placeholder we push at mutation start — the
-            // "thinking…" bubble below owns that slot. Otherwise the
-            // Markdown renderer shows "(empty)" while tools are still
-            // running, right next to "thinking…", and the UI double-renders.
             if (m.role === 'assistant' && !m.content) return null;
+            const isLastAssistant = m.role === 'assistant' && i === messages.length - 1;
             return (
               <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
                 <div
                   className={
                     m.role === 'user'
                       ? 'bg-ink dark:bg-[#3A322A] text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[80%] whitespace-pre-wrap'
-                      : 'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-5 py-3 max-w-[85%]'
+                      : 'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-5 py-3 pb-2 max-w-[90%]'
                   }
                 >
                   {m.role === 'user' ? m.content : <Markdown source={m.content} />}
+                  {m.role === 'assistant' && m.content && !(isLastAssistant && sendMut.isPending) && (
+                    <MessageFooter content={m.content} />
+                  )}
                 </div>
               </div>
             );
           })}
           {sendMut.isPending && (
-            <div className="flex justify-start">
-              <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-4 py-3 text-sm max-w-[85%] space-y-1.5">
-                <div className="flex items-center gap-2 text-muted dark:text-[#8C837C]">
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-flame" />
-                  </span>
-                  {streamingTools.length > 0 ? 'working…' : 'thinking…'}
-                </div>
-                {streamingTools.length > 0 && (
-                  <ul className="space-y-0.5 text-[11px] font-mono text-muted dark:text-[#8C837C]">
-                    {streamingTools.slice(-6).map((t, i) => (
-                      <li key={i} className="truncate">{t}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
+            <ActivityBubble activity={activity} startedAt={runStartedAt} />
           )}
           <div ref={bottomRef} />
         </div>
@@ -435,3 +513,133 @@ export function ChatSurface({
 // empty kills the demo brand strings entirely; callers can still pass
 // their own `scenarios` prop (the Team cockpit does).
 const DEFAULT_SCENARIOS: ChatScenario[] = [];
+
+// ---------------------------------------------------------------------------
+// Activity bubble — the left-aligned card that replaces the old "thinking…"
+// dot while the agent is running. Renders each reasoning paragraph and each
+// tool call on its own row, with a live "Processing… Ns" elapsed timer at
+// the bottom so long autonomous runs feel alive instead of opaque.
+// ---------------------------------------------------------------------------
+function ActivityBubble({
+  activity,
+  startedAt,
+}: {
+  activity: ActivityItem[];
+  startedAt: number | null;
+}) {
+  return (
+    <div className="flex justify-start">
+      <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-5 py-3 text-sm max-w-[90%] w-full space-y-2">
+        {activity.length === 0 ? (
+          <div className="flex items-center gap-2 text-muted dark:text-[#8C837C]">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-flame" />
+            <span>Thinking…</span>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {activity.map((it) =>
+              it.kind === 'reasoning' ? (
+                <ReasoningRow key={it.id} text={it.text} />
+              ) : (
+                <ToolRow key={it.id} item={it} />
+              ),
+            )}
+          </div>
+        )}
+        {startedAt && (
+          <div className="flex items-center gap-1.5 pt-1 text-[11px] text-muted dark:text-[#8C837C]">
+            <Loader2 className="w-3 h-3 animate-spin text-flame" />
+            <span>
+              Processing… <Elapsed startedAt={startedAt} />
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ToolRow({ item }: { item: Extract<ActivityItem, { kind: 'tool' }> }) {
+  const Icon =
+    item.status === 'done' ? Check :
+    item.status === 'error' ? AlertCircle :
+    Loader2;
+  const iconClass =
+    item.status === 'done' ? 'text-[#7E8C67]' :
+    item.status === 'error' ? 'text-flame' :
+    'text-flame animate-spin';
+  return (
+    <div className="flex items-baseline gap-2 text-[12.5px] leading-snug">
+      <Icon className={`w-3.5 h-3.5 shrink-0 relative top-[2px] ${iconClass}`} />
+      <span className="text-ink dark:text-[#E6E0D8] font-medium shrink-0">
+        {friendlyToolName(item.name)}
+      </span>
+      {item.primary && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md border border-line dark:border-[#2A241D] bg-cream dark:bg-[#0F0D0A] text-[11px] font-mono text-ink dark:text-[#E6E0D8] shrink-0">
+          {item.primary}
+        </span>
+      )}
+      {item.tail && (
+        <span className="truncate text-[11px] font-mono text-muted dark:text-[#8C837C]">
+          · {item.tail}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ReasoningRow({ text }: { text: string }) {
+  const clean = text.trim();
+  if (!clean) return null;
+  return (
+    <div className="flex items-baseline gap-2 text-[12.5px] leading-snug">
+      <Sparkles className="w-3.5 h-3.5 shrink-0 relative top-[2px] text-muted dark:text-[#6B625C]" />
+      <span className="italic text-muted dark:text-[#8C837C]">{clean}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Message footer — Copy + View-as-Markdown, shown under any rendered
+// assistant message. Matches the CoWork reference's "Copy · View as
+// Markdown" row and gives the user a cleaner escape hatch than trying to
+// select the pretty-rendered markdown.
+// ---------------------------------------------------------------------------
+function MessageFooter({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+  async function onCopy() {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {}
+  }
+  function onView() {
+    try {
+      const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch {}
+  }
+  return (
+    <div className="mt-3 pt-2 border-t border-line/60 dark:border-[#2A241D]/60 flex items-center gap-3 text-[11px] text-muted dark:text-[#8C837C]">
+      <button
+        type="button"
+        onClick={onCopy}
+        className="inline-flex items-center gap-1 hover:text-flame transition-colors"
+      >
+        <CopyIcon className="w-3 h-3" />
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+      <button
+        type="button"
+        onClick={onView}
+        className="inline-flex items-center gap-1 hover:text-flame transition-colors"
+      >
+        <ExternalLink className="w-3 h-3" />
+        View as Markdown
+      </button>
+    </div>
+  );
+}

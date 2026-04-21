@@ -2,6 +2,28 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.14 — 2026-04-21
+
+### Changed
+- **Agent activity stream redesigned.** The old "thinking…" bubble
+  with its truncated 6-line tool log was replaced with a structured
+  activity stream inspired by Tukwork's CoWork surface. Each tool
+  call renders as its own row with a status icon (pending spinner /
+  ✓ done / ⚠ error), the tool name in title case, a bordered chip
+  for the load-bearing argument (filename, domain, prompt id), and
+  a muted tail with the full path / URL. Reasoning-summary deltas
+  render as italic `… <thought>` rows with a spark icon, so the
+  user sees the model's rationale for the next tool instead of a
+  parade of opaque names. A live `Processing… Ns` timer at the
+  bottom keeps long autonomous runs from feeling stalled.
+- **Assistant messages now have a Copy · View as Markdown footer.**
+  Renders below every finished assistant bubble: one-click copy of
+  the full markdown source, plus "View as Markdown" which opens the
+  raw text in a new tab (easier than trying to select pretty-
+  rendered prose). Same footer pattern as the CoWork reference so
+  shipping a long plan or report no longer requires a trip to the
+  runs page.
+
 ## 0.4.13 — 2026-04-21
 
 ### Added
