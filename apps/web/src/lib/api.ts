@@ -354,6 +354,38 @@ export const api = {
     request<GeoDeltaReport>(`/api/geo/reports/delta?${qs(q)}`),
   geoSovTrendOverlay: (q: { brand_id: string; start_date?: string; end_date?: string; model?: GeoModel }) =>
     request<GeoTrendOverlay>(`/api/geo/reports/sov-trend-overlay?${qs(q)}`),
+
+  // --- Entity activity / assignee / runs ---
+  entityActivity: (entityPath: string) =>
+    request<{ entries: EntityActivityEntry[] }>(`/api/entity/activity?path=${encodeURIComponent(entityPath)}`),
+  entityComment: (body: { path: string; body: string; parent_id?: string; author?: EntityActor }) =>
+    request<{ ok: true; entry: EntityActivityEntry }>('/api/entity/activity', { method: 'POST', body: JSON.stringify(body) }),
+  entityAssignee: (entityPath: string) =>
+    request<{ assignee: EntityAssignee }>(`/api/entity/assignee?path=${encodeURIComponent(entityPath)}`),
+  entitySetAssignee: (body: { path: string; assignee: EntityAssignee; actor?: EntityActor }) =>
+    request<{ ok: true; assignee: EntityAssignee; previous: EntityAssignee }>('/api/entity/assignee', { method: 'PUT', body: JSON.stringify(body) }),
+  entityRuns: (entityPath: string) =>
+    request<{ runs: Array<{ runId: string; agent: string; tokensIn: number; tokensOut: number; costCents: number; toolCalls: number; turns: number; preview?: string }> }>(`/api/entity/runs?path=${encodeURIComponent(entityPath)}`),
+};
+
+export type EntityActor = { type: 'member' | 'agent' | 'system'; id: string; name?: string };
+export type EntityAssignee = { type: 'agent' | 'member' | null; id: string | null; name?: string };
+export type EntityActivityEntry = {
+  id: string;
+  ts: string;
+  kind:
+    | 'comment'
+    | 'assign'
+    | 'unassign'
+    | 'status_change'
+    | 'agent_run_started'
+    | 'agent_run_finished'
+    | 'agent_run_failed';
+  author: EntityActor;
+  content?: string;
+  mentions?: string[];
+  parent_id?: string;
+  data?: Record<string, unknown>;
 };
 
 function qs(obj: Record<string, unknown>): string {

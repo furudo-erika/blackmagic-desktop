@@ -80,6 +80,10 @@ export interface RunOptions {
   /** Optional prior conversation (user + assistant turns). Prepended before `task`. */
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
   threadId?: string;
+  /** Vault path of the entity this run was scoped to (companies/X.md, etc).
+   *  Stamped into meta.json so the UI can filter live-card + history per
+   *  entity in the Multica-style detail page. */
+  entityRef?: string;
   config: Config;
   onEvent?: (ev: RunEvent) => void;
   maxTurns?: number;
@@ -353,6 +357,7 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
         turns: toolLog.length,
         preview,
         threadId: opts.threadId,
+        entity_ref: opts.entityRef,
       },
       null,
       2,

@@ -30,6 +30,7 @@ import { pushTriggers, pushDrafts } from './sync.js';
 import { runCodex, codexAvailable, CodexNotInstalled } from './codex.js';
 import matter from 'gray-matter';
 import * as geo from './geo.js';
+import * as activity from './activity.js';
 import { seedVercelDemo } from './us-demo.js';
 import {
   deriveRunPreview,
@@ -498,6 +499,71 @@ async function main() {
     const q = c.req.query();
     if (!q.brand_id) return c.json({ error: 'brand_id required' }, 400);
     return c.json(await geo.sovTrendWithPrior({ brand_id: q.brand_id, start_date: q.start_date, end_date: q.end_date, model: q.model as geo.GeoModel }));
+  });
+
+  // Activity feed + entity assignment. Every vault entity (company /
+  // contact / deal) can carry an `assignee` frontmatter field and an
+  // append-only `signals/activity/<entity-path>.jsonl` log of comments,
+  // status changes, agent runs, etc.
+  app.get('/api/entity/activity', async (c) => {
+    const p = c.req.query('path');
+    if (!p) return c.json({ error: 'path required' }, 400);
+    return c.json({ entries: await activity.listActivity(p) });
+  });
+  app.post('/api/entity/activity', async (c) => {
+    const body = await c.req.json<{
+      path: string;
+      body: string;
+      author?: activity.Actor;
+      parent_id?: string;
+    }>();
+    if (!body.path || !body.body) return c.json({ error: 'path + body required' }, 400);
+    const author: activity.Actor = body.author ?? { type: 'member', id: 'me', name: 'You' };
+    const inherited = await activity.inheritedMentionsFor(body.path, body.parent_id);
+    const entry = await activity.postComment(body.path, {
+      body: body.body,
+      author,
+      parent_id: body.parent_id,
+      inherited_mentions: inherited,
+    });
+    // Mention-triggered agent runs. For every @slug in the effective
+    // mentions (including inherited), enqueue a task scoped to this
+    // entity. We fire-and-forget — the UI polls /api/agent/runs?entity=
+    // for visibility.
+    const slugs = entry.mentions ?? [];
+    for (const slug of slugs) {
+      const task = `Continue work on ${body.path}. The latest comment from ${author.name ?? author.id}: "${body.body}"`;
+      runAgent({ agent: slug, task, config, entityRef: body.path }).catch((err) => {
+        console.error(`[activity] mention-triggered run for ${slug} failed:`, err?.message || err);
+      });
+    }
+    return c.json({ ok: true, entry });
+  });
+  app.get('/api/entity/assignee', async (c) => {
+    const p = c.req.query('path');
+    if (!p) return c.json({ error: 'path required' }, 400);
+    return c.json({ assignee: await activity.getAssignee(p) });
+  });
+  app.put('/api/entity/assignee', async (c) => {
+    const body = await c.req.json<{ path: string; assignee: activity.Assignee; actor?: activity.Actor }>();
+    if (!body.path) return c.json({ error: 'path required' }, 400);
+    const actor: activity.Actor = body.actor ?? { type: 'member', id: 'me', name: 'You' };
+    const result = await activity.setAssignee(body.path, body.assignee, actor);
+    // Assigning to an agent triggers a run on this entity. Unassigning
+    // or reassigning to a member does not.
+    if (result.assignee.type === 'agent' && result.assignee.id &&
+        (result.previous.type !== 'agent' || result.previous.id !== result.assignee.id)) {
+      const task = `You were just assigned to ${body.path}. Read that file (and related context in the vault), then execute your loop end-to-end.`;
+      runAgent({ agent: result.assignee.id, task, config, entityRef: body.path }).catch((err) => {
+        console.error(`[activity] assignment-triggered run for ${result.assignee.id} failed:`, err?.message || err);
+      });
+    }
+    return c.json({ ok: true, ...result });
+  });
+  app.get('/api/entity/runs', async (c) => {
+    const p = c.req.query('path');
+    if (!p) return c.json({ error: 'path required' }, 400);
+    return c.json({ runs: await activity.listRunsForEntity(p) });
   });
 
   app.get('/api/tools', async (c) => {

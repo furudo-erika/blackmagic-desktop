@@ -2,6 +2,28 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.23 — 2026-04-21
+
+### Changed
+- **Sidebar restored to sectioned structure (WORK / VAULT / SYSTEM).**
+  The 0.4.21 flat 6-row list hid Playbooks, Triggers, Runs under
+  "Automations" and hid Companies, Contacts, Deals under "Vault" —
+  which made recurring tasks ("what's running now?", "pull up the
+  acme contact") a two-click scan. Restored direct rows for all 13
+  destinations, grouped under lightweight uppercase section labels
+  (not clickable, no chevrons). Runs row now shows a live-pulse
+  badge when any agent is mid-run. /automations is still reachable
+  from ⌘K as a hub for newcomers.
+
+### Fixed
+- **Dashboard activity heatmap was rendering at 5× size.** The SVG
+  used `className="w-full"` with a small viewBox, so `preserveAspect
+  meet` scaled every cell + label uniformly up to ~60px squares and
+  giant "Mon/Wed/Fri/Less/More" text on wider panels. Switched to
+  fixed-pixel rendering with `maxWidth: 100%` + `height: auto` so
+  the heatmap stays at its native 11px cell size regardless of
+  container width.
+
 ## 0.4.22 — 2026-04-21
 
 ### Fixed

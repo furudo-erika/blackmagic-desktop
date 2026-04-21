@@ -3,11 +3,15 @@
 /**
  * Sidebar — Multica-inspired slim flat nav.
  *
- * 0.4.21: the 0.4.20 rewrite with six collapsible category buttons was
- * overkill — Multica uses a flat list with subtle section labels, not
- * chevron-nested trees. Each top-level item now routes directly; any
- * sub-nav lives inside the destination page (tabs on /vault,
- * /automations, etc), not in the sidebar.
+ * 0.4.23: Restored the section-headered structure from the original
+ * pre-flattening design (WORK / VAULT / SYSTEM), while keeping the
+ * Multica-style row styling introduced in 0.4.20. Section labels are
+ * plain uppercase tracking-widest mono text — not clickable, no
+ * chevrons, just visual anchors. Rationale: the 0.4.21 flat 6-row
+ * list hid Companies/Contacts/Deals/Playbooks/Triggers/Runs behind
+ * generic "Vault" + "Automations" rows, so finding "what's running"
+ * or "the acme contact" took two clicks and a scan. Direct rows
+ * scanned by section header is faster for recurring tasks.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -15,17 +19,23 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
+  BookOpen,
+  Building2,
   ChevronDown,
+  FileText,
+  History,
   Inbox,
   LayoutDashboard,
   MessageSquare,
   Moon,
+  Plug,
   Search,
   Settings as SettingsIcon,
   Sun,
   SquarePen,
   Sparkles,
-  FolderKanban,
+  Users,
+  Briefcase,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
@@ -75,6 +85,18 @@ export function Sidebar() {
   }, [drafts.data]);
 
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, staleTime: 60_000 });
+
+  // Live-run count for the Runs row badge — so you can see at a glance
+  // that something is currently working without opening the page.
+  const runs = useQuery({
+    queryKey: ['runs'],
+    queryFn: api.listRuns,
+    refetchInterval: 15_000,
+  });
+  const liveRunCount = useMemo(
+    () => (runs.data?.runs ?? []).filter((r) => !r.done).length,
+    [runs.data],
+  );
 
   // Cmd+K command palette
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -127,30 +149,33 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Flat nav — six rows. No collapse, no chevrons. Inner sub-navigation
-          lives on each destination page (tabs on /vault, /automations). */}
+      {/* Section-headered nav. Labels (WORK/VAULT/SYSTEM) are plain text,
+          not buttons — they group the rows underneath visually without
+          introducing an extra click. */}
       <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-3 pt-1">
-        <ActionRow
-          icon={SquarePen}
-          label="New chat"
-          kbd="⌘N"
-          onClick={startNewThread}
-        />
-        <ActionRow
-          icon={Search}
-          label="Search"
-          kbd="⌘K"
-          onClick={() => setPaletteOpen(true)}
-        />
+        <ActionRow icon={SquarePen} label="New chat" kbd="⌘N" onClick={startNewThread} />
+        <ActionRow icon={Search}    label="Search"   kbd="⌘K" onClick={() => setPaletteOpen(true)} />
 
         <div className="h-px bg-line dark:bg-[#2A241D] my-2 mx-2" />
 
-        <NavRow icon={MessageSquare} label="Chat" href="/" pathname={pathname} exact />
-        <NavRow icon={Inbox}          label="Inbox" href="/outreach" pathname={pathname} badge={pendingDraftCount} />
-        <NavRow icon={LayoutDashboard}label="Dashboard" href="/dashboard" pathname={pathname} />
-        <NavRow icon={FolderKanban}   label="Vault" href="/vault" pathname={pathname} />
-        <NavRow icon={Zap}            label="Automations" href="/automations" pathname={pathname} />
-        <NavRow icon={SettingsIcon}   label="Settings" href="/settings" pathname={pathname} />
+        <NavRow icon={MessageSquare}   label="Chat"      href="/"          pathname={pathname} exact />
+        <NavRow icon={Inbox}           label="Inbox"     href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
+        <NavRow icon={LayoutDashboard} label="Dashboard" href="/dashboard" pathname={pathname} />
+
+        <SectionLabel>Work</SectionLabel>
+        <NavRow icon={BookOpen} label="Playbooks" href="/playbooks" pathname={pathname} />
+        <NavRow icon={Zap}      label="Triggers"  href="/triggers"  pathname={pathname} />
+        <NavRow icon={History}  label="Runs"      href="/runs"      pathname={pathname} live={liveRunCount} />
+
+        <SectionLabel>Vault</SectionLabel>
+        <NavRow icon={Building2} label="Companies" href="/companies" pathname={pathname} />
+        <NavRow icon={Users}     label="Contacts"  href="/contacts"  pathname={pathname} />
+        <NavRow icon={Briefcase} label="Deals"     href="/deals"     pathname={pathname} />
+        <NavRow icon={FileText}  label="Files"     href="/vault"     pathname={pathname} />
+
+        <SectionLabel>System</SectionLabel>
+        <NavRow icon={Plug}         label="Integrations" href="/integrations" pathname={pathname} />
+        <NavRow icon={SettingsIcon} label="Settings"     href="/settings"     pathname={pathname} />
       </nav>
 
       {/* Footer */}
@@ -180,6 +205,14 @@ export function Sidebar() {
   );
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-3 pt-4 pb-1 text-[10px] uppercase tracking-widest font-mono text-muted/70 dark:text-[#6B625C]/80 select-none">
+      {children}
+    </div>
+  );
+}
+
 function NavRow({
   icon: Icon,
   label,
@@ -187,6 +220,7 @@ function NavRow({
   pathname,
   exact,
   badge,
+  live,
 }: {
   icon: LucideIcon;
   label: string;
@@ -194,6 +228,7 @@ function NavRow({
   pathname: string;
   exact?: boolean;
   badge?: number;
+  live?: number;
 }) {
   const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(href + '/');
   return (
@@ -208,6 +243,15 @@ function NavRow({
     >
       <Icon className="w-4 h-4 shrink-0" />
       <span className="flex-1 truncate">{label}</span>
+      {live != null && live > 0 && (
+        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-flame">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-flame" />
+          </span>
+          {live}
+        </span>
+      )}
       {badge != null && badge > 0 && (
         <span className="rounded-full px-1.5 py-0.5 text-[10px] leading-none font-medium bg-flame text-white">
           {badge}

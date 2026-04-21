@@ -287,18 +287,21 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 // max cell in the window. Pure SVG; mirrors GitHub's contribution chart.
 // ---------------------------------------------------------------------------
 function ActivityHeatmap({ grid, windowDays }: { grid: HeatCell[]; windowDays: number }) {
-  const cols = Math.ceil(windowDays / 7);
-  const rows = 7;
-  const cellSize = 12;
+  // Render at native pixel size so cells stay small and tidy instead of
+  // ballooning to 60px+ when the panel is wide. SVG is left-aligned
+  // inside the panel.
+  const cols = Math.ceil(grid.length / 7);
+  const cellSize = 11;
   const gap = 3;
-  const w = cols * (cellSize + gap) + 24;
-  const h = rows * (cellSize + gap) + 24;
+  const labelW = 22;
+  const legendH = 14;
+  const w = labelW + cols * (cellSize + gap);
+  const h = 7 * (cellSize + gap) + legendH;
   const max = Math.max(1, ...grid.map((c) => c.count));
 
   function intensity(c: number) {
     if (c === 0) return 'rgba(120,110,100,0.12)';
     const t = Math.min(1, c / max);
-    // Flame ramp — 0 → soft, 1 → full.
     const alpha = 0.2 + t * 0.8;
     return `rgba(232,93,59,${alpha.toFixed(2)})`;
   }
@@ -306,13 +309,19 @@ function ActivityHeatmap({ grid, windowDays }: { grid: HeatCell[]; windowDays: n
   const dayLabels = ['Mon', 'Wed', 'Fri'];
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" preserveAspectRatio="xMinYMin meet">
+    <svg
+      width={w}
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      style={{ maxWidth: '100%', height: 'auto' }}
+      shapeRendering="crispEdges"
+    >
       {dayLabels.map((lbl, idx) => (
         <text
           key={lbl}
           x={0}
           y={(idx * 2 + 1) * (cellSize + gap) + cellSize - 2}
-          fontSize={9}
+          fontSize={8.5}
           fill="currentColor"
           fillOpacity={0.45}
         >
@@ -322,7 +331,7 @@ function ActivityHeatmap({ grid, windowDays }: { grid: HeatCell[]; windowDays: n
       {grid.map((c, i) => {
         const col = Math.floor(i / 7);
         const row = i % 7;
-        const x = 24 + col * (cellSize + gap);
+        const x = labelW + col * (cellSize + gap);
         const y = row * (cellSize + gap);
         return (
           <rect
@@ -338,8 +347,8 @@ function ActivityHeatmap({ grid, windowDays }: { grid: HeatCell[]; windowDays: n
           </rect>
         );
       })}
-      <text x={24} y={h - 4} fontSize={9} fill="currentColor" fillOpacity={0.45}>Less</text>
-      <text x={w - 4} y={h - 4} fontSize={9} fill="currentColor" fillOpacity={0.45} textAnchor="end">More</text>
+      <text x={labelW} y={h - 2} fontSize={8.5} fill="currentColor" fillOpacity={0.45}>Less</text>
+      <text x={w - 2} y={h - 2} fontSize={8.5} fill="currentColor" fillOpacity={0.45} textAnchor="end">More</text>
     </svg>
   );
 }
