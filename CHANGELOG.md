@@ -2,6 +2,34 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.10 — 2026-04-21
+
+### Changed
+- **All 10 agent system prompts rewritten autonomous-first.** Every
+  agent now executes a full READ → PLAN → ACT → SUMMARIZE cycle in
+  one run instead of stopping midway to ask the user what to do. The
+  three classic "I can't continue without X" halt points — missing
+  ICP, empty signal file, missing personas — now auto-bootstrap with
+  a best-effort default marked `draft: true` in frontmatter so a
+  human can review later, and the agent keeps going. Halts are
+  reserved for genuine hard blockers (missing API credential a tool
+  can't run without, destructive action requiring confirmation,
+  persistent upstream 5xx) and come with a one-line statement of the
+  exact resolution needed.
+- **GEO Analyst auto-bootstraps personas + brand config.** Step 1
+  (personas < 2) now derives 2 draft personas from `us/company.md` +
+  `us/icp.md` + `us/customers/top.md`. Step 2 (no brands or no
+  `is_us: true`) infers from `us/company.md` + `us/competitors/*`
+  and calls `geo_set_brands`. Step 3 (thin prompt pool) generates
+  candidates per persona × 6 query types. The full 10-step loop now
+  runs to the weekly report without interruption.
+- **Every seeded agent gains `revision:` frontmatter.** `ensureVault`
+  now compares the template's revision vs the user's on-disk file
+  and overwrites when newer. This retires stale `peec_*` tool lists
+  on vaults seeded in 0.4.3 and ships prompt rewrites without
+  requiring manual vault cleanup. Future edits only need a revision
+  bump to propagate.
+
 ## 0.4.9 — 2026-04-21
 
 ### Fixed
