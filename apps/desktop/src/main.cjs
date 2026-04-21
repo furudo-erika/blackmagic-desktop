@@ -374,7 +374,7 @@ function pollLogAndPush(win, logPath, flagPath) {
         else if (lower.includes('moving') || lower.includes('linking')) { pct = 80; stage = 'Moving app into place…'; }
         else if (lower.includes('fetching') || lower.includes('downloading')) { pct = 40; stage = 'Downloading the DMG…'; }
         else if (lower.includes('refreshing tap') || lower.includes('updating homebrew')) { pct = 15; stage = 'Refreshing Homebrew tap…'; }
-        else if (lower.includes('auto-upgrade starting')) { pct = 5; stage = 'Waiting for previous process to exit…'; }
+        else if (lower.includes('auto-upgrade starting')) { pct = 5; stage = 'Starting upgrade…'; }
         win.webContents.send('bm:upgrade-update', { log: tail, pct, stage });
       }
     } catch {}
@@ -464,15 +464,7 @@ function launchBrewUpgradeAndRelaunch(brewPath) {
   const script = `#!/bin/sh
 set -u
 exec >>"${logPath}" 2>&1
-echo "[$(date -u +%FT%TZ)] auto-upgrade starting; waiting for pid ${pid}"
-# Wait up to 30s for the old app to fully exit so brew can replace it.
-for i in $(seq 1 60); do
-  if ! kill -0 ${pid} 2>/dev/null; then break; fi
-  sleep 0.5
-done
-# Clean any abandoned zombie daemon processes from prior upgrade attempts.
-# macOS won't let brew replace the .app while any process in it is alive.
-pkill -9 -f "/Applications/BlackMagic AI.app" 2>/dev/null || true
+echo "[$(date -u +%FT%TZ)] auto-upgrade starting; main pid ${pid} stays alive for progress window"
 # Clear stale download locks from a killed earlier upgrade — otherwise
 # brew refuses with "A brew upgrade process has already locked ..." and
 # exits 1, leaving the user on the old version.

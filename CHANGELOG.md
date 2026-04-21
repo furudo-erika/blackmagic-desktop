@@ -2,6 +2,22 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.22 — 2026-04-21
+
+### Fixed
+- **Auto-upgrade no longer hangs at "Waiting for previous process to
+  exit…".** The upgrader shell script still had the pre-0.4.19 design's
+  opening step: wait up to 30s for the main Electron pid to exit, then
+  `pkill` the app. But 0.4.19's progress-window rewrite deliberately
+  keeps the main process alive so it can host the progress BrowserWindow
+  and tail the brew log. Those two designs contradicted each other —
+  the script stalled 30s on a pid that would never exit, then `pkill`
+  killed the progress window along with the main app, and brew ran
+  blind. Dropped the opening wait + pkill; brew now starts downloading
+  immediately while the progress window shows real-time output. The
+  second wait loop near end-of-script (after brew finishes) still
+  handles the replace-and-relaunch dance as designed.
+
 ## 0.4.21 — 2026-04-21
 
 ### Changed
