@@ -1,14 +1,13 @@
 'use client';
 
 /**
- * Sidebar — Multica-inspired slim nav.
+ * Sidebar — Multica-inspired slim flat nav.
  *
- * 0.4.20 rewrite: every section is now collapsible and starts collapsed,
- * so the sidebar opens at 6 rows instead of 14. The old per-agent Team
- * section is gone; entity detail pages (/dashboard, /vault, /automations)
- * are single-tab container pages with sub-nav inside. Collapse state
- * persists per-user in localStorage so the nav remembers what you opened
- * last.
+ * 0.4.21: the 0.4.20 rewrite with six collapsible category buttons was
+ * overkill — Multica uses a flat list with subtle section labels, not
+ * chevron-nested trees. Each top-level item now routes directly; any
+ * sub-nav lives inside the destination page (tabs on /vault,
+ * /automations, etc), not in the sidebar.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -17,7 +16,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   ChevronDown,
-  ChevronRight,
   Inbox,
   LayoutDashboard,
   MessageSquare,
@@ -32,21 +30,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../lib/api';
-
-function readCollapsed(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem('bm-sidebar-collapsed');
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeCollapsed(state: Record<string, boolean>) {
-  try { localStorage.setItem('bm-sidebar-collapsed', JSON.stringify(state)); } catch {}
-}
 
 function newThreadId(): string {
   const d = new Date();
@@ -93,24 +76,7 @@ export function Sidebar() {
 
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, staleTime: 60_000 });
 
-  // Collapse state per section (all collapsed by default; persisted).
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setCollapsed(readCollapsed());
-    setHydrated(true);
-  }, []);
-  function toggleSection(key: string) {
-    setCollapsed((prev) => {
-      const next = { ...prev, [key]: prev[key] === false ? true : !prev[key] };
-      writeCollapsed(next);
-      return next;
-    });
-  }
-  // Default-collapsed semantics: missing key = collapsed.
-  const isOpen = (key: string) => collapsed[key] === false;
-
-  // Cmd+K command palette (lightweight — jumps between routes).
+  // Cmd+K command palette
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
   useEffect(() => {
@@ -133,8 +99,8 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-[240px] shrink-0 bg-cream-light dark:bg-[#17140F] border-r border-line dark:border-[#2A241D] flex flex-col min-h-0">
-      {/* macOS traffic-light gutter — whole band is window-drag. */}
+    <aside className="w-[220px] shrink-0 bg-cream-light dark:bg-[#17140F] border-r border-line dark:border-[#2A241D] flex flex-col min-h-0">
+      {/* macOS traffic-light gutter */}
       <div
         className="pt-10 pb-2 pl-[84px] pr-3 flex items-center gap-2 shrink-0"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
@@ -145,8 +111,8 @@ export function Sidebar() {
         </span>
       </div>
 
-      {/* Project switcher pill */}
-      <div className="px-3 pb-2 shrink-0">
+      {/* Project switcher */}
+      <div className="px-2 pb-1.5 shrink-0">
         <button
           type="button"
           onClick={openProjectPicker}
@@ -161,108 +127,30 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Top actions: New chat + Search (⌘K) */}
-      <div className="px-2 pb-3 shrink-0 flex flex-col gap-0.5">
-        <button
+      {/* Flat nav — six rows. No collapse, no chevrons. Inner sub-navigation
+          lives on each destination page (tabs on /vault, /automations). */}
+      <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-3 pt-1">
+        <ActionRow
+          icon={SquarePen}
+          label="New chat"
+          kbd="⌘N"
           onClick={startNewThread}
-          className="flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-ink/80 dark:text-[#E6E0D8]/80 hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 hover:text-ink dark:hover:text-[#F5F1EA] rounded-md transition-colors"
-        >
-          <SquarePen className="w-4 h-4 shrink-0" />
-          <span className="flex-1 text-left truncate">New chat</span>
-          <kbd className="text-[10px] font-mono text-muted/60 dark:text-[#6B625C]">⌘N</kbd>
-        </button>
-        <button
+        />
+        <ActionRow
+          icon={Search}
+          label="Search"
+          kbd="⌘K"
           onClick={() => setPaletteOpen(true)}
-          className="flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium text-ink/80 dark:text-[#E6E0D8]/80 hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 hover:text-ink dark:hover:text-[#F5F1EA] rounded-md transition-colors"
-        >
-          <Search className="w-4 h-4 shrink-0" />
-          <span className="flex-1 text-left truncate">Search</span>
-          <kbd className="text-[10px] font-mono text-muted/60 dark:text-[#6B625C]">⌘K</kbd>
-        </button>
-      </div>
+        />
 
-      <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-3">
-        <NavGroup
-          label="Chat"
-          icon={MessageSquare}
-          href="/"
-          pathname={pathname}
-          open={isOpen('chat')}
-          onToggle={() => toggleSection('chat')}
-          hydrated={hydrated}
-        >
-          <NavChild label="All chats" href="/" pathname={pathname} exact />
-          <NavChild label="Drafts" href="/outreach" pathname={pathname} badge={pendingDraftCount} />
-        </NavGroup>
+        <div className="h-px bg-line dark:bg-[#2A241D] my-2 mx-2" />
 
-        <NavGroup
-          label="Inbox"
-          icon={Inbox}
-          href="/outreach"
-          pathname={pathname}
-          open={isOpen('inbox')}
-          onToggle={() => toggleSection('inbox')}
-          hydrated={hydrated}
-          badge={pendingDraftCount}
-        >
-          <NavChild label="Pending drafts" href="/outreach" pathname={pathname} />
-        </NavGroup>
-
-        <NavGroup
-          label="Dashboard"
-          icon={LayoutDashboard}
-          href="/dashboard"
-          pathname={pathname}
-          open={isOpen('dashboard')}
-          onToggle={() => toggleSection('dashboard')}
-          hydrated={hydrated}
-        >
-          <NavChild label="Overview" href="/dashboard" pathname={pathname} />
-          <NavChild label="Runs" href="/runs" pathname={pathname} />
-        </NavGroup>
-
-        <NavGroup
-          label="Vault"
-          icon={FolderKanban}
-          href="/vault"
-          pathname={pathname}
-          open={isOpen('vault')}
-          onToggle={() => toggleSection('vault')}
-          hydrated={hydrated}
-        >
-          <NavChild label="Companies" href="/companies" pathname={pathname} />
-          <NavChild label="Contacts" href="/contacts" pathname={pathname} />
-          <NavChild label="Deals" href="/deals" pathname={pathname} />
-          <NavChild label="Files" href="/vault" pathname={pathname} />
-        </NavGroup>
-
-        <NavGroup
-          label="Automations"
-          icon={Zap}
-          href="/automations"
-          pathname={pathname}
-          open={isOpen('automations')}
-          onToggle={() => toggleSection('automations')}
-          hydrated={hydrated}
-        >
-          <NavChild label="Skills" href="/playbooks" pathname={pathname} />
-          <NavChild label="Triggers" href="/triggers" pathname={pathname} />
-          <NavChild label="GEO" href="/geo" pathname={pathname} />
-          <NavChild label="Runs" href="/runs" pathname={pathname} />
-        </NavGroup>
-
-        <NavGroup
-          label="Settings"
-          icon={SettingsIcon}
-          href="/settings"
-          pathname={pathname}
-          open={isOpen('settings')}
-          onToggle={() => toggleSection('settings')}
-          hydrated={hydrated}
-        >
-          <NavChild label="General" href="/settings" pathname={pathname} />
-          <NavChild label="Integrations" href="/integrations" pathname={pathname} />
-        </NavGroup>
+        <NavRow icon={MessageSquare} label="Chat" href="/" pathname={pathname} exact />
+        <NavRow icon={Inbox}          label="Inbox" href="/outreach" pathname={pathname} badge={pendingDraftCount} />
+        <NavRow icon={LayoutDashboard}label="Dashboard" href="/dashboard" pathname={pathname} />
+        <NavRow icon={FolderKanban}   label="Vault" href="/vault" pathname={pathname} />
+        <NavRow icon={Zap}            label="Automations" href="/automations" pathname={pathname} />
+        <NavRow icon={SettingsIcon}   label="Settings" href="/settings" pathname={pathname} />
       </nav>
 
       {/* Footer */}
@@ -292,67 +180,15 @@ export function Sidebar() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Group row — clickable to expand/collapse; whole row links to the "home" of
-// the section. Row click toggles; chevron is decorative. Active styling when
-// the current pathname is in the section tree.
-// ---------------------------------------------------------------------------
-function NavGroup({
-  label,
+function NavRow({
   icon: Icon,
-  href,
-  pathname,
-  open,
-  onToggle,
-  hydrated,
-  badge,
-  children,
-}: {
-  label: string;
-  icon: LucideIcon;
-  href: string;
-  pathname: string;
-  open: boolean;
-  onToggle: () => void;
-  hydrated: boolean;
-  badge?: number;
-  children: React.ReactNode;
-}) {
-  const isInSection = pathname === href || pathname.startsWith(href + '/');
-  const Chevron = open ? ChevronDown : ChevronRight;
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={onToggle}
-        className={
-          'w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-md transition-colors ' +
-          (isInSection
-            ? 'bg-white dark:bg-[#1F1B15] text-ink dark:text-[#F5F1EA]'
-            : 'text-ink/80 dark:text-[#E6E0D8]/80 hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 hover:text-ink dark:hover:text-[#F5F1EA]')
-        }
-      >
-        <Chevron className="w-3 h-3 shrink-0 text-muted/70 dark:text-[#6B625C]" />
-        <Icon className="w-4 h-4 shrink-0" />
-        <span className="flex-1 text-left truncate">{label}</span>
-        {badge != null && badge > 0 && (
-          <span className="rounded-full px-1.5 py-0.5 text-[10px] leading-none font-medium bg-flame text-white">
-            {badge}
-          </span>
-        )}
-      </button>
-      {hydrated && open && <div className="ml-5 mt-0.5 flex flex-col gap-0.5 pl-2 border-l border-line/60 dark:border-[#2A241D]/60">{children}</div>}
-    </div>
-  );
-}
-
-function NavChild({
   label,
   href,
   pathname,
   exact,
   badge,
 }: {
+  icon: LucideIcon;
   label: string;
   href: string;
   pathname: string;
@@ -364,12 +200,13 @@ function NavChild({
     <Link
       href={href}
       className={
-        'flex items-center gap-2 pl-2 pr-3 py-1.5 text-[12.5px] rounded-md transition-colors ' +
+        'flex items-center gap-2.5 px-3 py-2 text-[13px] rounded-md transition-colors ' +
         (isActive
-          ? 'text-ink dark:text-[#F5F1EA] bg-white/80 dark:bg-[#1F1B15]/80'
-          : 'text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]')
+          ? 'bg-white dark:bg-[#1F1B15] text-ink dark:text-[#F5F1EA] font-medium'
+          : 'text-ink/80 dark:text-[#E6E0D8]/80 hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 hover:text-ink dark:hover:text-[#F5F1EA]')
       }
     >
+      <Icon className="w-4 h-4 shrink-0" />
       <span className="flex-1 truncate">{label}</span>
       {badge != null && badge > 0 && (
         <span className="rounded-full px-1.5 py-0.5 text-[10px] leading-none font-medium bg-flame text-white">
@@ -380,10 +217,31 @@ function NavChild({
   );
 }
 
+function ActionRow({
+  icon: Icon,
+  label,
+  kbd,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  kbd: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink/80 dark:text-[#E6E0D8]/80 hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 hover:text-ink dark:hover:text-[#F5F1EA] rounded-md transition-colors"
+    >
+      <Icon className="w-4 h-4 shrink-0" />
+      <span className="flex-1 text-left truncate">{label}</span>
+      <kbd className="text-[10px] font-mono text-muted/60 dark:text-[#6B625C]">{kbd}</kbd>
+    </button>
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Minimal ⌘K palette — jumps between routes. Not a full search index; the
-// plan for batch 2 is to also index Companies / Contacts / Deals / Drafts
-// results from the daemon so the palette becomes global search.
+// ⌘K palette — jumps between routes.
 // ---------------------------------------------------------------------------
 function CommandPalette({
   query,

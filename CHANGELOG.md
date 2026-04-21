@@ -2,6 +2,18 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.21 — 2026-04-21
+
+### Changed
+- **Sidebar flat again — dropped the category/chevron structure.**
+  0.4.20 wrapped every destination in a collapsible category with a
+  chevron; Multica's sidebar is a flat list of rows with subtle
+  section labels, not nested trees. Sidebar is now six flat rows:
+  Chat · Inbox · Dashboard · Vault · Automations · Settings. Inner
+  sub-navigation lives on each destination page (tabs on `/vault`,
+  `/automations`) rather than in the nav. New chat + ⌘K Search
+  remain pinned at the top, separated by a thin divider.
+
 ## 0.4.20 — 2026-04-21
 
 ### Changed
