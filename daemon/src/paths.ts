@@ -66,12 +66,12 @@ export function loadConfig(): Config {
   // never exposes them. Client only auths with its own ck_.
   //
   // Two URLs:
-  //   billing_url    — blackmagic.run (dashboard, /auth/cli, /api/token-events, /api/sync/*)
-  //   zenn_base_url  — api.blackmagic.run/api/v1 (OpenAI-shape proxy: /responses etc.)
+  //   billing_url    — blackmagic.engineering (dashboard, /auth/cli, /api/token-events, /api/sync/*)
+  //   zenn_base_url  — api.blackmagic.engineering/api/v1 (OpenAI-shape proxy: /responses etc.)
   //                    Codex appends /responses to whatever this is. Do not include trailing slash.
   // In dev both resolve to localhost:3001.
-  const billingUrl = process.env.BM_BILLING_URL ?? 'https://blackmagic.run';
-  const apiUrl = process.env.BM_API_URL ?? billingUrl.replace('blackmagic.run', 'api.blackmagic.run');
+  const billingUrl = process.env.BM_BILLING_URL ?? 'https://blackmagic.engineering';
+  const apiUrl = process.env.BM_API_URL ?? billingUrl.replace('blackmagic.engineering', 'api.blackmagic.engineering');
   const defaultZennBase = `${apiUrl.replace(/\/+$/, '')}/v1`;
   const base: Config = {
     vault_path: vault,

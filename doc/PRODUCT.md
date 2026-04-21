@@ -4,7 +4,7 @@
 
 Black Magic Desktop is a local, open-source Electron app that runs a personal AI GTM engineer on top of a markdown vault. You install it, point it at your Zenn-issued API key, and a codex-class model can now read and edit your companies / contacts / deals / playbooks as plain `.md` files on disk.
 
-No company, contact, deal, or memory content ever leaves your machine. The cloud (blackmagic.run + zenn.engineering) only sees authentication and per-request token counts for billing.
+No company, contact, deal, or memory content ever leaves your machine. The cloud (blackmagic.engineering + zenn.engineering) only sees authentication and per-request token counts for billing.
 
 ## Core Principles
 
@@ -15,7 +15,7 @@ No company, contact, deal, or memory content ever leaves your machine. The cloud
 5. **Unopinionated tools.** Tools come from three places: (a) built-ins the daemon ships with (file ops, web fetch, grep), (b) MCP servers the user configures in `.bm/mcp.json`, (c) per-agent tool lists declared in `agents/<name>.md` frontmatter.
 6. **Triggers are cron + webhook.** A trigger is a markdown file with a schedule or inbound URL. When it fires, the daemon spawns an agent run against a playbook.
 7. **Approval gates, not autonomy.** Outbound side effects (send email, post to LinkedIn, mutate CRM) produce a draft in `drafts/` first. A human clicks Approve. No autopilot outreach.
-8. **Cloud is a bill meter.** `blackmagic.run` receives `{tokens_in, tokens_out, model, timestamp}` per agent call, charges the user's `user_credit` in cents, and nothing else. Vault content is never uploaded.
+8. **Cloud is a bill meter.** `blackmagic.engineering` receives `{tokens_in, tokens_out, model, timestamp}` per agent call, charges the user's `user_credit` in cents, and nothing else. Vault content is never uploaded.
 
 ## What It Is Not
 
@@ -26,11 +26,11 @@ No company, contact, deal, or memory content ever leaves your machine. The cloud
 
 ## User Flow (V1)
 
-1. Download `Black Magic-<ver>.dmg` (or `.exe`) from blackmagic.run.
-2. Launch, sign in with your blackmagic.run account, paste (or auto-retrieve) a `ck_` key.
+1. Download `Black Magic-<ver>.dmg` (or `.exe`) from blackmagic.engineering.
+2. Launch, sign in with your blackmagic.engineering account, paste (or auto-retrieve) a `ck_` key.
 3. App writes the key to `~/BlackMagic/.bm/config.toml`, seeds the vault skeleton, starts the daemon on 127.0.0.1.
 4. Open Chat: "Enrich acme.com and draft a first-touch email to their head of RevOps."
-5. Agent (gpt-5.3-codex) calls `web_fetch`, `pdl_enrich`, writes `companies/acme.md`, writes `drafts/acme-first-touch-<ts>.md`. Token count posts to blackmagic.run.
+5. Agent (gpt-5.3-codex) calls `web_fetch`, `pdl_enrich`, writes `companies/acme.md`, writes `drafts/acme-first-touch-<ts>.md`. Token count posts to blackmagic.engineering.
 6. User reviews the draft, clicks Approve → Gmail MCP sends it.
 
 ## Pricing Model

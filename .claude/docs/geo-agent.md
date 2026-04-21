@@ -22,7 +22,7 @@ measure that every day, and show change over time.
 
 ```
 desktop daemon
-  → POST https://blackmagic.run/api/agent-tools/geo_{chatgpt,pplx,ai_overview}
+  → POST https://blackmagic.engineering/api/agent-tools/geo_{chatgpt,pplx,ai_overview}
   → auth: Bearer ck_…  (user's desktop key)
   → blackmagic-web validates ck_, checks credits, enforces daily cap
   → forwards to upstream (Railway relay / Perplexity / SerpAPI)

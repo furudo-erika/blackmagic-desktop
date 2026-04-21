@@ -23,7 +23,7 @@ Build contract. When this doc conflicts with `PRODUCT.md`, this doc controls V1.
    - Settings (API key, vault path, model, billing balance)
 8. Trigger runtime (cron + webhook) in the daemon.
 9. Draft → approve → send pipeline with Gmail MCP.
-10. Token metering → `blackmagic.run/api/token-events`.
+10. Token metering → `blackmagic.engineering/api/token-events`.
 
 ## 2. V1 Scope — Out
 
@@ -79,7 +79,7 @@ Build contract. When this doc conflicts with `PRODUCT.md`, this doc controls V1.
 | Vault path | `~/BlackMagic/` | `BM_VAULT_PATH` / `.bm/config.toml` |
 | Model | `gpt-5.3-codex` | `.bm/config.toml` `default_model` |
 | Zenn base URL | `https://zenn.engineering/api/v1` | `ZENN_BASE_URL` |
-| Billing backend | `https://blackmagic.run` | `BM_BILLING_URL` |
+| Billing backend | `https://blackmagic.engineering` | `BM_BILLING_URL` |
 
 ## 6. HTTP API (daemon)
 
@@ -121,7 +121,7 @@ WS   /ws                             → run events, file change events
 
 ## 8. Success Criteria for V1
 
-1. `pnpm package:mac` produces a runnable `.dmg` that seeds a vault, opens Chat, lets me send "Enrich acme.com", produces `companies/acme.md` with non-empty frontmatter, and deducts credits via a visible balance change on blackmagic.run.
+1. `pnpm package:mac` produces a runnable `.dmg` that seeds a vault, opens Chat, lets me send "Enrich acme.com", produces `companies/acme.md` with non-empty frontmatter, and deducts credits via a visible balance change on blackmagic.engineering.
 2. `pnpm package:win` produces a runnable `.exe` with the same flow.
 3. Re-launching the app finds the existing vault and resumes without re-seeding.
 4. Supabase schema has only billing/auth tables; no domain data.

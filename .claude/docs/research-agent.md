@@ -35,7 +35,7 @@ None direct. Playbooks that delegate to it: `enrich-company`,
 ## Dependencies
 
 - `enrich_company` / `enrich_contact` / `enrich_contact_linkedin` — all
-  proxied through `blackmagic.run/api/agent-tools/*` using the user's
+  proxied through `blackmagic.engineering/api/agent-tools/*` using the user's
   `ck_` token. No BYO key required on the desktop side.
 - `web_search` is OpenAI Responses built-in; billed per search by the
   proxy.

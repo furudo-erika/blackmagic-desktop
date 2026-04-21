@@ -132,18 +132,18 @@ const web_fetch: ToolDef = {
     required: ['url'],
   },
   handler: async (args) => {
-    const res = await fetch(args.url, { headers: { 'User-Agent': 'BlackMagic/0.1 (+https://blackmagic.run)' } });
+    const res = await fetch(args.url, { headers: { 'User-Agent': 'BlackMagic/0.1 (+https://blackmagic.engineering)' } });
     const text = (await res.text()).slice(0, 20_000);
     return { status: res.status, text };
   },
 };
 
-// Both web_search and enrich_company are proxied through blackmagic.run so the
+// Both web_search and enrich_company are proxied through blackmagic.engineering so the
 // user doesn't manage third-party keys. Server side charges the user's
 // credits per call and forwards the response. Authed with the vault's ck_.
 async function proxyTool(toolName: string, args: Record<string, unknown>, ctx: ToolCtx) {
   const key = ctx.config.zenn_api_key;
-  const base = (ctx.config.billing_url ?? 'https://blackmagic.run').replace(/\/+$/, '');
+  const base = (ctx.config.billing_url ?? 'https://blackmagic.engineering').replace(/\/+$/, '');
   if (!key) return { error: 'not signed in; no ck_ key available' };
   const res = await fetch(`${base}/api/agent-tools/${toolName}`, {
     method: 'POST',
@@ -164,7 +164,7 @@ async function proxyTool(toolName: string, args: Record<string, unknown>, ctx: T
 const deep_research: ToolDef = {
   name: 'deep_research',
   description:
-    'Multi-hop web research via Perplexity sonar-deep-research, proxied through blackmagic.run. Spends a few minutes, returns a structured report with inline citations. Use for account briefs, competitor teardowns, market scans — NOT for quick factual lookups (use the model\'s built-in web_search for those).',
+    'Multi-hop web research via Perplexity sonar-deep-research, proxied through blackmagic.engineering. Spends a few minutes, returns a structured report with inline citations. Use for account briefs, competitor teardowns, market scans — NOT for quick factual lookups (use the model\'s built-in web_search for those).',
   parameters: {
     type: 'object',
     properties: {

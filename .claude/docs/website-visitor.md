@@ -36,7 +36,7 @@ landing in `signals/visitors/` and invokes this agent.
 ## Dependencies
 
 - **ICP must exist** (`us/icp.md`). Agent refuses to score without it.
-- `enrich_company` / `enrich_contact` (proxied through blackmagic.run)
+- `enrich_company` / `enrich_contact` (proxied through blackmagic.engineering)
 - Optional: `hubspot_api_key` for HubSpot object creation
 
 ## Quirks

@@ -178,18 +178,18 @@ export default function SettingsPage() {
             <p className="text-[11px] text-muted dark:text-[#8C837C]">
               Manage all keys at{' '}
               <a
-                href="https://blackmagic.run/dashboard/api-keys"
+                href="https://blackmagic.engineering/dashboard/api-keys"
                 onClick={(e) => {
                   if (window.bmBridge?.openExternal) {
                     e.preventDefault();
-                    window.bmBridge.openExternal('https://blackmagic.run/dashboard/api-keys');
+                    window.bmBridge.openExternal('https://blackmagic.engineering/dashboard/api-keys');
                   }
                 }}
                 target="_blank"
                 rel="noreferrer"
                 className="text-flame underline"
               >
-                blackmagic.run/dashboard/api-keys
+                blackmagic.engineering/dashboard/api-keys
               </a>. Revoke this key to sign out.
             </p>
           </Section>

@@ -254,12 +254,12 @@ async function main() {
   });
 
   // OAuth-like handshake: renderer calls /api/auth/start to mint a state and
-  // get the browser URL to open. User signs in on blackmagic.run and gets
+  // get the browser URL to open. User signs in on blackmagic.engineering and gets
   // redirected to /auth/callback?token=ck_...&state=... — callback persists
   // the key to config.toml and shows a success page.
   app.get('/api/auth/start', (c) => {
     const state = issueOAuthState();
-    const billingUrl = (config.billing_url ?? 'https://blackmagic.run').replace(/\/+$/, '');
+    const billingUrl = (config.billing_url ?? 'https://blackmagic.engineering').replace(/\/+$/, '');
     // blackmagic-ai already has /auth/cli that handles login + authorize +
     // redirect-to-callback. We embed our state into the callback URL so the
     // site echoes it back untouched.
@@ -290,7 +290,7 @@ async function main() {
       `[oauth] /auth/callback hit  state=${state.slice(0, 8)}…  token=${token ? token.slice(0, 8) + '…' : '(missing)'}`,
     );
     if (!token.startsWith('ck_') || token.length < 10) {
-      return c.html(callbackPage('Invalid key', 'The key returned by blackmagic.run was malformed.', false), 400);
+      return c.html(callbackPage('Invalid key', 'The key returned by blackmagic.engineering was malformed.', false), 400);
     }
     if (!consumeOAuthState(state)) {
       return c.html(
@@ -313,10 +313,10 @@ async function main() {
     config.zenn_api_key = token;
 
     // Belt-and-suspenders: 302 the browser back to the public site's
-    // "signed in" page. The user's browser tab ends up on blackmagic.run,
+    // "signed in" page. The user's browser tab ends up on blackmagic.engineering,
     // not on 127.0.0.1 — less jarring, zero security cost (the key is
     // already in config.toml before we redirect).
-    const billing = (config.billing_url ?? 'https://blackmagic.run').replace(/\/+$/, '');
+    const billing = (config.billing_url ?? 'https://blackmagic.engineering').replace(/\/+$/, '');
     return c.redirect(`${billing}/auth/cli/done`, 302);
   });
 
@@ -607,10 +607,10 @@ async function main() {
   app.get('/api/integrations/:provider/oauth/start', async (c) => {
     const provider = c.req.param('provider') as IntegrationProvider;
     if (!PROVIDERS.includes(provider)) return c.json({ error: 'unknown provider' }, 400);
-    const billing = (config.billing_url ?? 'https://blackmagic.run');
+    const billing = (config.billing_url ?? 'https://blackmagic.engineering');
     return c.json(oauthStartUrl(provider, port, LOCAL_TOKEN, billing));
   });
-  // Browser-facing OAuth callback — bounce from blackmagic.run returns here.
+  // Browser-facing OAuth callback — bounce from blackmagic.engineering returns here.
   app.get('/integrations/:provider/callback', async (c) => {
     const provider = c.req.param('provider') as IntegrationProvider;
     const token = c.req.query('token');

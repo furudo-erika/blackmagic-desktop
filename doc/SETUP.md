@@ -37,7 +37,7 @@ To use a different location, set `BM_VAULT_PATH` before launching, or edit `~/Bl
 | `ZENN_BASE_URL` | `https://zenn.engineering/api/v1` |
 | `BM_DEFAULT_MODEL` | `gpt-5.3-codex` |
 | `BM_DAEMON_PORT` | ephemeral (allocated at boot) |
-| `BM_BILLING_URL` | `https://blackmagic.run` |
+| `BM_BILLING_URL` | `https://blackmagic.engineering` |
 
 ## Troubleshooting
 
@@ -49,6 +49,6 @@ To use a different location, set `BM_VAULT_PATH` before launching, or edit `~/Bl
 
 **`zenn 401`** — invalid or missing `ck_` key. Re-paste in Settings.
 
-**`zenn 402`** — credits exhausted. Top up at https://blackmagic.run/dashboard/billing.
+**`zenn 402`** — credits exhausted. Top up at https://blackmagic.engineering/dashboard/billing.
 
 **UI shows "daemon not connected"** — wait a few seconds on first launch (vault seeding + port binding). Restart the app if it persists.

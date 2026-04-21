@@ -2,6 +2,22 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.27 — 2026-04-21
+
+### Changed
+- **Domain migrated: `blackmagic.run` → `blackmagic.engineering`.**
+  Every hardcoded URL, default config value, documentation string,
+  comment, and changelog reference across both repos has been
+  rewritten. API subdomain moves correspondingly
+  (`api.blackmagic.run` → `api.blackmagic.engineering`). The
+  desktop daemon's billing-URL default, the web app's
+  `NEXT_PUBLIC_BASE_URL`, the upgrade cask references, and the
+  `auto-upgrade` log all point at the new domain out of the box.
+  Users can keep the old domain pinned in their local
+  `.bm/config.toml` or Vercel env if they want to stage the cutover,
+  since every URL is env-var overrideable. Old domain kept as a
+  301 redirect upstream to avoid breaking any existing bookmarks.
+
 ## 0.4.26 — 2026-04-21
 
 ### Restored
@@ -420,7 +436,7 @@ All notable changes to BlackMagic AI. Dates in UTC.
 - **GEO is now native.** Drops the Peec AI integration and replaces it
   with a daily sweep that runs your seed-prompt pool through ChatGPT
   (gpt-5.2 + web_search), Perplexity Sonar, and Google AI Overview
-  (via SerpAPI) — all proxied through blackmagic.run, so you never
+  (via SerpAPI) — all proxied through blackmagic.engineering, so you never
   manage upstream keys. Credits are charged at OpenAI / Perplexity /
   SerpAPI list price + 10% markup (8¢ / 2¢ / 2¢ per call). Results
   land in `signals/geo/runs/<date>/<model>/<prompt>.json`.
@@ -445,7 +461,7 @@ All notable changes to BlackMagic AI. Dates in UTC.
 ### Removed
 - **Peec AI integration.** The nine `peec_*` tools are gone. The
   `peec_api_key` setting is retired — proxying through
-  blackmagic.run means no per-user third-party key to manage.
+  blackmagic.engineering means no per-user third-party key to manage.
 
 ## 0.4.6 — 2026-04-21
 
@@ -803,7 +819,7 @@ distribution stack forward.
 ### Fixed
 - **Chat 404 "endpoint not available on API subdomain"** — middleware
   accepts both `/v1/*` (canonical) and `/api/v1/*` (legacy) on
-  `api.blackmagic.run`.
+  `api.blackmagic.engineering`.
 - **Gatekeeper "app is damaged"** — Homebrew cask under
   `blackmagic-ai/tap`; ad-hoc signing in afterPack; `postflight` runs
   `xattr -cr` as a backstop.

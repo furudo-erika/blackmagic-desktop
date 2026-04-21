@@ -182,7 +182,7 @@ interface ModelResult {
   error?: string;
 }
 
-// All three model providers hit the blackmagic.run proxy, authed with the
+// All three model providers hit the blackmagic.engineering proxy, authed with the
 // user's ck_ key. The proxy holds the upstream credentials, charges credits
 // from the user's balance (at OpenAI/Perplexity/SerpAPI list price + 10%
 // markup), and never exposes the upstream URL to the desktop. Every model
@@ -190,7 +190,7 @@ interface ModelResult {
 async function callProxy(toolName: 'geo_chatgpt' | 'geo_pplx' | 'geo_ai_overview', body: Record<string, unknown>, cfg: Config): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
   const key = cfg.zenn_api_key;
   if (!key) return { ok: false, status: 0, data: null, error: 'not signed in (no ck_ key)' };
-  const base = (cfg.billing_url ?? 'https://blackmagic.run').replace(/\/+$/, '');
+  const base = (cfg.billing_url ?? 'https://blackmagic.engineering').replace(/\/+$/, '');
   try {
     const res = await fetch(`${base}/api/agent-tools/${toolName}`, {
       method: 'POST',
@@ -510,7 +510,7 @@ export async function runDaily(cfg: Config, opts: { date?: string; models?: GeoM
 }
 
 function missingKeyReason(_m: GeoModel, cfg: Config): string | null {
-  // All three tools are proxied through blackmagic.run now. Only pre-flight
+  // All three tools are proxied through blackmagic.engineering now. Only pre-flight
   // check we need is that the user is signed in (has a ck_ key).
   if (!cfg.zenn_api_key) return 'not signed in (run `bm auth` or set ZENN_API_KEY)';
   return null;

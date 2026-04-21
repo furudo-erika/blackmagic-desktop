@@ -8,7 +8,7 @@
  *
  * A "runtime" here is one of:
  *   - local desktop (this machine, talking to the local daemon)
- *   - cloud proxy  (api.blackmagic.run — billed calls)
+ *   - cloud proxy  (api.blackmagic.engineering — billed calls)
  *   - each configured project vault (since each has its own runs/ dir)
  *
  * Everything renders with pure SVG for the charts to avoid adding recharts
@@ -47,7 +47,7 @@ export default function DashboardPage() {
     });
     rows.push({
       id: 'cloud',
-      name: 'Cloud (blackmagic.run)',
+      name: 'Cloud (blackmagic.engineering)',
       subtitle: health.data?.zennConfigured ? 'signed in' : 'not signed in',
       icon: 'cloud',
       status: health.data?.zennConfigured ? 'online' : 'offline',

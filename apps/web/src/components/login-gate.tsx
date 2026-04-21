@@ -218,7 +218,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
             disabled={authStarting}
             className="w-full h-11 rounded-md bg-flame text-white text-sm font-medium disabled:opacity-40 flex items-center justify-center gap-2"
           >
-            {authStarting ? 'Opening browser…' : 'Sign in with blackmagic.run'}
+            {authStarting ? 'Opening browser…' : 'Sign in with blackmagic.engineering'}
           </button>
 
           {err && (
@@ -230,14 +230,14 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           <p className="mt-3 text-[12px] text-muted text-center">
             No account?{' '}
             <a
-              href="https://blackmagic.run/register"
+              href="https://blackmagic.engineering/register"
               target="_blank"
               rel="noreferrer"
               className="text-flame underline"
               onClick={(e) => {
                 if (window.bmBridge?.openExternal) {
                   e.preventDefault();
-                  window.bmBridge.openExternal('https://blackmagic.run/register');
+                  window.bmBridge.openExternal('https://blackmagic.engineering/register');
                 }
               }}
             >
