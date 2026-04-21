@@ -2,6 +2,25 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.2 — 2026-04-21
+
+### Removed
+- **Demo brand names in Chat default scenarios.** `DEFAULT_SCENARIOS`
+  still held six GTM prompt templates referencing `acme.com`,
+  `beta-corp`, `jane@acme.com` even though the rendered scenario
+  cards were dropped in 0.3.4 — the array still shipped in the
+  bundle and its `length > 0` was what gated the "What do you want
+  to do? / Reference files in your vault with [[wikilinks]]" copy.
+  Array is now empty; Chat's empty state is blank unless a caller
+  passes its own `scenarios`. The Team cockpit's agent-scoped
+  scenarios are unaffected.
+
+### Changed
+- **Empty-state renders scenario cards when callers provide them.**
+  For callers that do pass `scenarios` (e.g. agent-specific chats),
+  the cards come back as a tidy grid, without the generic
+  "What do you want to do?" title on top.
+
 ## 0.4.1 — 2026-04-21
 
 ### Fixed

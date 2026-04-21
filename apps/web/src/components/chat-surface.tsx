@@ -18,7 +18,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Send, MessageSquare, Bot } from 'lucide-react';
+import { Send, Bot } from 'lucide-react';
 
 import { api } from '../lib/api';
 import { Markdown } from './markdown';
@@ -305,15 +305,22 @@ export function ChatSurface({
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {messages.length === 0 && scenarios.length > 0 && (
-          <div className="max-w-3xl mx-auto py-10 text-center">
-            <MessageSquare className="w-7 h-7 mx-auto mb-3 text-muted dark:text-[#8C837C] opacity-50" />
-            <h2 className="text-base font-semibold text-ink dark:text-[#F5F1EA] mb-1">
-              What do you want to do?
-            </h2>
-            <p className="text-[13px] text-muted dark:text-[#8C837C]">
-              Ask anything. Reference files in your vault with{' '}
-              <span className="font-mono text-flame">[[wikilinks]]</span>.
-            </p>
+          <div className="max-w-3xl mx-auto py-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {scenarios.map((s) => (
+                <button
+                  key={s.title}
+                  type="button"
+                  onClick={() => setInput(s.prompt)}
+                  className="text-left p-3 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl hover:border-flame transition-colors"
+                >
+                  <div className="text-[12px] font-semibold text-ink dark:text-[#F5F1EA]">{s.title}</div>
+                  <div className="text-[11px] text-muted dark:text-[#8C837C] line-clamp-2 mt-1">
+                    {s.prompt.slice(0, 140)}…
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
         <div className="max-w-3xl mx-auto space-y-4">
@@ -392,35 +399,10 @@ export function ChatSurface({
   );
 }
 
-const DEFAULT_SCENARIOS: ChatScenario[] = [
-  {
-    title: 'High-intent visitor',
-    prompt:
-      'A visitor from [acme.com] just hit our pricing page twice. Deanonymize the company, qualify against our ICP (from CLAUDE.md), research recent news, and draft a first-touch email to the most likely champion. Save everything under companies/, contacts/, drafts/.',
-  },
-  {
-    title: 'Lookalike outbound',
-    prompt:
-      'We just closed-won [acme.com] at $[48000] ACV. Find 25 lookalike companies (industry, size, stack), identify a likely buying committee at each, and draft an outbound sequence that anchors on the Acme outcome. Save to companies/, contacts/, drafts/.',
-  },
-  {
-    title: 'Closed-lost analysis',
-    prompt:
-      'The deal at [deals/closed-lost/beta-corp.md] just moved to lost. Pull the full history, analyze why (compare against our last 20 losses), extract any competitor intel, and propose 3 concrete process changes with owners. Append findings to the deal file and draft a Slack-style team post in drafts/.',
-  },
-  {
-    title: 'Meeting prep',
-    prompt:
-      'I have a meeting with [jane@acme.com] in 2 hours. Pull everything we know about her + Acme, surface the 3-5 freshest news items, review her engagement with us, and write me a <150-word pre-call brief with agenda, 3 discovery questions, and the trap to avoid. Save to drafts/.',
-  },
-  {
-    title: 'Pipeline health scan',
-    prompt:
-      'Scan deals/open/ for stale deals (no activity in [7] days), missing next-steps in proposal+ stages, and at-risk late-stage deals (close date pushed twice+, silent champion, competitor resurfacing). Rank by ARR at risk and propose one concrete recovery action per deal. Notify the owner via a drafts/ Slack DM.',
-  },
-  {
-    title: 'LinkedIn intent',
-    prompt:
-      'Someone at [acme.com] just commented on my latest LinkedIn post about [topic]. Enrich the person + company, research what might be driving their engagement, and draft a <=60-word LinkedIn DM that references their comment without being creepy. Save to drafts/.',
-  },
-];
+// The empty-state used to carry a hardcoded list of GTM demo prompts
+// (acme.com, beta-corp, jane@acme.com, …) that shipped in every bundle
+// even after the scenario cards were removed in 0.3.4 — the array was
+// still imported and its length gated the default copy. Leaving this
+// empty kills the demo brand strings entirely; callers can still pass
+// their own `scenarios` prop (the Team cockpit does).
+const DEFAULT_SCENARIOS: ChatScenario[] = [];

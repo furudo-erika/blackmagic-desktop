@@ -12,6 +12,7 @@ export interface Config {
   daemon_port?: number;
   apify_api_key?: string;
   enrichlayer_api_key?: string;
+  peec_api_key?: string;
   hubspot_api_key?: string;
   apollo_api_key?: string;
   attio_api_key?: string;
@@ -82,6 +83,7 @@ export function loadConfig(): Config {
     daemon_port: process.env.BM_DAEMON_PORT ? Number(process.env.BM_DAEMON_PORT) : undefined,
     apify_api_key: process.env.APIFY_API_KEY,
     enrichlayer_api_key: process.env.ENRICHLAYER_API_KEY,
+    peec_api_key: process.env.PEEC_API_KEY,
     hubspot_api_key: process.env.HUBSPOT_API_KEY,
     apollo_api_key: process.env.APOLLO_API_KEY,
     attio_api_key: process.env.ATTIO_API_KEY,

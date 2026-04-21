@@ -331,6 +331,7 @@ async function main() {
   const INTEGRATION_KEYS = [
     'apify_api_key',
     'enrichlayer_api_key',
+    'peec_api_key',
     'hubspot_api_key',
     'apollo_api_key',
     'attio_api_key',
@@ -351,6 +352,7 @@ async function main() {
     c.json({
       apify_api_key: Boolean(config.apify_api_key),
       enrichlayer_api_key: Boolean(config.enrichlayer_api_key),
+      peec_api_key: Boolean(config.peec_api_key),
       hubspot_api_key: Boolean(config.hubspot_api_key),
       apollo_api_key: Boolean(config.apollo_api_key),
       attio_api_key: Boolean(config.attio_api_key),

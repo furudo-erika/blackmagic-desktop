@@ -75,6 +75,7 @@ export const api = {
     request<{
       apify_api_key: boolean;
       enrichlayer_api_key: boolean;
+      peec_api_key: boolean;
       hubspot_api_key: boolean;
       apollo_api_key: boolean;
       attio_api_key: boolean;
@@ -93,6 +94,7 @@ export const api = {
   setIntegrationKeys: (body: {
     apify_api_key?: string;
     enrichlayer_api_key?: string;
+    peec_api_key?: string;
     hubspot_api_key?: string;
     apollo_api_key?: string;
     attio_api_key?: string;
