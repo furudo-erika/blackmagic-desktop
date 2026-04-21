@@ -2,6 +2,20 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.8 — 2026-04-21
+
+### Fixed
+- **Auto-upgrade now reads the Homebrew cask directly.** Both the
+  launch-time hard gate and the renderer's soft upgrade banner used
+  to compare against the R2 `version.json` manifest. That manifest
+  is only refreshed by `./scripts/release.sh`, which means any
+  0.4.x version bumped in the repo but not packaged looked "up to
+  date" to the installed app — exactly why 0.4.6 on disk never saw
+  0.4.7. Source of truth is now the tap's cask file at
+  `https://raw.githubusercontent.com/blackmagic-ai/homebrew-tap/main/Casks/blackmagic-ai.rb`,
+  parsed with a regex on `version "X.Y.Z"`. No R2 dependency, cache-
+  busted per check.
+
 ## 0.4.7 — 2026-04-21
 
 ### Added

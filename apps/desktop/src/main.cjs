@@ -14,8 +14,11 @@ const { spawn } = require('node:child_process');
 // below pokes the renderer so it can show an "upgrade via brew" banner.
 
 const APP_NAME = 'BlackMagic AI';
-const VERSION_MANIFEST_URL = 'https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/version.json';
-const DOWNLOAD_PAGE_URL = 'https://pub-d259d1d2737843cb8bcb2b1ff98fc9c6.r2.dev/blackmagic-desktop/index.html';
+// Source of truth for "what is the latest version" is the Homebrew cask
+// in the user-facing tap repo. We stopped packaging to R2, so the old
+// version.json manifest there is stale and unreliable. Parsing the cask
+// gives us exactly what `brew upgrade --cask blackmagic-ai` will install.
+const CASK_URL = 'https://raw.githubusercontent.com/blackmagic-ai/homebrew-tap/main/Casks/blackmagic-ai.rb';
 const RESOURCES = path.join(__dirname, '..', 'resources');
 const ICON_PNG = path.join(RESOURCES, 'icon.png');
 const ICON_ICNS = path.join(RESOURCES, 'icon.icns');
@@ -227,23 +230,33 @@ function cmpVersion(a, b) {
   return 0;
 }
 
-// Hard-gate: fetch the R2 manifest and refuse to run if this build isn't the
-// latest. Updates ship fast; we can't support a long tail of stale clients,
-// so every launch either matches manifest.latestVersion or is blocked with a
-// brew-upgrade dialog. Cache-busted so CDN can never serve a stale answer.
-// Network failures are non-fatal — offline users aren't bricked.
+// Fetch the latest version directly from the Homebrew cask. Cache-busted
+// (GitHub's raw CDN respects the query param). Network failures are
+// non-fatal — offline users aren't bricked.
+async function fetchLatestCaskVersion() {
+  try {
+    const url = `${CASK_URL}?t=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const text = await res.text();
+    const m = text.match(/^\s*version\s+"([^"]+)"/m);
+    return m ? m[1] : null;
+  } catch (err) {
+    console.warn('[main] cask fetch failed:', err?.message || err);
+    return null;
+  }
+}
+
+// Hard-gate: if this build isn't the latest the cask offers, block with
+// a brew-upgrade dialog. Source of truth is the cask file — never
+// packaging to R2 again, so anything comparing against version.json
+// would lie.
 async function enforceMinVersion() {
   const current = app.getVersion();
+  const target = await fetchLatestCaskVersion();
+  if (!target) return;
+  if (cmpVersion(current, target) >= 0) return;
   try {
-    const url = `${VERSION_MANIFEST_URL}?t=${Date.now()}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return;
-    const manifest = await res.json();
-    const min = manifest.minVersion;
-    const latest = manifest.latestVersion;
-    const target = latest || min;
-    if (!target) return;
-    if (cmpVersion(current, target) >= 0) return;
 
     const brewCmd = 'brew upgrade --cask blackmagic-ai';
     const brewPath = resolveBrewPath();
@@ -355,28 +368,20 @@ fi
   app.exit(0);
 }
 
-// Soft "newer version available" check. We no longer ship auto-updates via
-// electron-updater — distribution is brew-only. On every launch we poll the
-// same R2 manifest and, if a newer version exists, push an IPC event to the
-// renderer so it can show a banner with `brew upgrade --cask blackmagic-ai`.
+// Soft "newer version available" check. Distribution is brew-only. On
+// every launch we poll the Homebrew cask file and, if a newer version
+// exists, push an IPC event to the renderer so it can show a banner
+// with `brew upgrade --cask blackmagic-ai`.
 async function notifyIfNewerAvailable(win) {
   if (!app.isPackaged) return;
   const current = app.getVersion();
-  try {
-    const url = `${VERSION_MANIFEST_URL}?t=${Date.now()}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return;
-    const manifest = await res.json();
-    const latest = manifest.latestVersion;
-    if (!latest || cmpVersion(current, latest) >= 0) return;
-    win.webContents.send('bm:update-available', {
-      currentVersion: current,
-      latestVersion: latest,
-      brewCommand: 'brew upgrade --cask blackmagic-ai',
-    });
-  } catch (err) {
-    console.warn('[main] upgrade nudge check failed:', err?.message || err);
-  }
+  const latest = await fetchLatestCaskVersion();
+  if (!latest || cmpVersion(current, latest) >= 0) return;
+  win.webContents.send('bm:update-available', {
+    currentVersion: current,
+    latestVersion: latest,
+    brewCommand: 'brew upgrade --cask blackmagic-ai',
+  });
 }
 
 app.whenReady().then(async () => {
