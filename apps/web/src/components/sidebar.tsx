@@ -35,6 +35,7 @@ import {
   Repeat,
   RotateCcw,
   Search,
+  Send,
   Settings as SettingsIcon,
   Sparkles,
   SquarePen,
@@ -54,6 +55,10 @@ const SIDEBAR_AGENT_ICONS: Record<string, LucideIcon> = {
   Copy,
   RotateCcw,
   Activity,
+  Search,
+  Send,
+  Briefcase,
+  Bot,
 };
 import { SidebarChats, newThreadId } from './sidebar-chats';
 import { useRouter } from 'next/navigation';
@@ -242,17 +247,14 @@ export function Sidebar() {
         <SidebarSection label="Team">
           {teamItems.map((agent) => {
             const Icon = SIDEBAR_AGENT_ICONS[agent.icon] ?? Bot;
-            // Vault-backed agents link to their .md in the vault editor —
-            // dynamic `/team/[slug]` routes aren't prerendered for user
-            // slugs in the static export, so that page would 404. The
-            // hardcoded AGENTS fallback still uses /team/[slug].
-            const href = agent.vault
-              ? `/vault?path=${encodeURIComponent(`agents/${agent.slug}.md`)}`
-              : `/team/${agent.slug}`;
+            // Single static cockpit at /team?slug=X. Works for any vault
+            // agent (slug resolved at runtime via searchParams) and for
+            // the hardcoded fallback slugs. /team/[slug] still resolves
+            // for old bookmarks.
             return (
               <SidebarNavItem
                 key={agent.slug}
-                href={href}
+                href={`/team?slug=${encodeURIComponent(agent.slug)}`}
                 label={agent.name}
                 icon={Icon}
                 breathing={isBreathing}

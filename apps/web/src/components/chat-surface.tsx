@@ -17,8 +17,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Send, MessageSquare } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Send, MessageSquare, Bot } from 'lucide-react';
 
 import { api } from '../lib/api';
 import { Markdown } from './markdown';
@@ -91,6 +91,34 @@ export function ChatSurface({
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [streamingTools, setStreamingTools] = useState<string[]>([]);
+  // Agent picker — lets the user swap the routing agent inside Chat
+  // instead of having to open /team?slug=X first. When the parent
+  // passes an `agent` prop (e.g. from a deep link) we initialize with
+  // that, but still let the user change it for this thread.
+  const [pickedAgent, setPickedAgent] = useState<string | undefined>(agent);
+  useEffect(() => { setPickedAgent(agent); }, [agent]);
+  const effectiveAgent = pickedAgent ?? agent;
+  const agentOptions = useQuery({
+    queryKey: ['chat-agent-options'],
+    queryFn: async () => {
+      const tree = await api.vaultTree();
+      const files = tree.tree.filter(
+        (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
+      );
+      const rows = await Promise.all(
+        files.map(async (f) => {
+          const r = await api.readFile(f.path);
+          const fm = r.frontmatter ?? {};
+          const slug = f.path.replace(/^agents\//, '').replace(/\.md$/, '');
+          const name = typeof fm.name === 'string' && fm.name ? fm.name : slug;
+          return { slug, name };
+        }),
+      );
+      rows.sort((a, b) => a.name.localeCompare(b.name));
+      return rows;
+    },
+    staleTime: 60_000,
+  });
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -153,7 +181,7 @@ export function ChatSurface({
       let assistantText = '';
       let runId = '';
       await api.chatStream(msgs, {
-        agent,
+        agent: effectiveAgent,
         threadId,
         onEvent: ({ type, data }) => {
           if (type === 'meta') runId = data.runId;
@@ -244,7 +272,23 @@ export function ChatSurface({
             <p className="text-[12px] text-muted dark:text-[#8C837C] truncate">{subtitle}</p>
           )}
         </div>
-        {headerRight}
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="inline-flex items-center gap-1.5 text-[11px] text-muted dark:text-[#8C837C]">
+            <Bot className="w-3.5 h-3.5" />
+            <select
+              value={effectiveAgent ?? ''}
+              onChange={(e) => setPickedAgent(e.target.value || undefined)}
+              className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md px-2 py-1 text-[12px] text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+              title="Route this message to a specific agent"
+            >
+              <option value="">auto (researcher)</option>
+              {(agentOptions.data ?? []).map((a) => (
+                <option key={a.slug} value={a.slug}>{a.name}</option>
+              ))}
+            </select>
+          </label>
+          {headerRight}
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">

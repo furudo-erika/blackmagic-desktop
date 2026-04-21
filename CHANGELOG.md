@@ -2,6 +2,32 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.0 — 2026-04-21
+
+### Added
+- **Agent cockpit** at `/team?slug=<agent>`. Clicking an agent in the
+  Team sidebar now lands on a purpose-built page instead of opening
+  the raw .md file or a duplicate chat. Shows identity + tools,
+  status strip (last run · skill count · live indicator), the
+  playbooks that agent owns as runnable skill cards (with inline
+  inputs), and the 8 most recent runs by this agent. Header CTA
+  deep-links into the main Chat with the agent preselected via
+  `/?agent=<slug>`. Works for any agent file in the vault — no more
+  404 on dynamic slugs under static export.
+- **Chat agent picker.** The main Chat header now has a small
+  dropdown populated from `agents/*.md`. Pick "auto (researcher)" or
+  route the next message to any specific agent (Deal Manager,
+  LinkedIn Outreach Agent, etc.). Setting it from the URL
+  (`/?agent=<slug>`) preselects for deep links.
+
+### Changed
+- **Friendlier display names for the three base agents.** `ae` →
+  "Deal Manager", `researcher` → "Research Agent", `sdr` →
+  "Outreach Agent". Slugs stay stable so existing playbooks
+  (`agent: researcher`, etc.) keep working. A migration rewrites
+  existing vaults' frontmatter only when the `name:` field still
+  matches the bare slug, so user renames are preserved.
+
 ## 0.3.12 — 2026-04-21
 
 ### Added

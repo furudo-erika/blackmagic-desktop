@@ -1,15 +1,31 @@
 'use client';
 
 /**
- * Home — the chat surface. No greeting band, no dashboard. The first
- * thing a user sees when they open the app is a chat input.
- *
- * Recent threads live in the sidebar. Drafts live in the sidebar.
- * Per-agent workspaces live under /team/[slug].
+ * Home — the chat surface. Reads ?agent=<slug> from the URL so Team
+ * cockpit's "Chat with X" button can deep-link into a thread scoped
+ * to that agent without a second chat page.
  */
 
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ChatSurface } from '../components/chat-surface';
 
+function HomeInner() {
+  const params = useSearchParams();
+  const agent = params.get('agent') ?? undefined;
+  return (
+    <ChatSurface
+      title="Chat"
+      agent={agent}
+      threadKey={agent ? `bm-team-thread-${agent}` : 'bm-last-thread'}
+    />
+  );
+}
+
 export default function HomePage() {
-  return <ChatSurface title="Chat" />;
+  return (
+    <Suspense fallback={<div className="p-8 text-sm text-muted">loading…</div>}>
+      <HomeInner />
+    </Suspense>
+  );
 }

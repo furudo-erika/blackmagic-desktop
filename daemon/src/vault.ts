@@ -526,7 +526,9 @@ in from your domain. Edit freely._
 const DEFAULT_AGENTS: Record<string, string> = {
   'researcher.md': `---
 kind: agent
-name: researcher
+name: Research Agent
+slug: researcher
+icon: Search
 model: gpt-5.3-codex
 tools:
   - read_file
@@ -564,7 +566,9 @@ When asked to enroll a contact in a multi-touch sequence, call
 `,
   'sdr.md': `---
 kind: agent
-name: sdr
+name: Outreach Agent
+slug: sdr
+icon: Send
 model: gpt-5.3-codex
 tools:
   - read_file
@@ -582,7 +586,9 @@ CLAUDE.md. You NEVER send; you only call draft_create.
 `,
   'ae.md': `---
 kind: agent
-name: ae
+name: Deal Manager
+slug: ae
+icon: Briefcase
 model: gpt-5.3-codex
 tools:
   - read_file
@@ -2194,6 +2200,35 @@ export async function ensureVault(): Promise<{ created: boolean }> {
         fm.tools = tools;
         await fs.writeFile(researcherPath, matter.stringify(parsed.content, fm), 'utf-8');
       }
+    } catch {}
+  }
+
+  // Migration: give the three bare-slug seed agents (ae/researcher/sdr)
+  // friendly display names + icons. Only rewrites if the existing file
+  // still has name == slug, so users who renamed their agent are never
+  // overwritten. Ships with the Team cockpit so the sidebar labels read
+  // as product names instead of internal role codes.
+  const SLUG_RENAMES: Record<string, { name: string; icon: string }> = {
+    'researcher.md': { name: 'Research Agent', icon: 'Search' },
+    'sdr.md': { name: 'Outreach Agent', icon: 'Send' },
+    'ae.md': { name: 'Deal Manager', icon: 'Briefcase' },
+  };
+  for (const [file, meta] of Object.entries(SLUG_RENAMES)) {
+    const p = path.join(getVaultRoot(), 'agents', file);
+    if (!fsSync.existsSync(p)) continue;
+    try {
+      const raw = await fs.readFile(p, 'utf-8');
+      const parsed = matter(raw);
+      const fm = parsed.data as any;
+      const slug = file.replace(/\.md$/, '');
+      let changed = false;
+      if (!fm.name || String(fm.name).trim() === slug) {
+        fm.name = meta.name;
+        changed = true;
+      }
+      if (!fm.slug) { fm.slug = slug; changed = true; }
+      if (!fm.icon) { fm.icon = meta.icon; changed = true; }
+      if (changed) await fs.writeFile(p, matter.stringify(parsed.content, fm), 'utf-8');
     } catch {}
   }
 
