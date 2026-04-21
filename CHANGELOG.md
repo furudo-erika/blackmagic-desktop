@@ -4,7 +4,28 @@ All notable changes to BlackMagic AI. Dates in UTC.
 
 ## 0.4.13 — 2026-04-21
 
+### Added
+- **Agent cockpit now shows reasoning between tool calls.** Long
+  autonomous runs (GEO Analyst, Pipeline Ops, Closed-Lost Revival)
+  used to render as a silent parade of tool names — you could see
+  which tools fired but not why. The daemon now forwards the
+  model's reasoning-summary deltas through the chat stream, and the
+  cockpit renders them as dimmed `… <thought>` lines interleaved
+  with the `→ tool` / `✓ tool` markers. Gives you a live window on
+  what the agent is deciding, not just what it's doing.
+
 ### Fixed
+- **Agent no longer exits silently after hitting turn budget.**
+  `runAgent` used to cap at 20 turns and, if the model was still
+  mid-tool-chain, write an empty `final.md` and leave the chat
+  showing `(empty)`. The default budget is now 50 turns, agents can
+  raise it via `max_turns:` frontmatter (GEO Analyst defaults to
+  100), and when the budget does run out the agent writes an
+  explicit closing message listing the last few tools called and
+  telling the user to re-run to pick up from the files already
+  written. No more mystery silences — the
+  2026-04-21T09-17-21-931Z-geo-analyst case.
+
 - **Real brand logos on integration cards.** 0.4.11 shipped colored
   tiles with initials ("H", "A", "SF", "飞", "MB", …) as a
   placeholder. Swapped for actual brand SVGs (Simple Icons paths,

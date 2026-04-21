@@ -207,6 +207,21 @@ export function ChatSurface({
             setStreamingTools((t) => [...t, `→ ${formatToolLine(data)}`]);
           } else if (type === 'tool') {
             setStreamingTools((t) => [...t, `✓ ${formatToolLine(data)}`]);
+          } else if (type === 'reasoning' || type === 'reasoning_pending') {
+            // Model is narrating its own next step between tool calls. Render
+            // it like a dimmed tool line so the user sees the "why" instead
+            // of just a parade of tool names.
+            const delta = typeof data?.delta === 'string' ? data.delta : typeof data?.text === 'string' ? data.text : '';
+            if (delta) {
+              setStreamingTools((t) => {
+                const last = t[t.length - 1] ?? '';
+                if (last.startsWith('… ')) {
+                  const merged = last + delta;
+                  return [...t.slice(0, -1), merged.length > 240 ? merged.slice(0, 237) + '…' : merged];
+                }
+                return [...t, `… ${delta}`];
+              });
+            }
           } else if (type === 'error') {
             assistantText = assistantText
               ? assistantText + '\n\n_error_: ' + data.message

@@ -984,7 +984,8 @@ name: GEO Analyst
 slug: geo-analyst
 icon: Radar
 model: gpt-5.4
-revision: 2
+revision: 3
+max_turns: 100
 tools:
   - read_file
   - write_file

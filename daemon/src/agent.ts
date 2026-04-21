@@ -23,6 +23,7 @@ export interface AgentSpec {
   tools: string[];
   temperature: number;
   systemBody: string;
+  maxTurns?: number;
 }
 
 export async function loadAgent(name: string): Promise<AgentSpec> {
@@ -36,6 +37,7 @@ export async function loadAgent(name: string): Promise<AgentSpec> {
     tools: Array.isArray(fm.tools) ? fm.tools : [],
     temperature: typeof fm.temperature === 'number' ? fm.temperature : 0.2,
     systemBody: m.content.trim(),
+    maxTurns: typeof fm.max_turns === 'number' ? fm.max_turns : undefined,
   };
 }
 
@@ -48,7 +50,11 @@ export async function loadClaudeMd(): Promise<string> {
 }
 
 export interface RunEvent {
-  type: 'text' | 'tool_call' | 'tool_result' | 'done' | 'error';
+  // `reasoning` carries the model's own thinking summary between tool calls
+  // so the UI can show the user WHY the next tool is being called, not just
+  // WHICH tool. Without it, long autonomous runs look like an opaque parade
+  // of tool names.
+  type: 'text' | 'tool_call' | 'tool_result' | 'reasoning' | 'done' | 'error';
   data: any;
 }
 
@@ -91,11 +97,16 @@ export interface RunOptions {
 export async function runAgent(opts: RunOptions): Promise<RunResult> {
   const { agent, task, config } = opts;
   const onEvent = opts.onEvent ?? (() => {});
-  const maxTurns = opts.maxTurns ?? 20;
 
   if (!config.zenn_api_key) throw new Error('ZENN_API_KEY not set');
 
   const spec = await loadAgent(agent);
+  // Precedence: explicit RunOptions.maxTurns > agent frontmatter max_turns >
+  // global default 50. Autonomous agents like geo-analyst need to run a full
+  // multi-step loop (personas + brands + prompts + reports + weekly bundle)
+  // in one turn budget — 20 was far too low and led to silent exits at
+  // `finalText = ''` after the model was still mid-tool-chain.
+  const maxTurns = opts.maxTurns ?? spec.maxTurns ?? 50;
   const claudeMd = await loadClaudeMd();
 
   const allTools = toolsByName();
@@ -211,6 +222,16 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
             if (typeof parsed.delta === 'string') {
               onEvent({ type: 'text', data: { delta: parsed.delta } });
             }
+          } else if (
+            event === 'response.reasoning_summary_text.delta' ||
+            event === 'response.reasoning_summary.delta'
+          ) {
+            // The reasoning summary is emitted incrementally between tool
+            // calls. Surface it so the cockpit can render a live "thinking"
+            // block alongside the tool chips.
+            if (typeof parsed.delta === 'string') {
+              onEvent({ type: 'reasoning', data: { delta: parsed.delta } });
+            }
           } else if (event === 'response.error' || event === 'error') {
             const err = `zenn stream error: ${payloadStr.slice(0, 300)}`;
             onEvent({ type: 'error', data: { message: err } });
@@ -290,6 +311,22 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
     }
 
     if (!sawToolCall) break;
+  }
+
+  // Budget exhausted with tools still mid-chain — without this fallback the
+  // run would persist `final.md` as an empty string and the UI would render
+  // "(empty)" with no hint why. Synthesize a visible closing message so the
+  // user knows to re-run and what state they're picking up from.
+  if (!finalText) {
+    const lastTools = toolLog.slice(-8).map((t) => t.name).join(', ');
+    finalText =
+      `_Hit the ${maxTurns}-turn budget while still in the tool loop._\n\n` +
+      `Completed ${toolLog.length} tool calls across ${maxTurns} turns. Last ` +
+      `few: ${lastTools || '(none)'}. Re-run to continue — the agent will ` +
+      `pick up from the files it already wrote.\n\n` +
+      `If this keeps happening, bump \`max_turns:\` in the agent's ` +
+      `frontmatter (\`agents/${agent}.md\`).`;
+    onEvent({ type: 'text', data: { delta: finalText } });
   }
 
   // Persist logs
