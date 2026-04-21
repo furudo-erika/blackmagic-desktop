@@ -18,7 +18,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Send, Bot, Check, Loader2, AlertCircle, Copy as CopyIcon, ExternalLink, Sparkles } from 'lucide-react';
+import {
+  Send, Bot, Check, Loader2, AlertCircle, Copy as CopyIcon, ExternalLink, Sparkles,
+  // Per-agent icons — matches the slugs seeded in daemon/src/vault.ts.
+  Search, Briefcase, Globe, Linkedin, CalendarClock, Copy as CopyTwin, RotateCcw,
+  Activity, Radar, type LucideIcon,
+} from 'lucide-react';
 
 import { api } from '../lib/api';
 import { Markdown } from './markdown';
@@ -82,6 +87,42 @@ function extractToolParts(data: any): { primary?: string; tail?: string } {
   const tail = full.length > basename.length + 1 ? full : undefined;
   return { primary: short, tail };
 }
+
+// Map an agent's frontmatter `icon:` name to the real lucide component.
+// Mirrors daemon/src/vault.ts DEFAULT_AGENTS where each agent ships an
+// icon name like `Radar` / `Globe` / `Linkedin` — this is the renderer
+// side of that contract.
+const AGENT_ICONS: Record<string, LucideIcon> = {
+  Search,
+  Send,
+  Briefcase,
+  Globe,
+  Linkedin,
+  CalendarClock,
+  Copy: CopyTwin,
+  RotateCcw,
+  Activity,
+  Radar,
+  Sparkles,
+  Bot,
+};
+
+// Color accent per agent — gives the gallery visual variety so every card
+// doesn't fade into the same dark tile. Keyed by slug with sensible
+// fallbacks for future agents.
+const AGENT_ACCENTS: Record<string, string> = {
+  'researcher':          'text-sky-400',
+  'sdr':                 'text-violet-400',
+  'ae':                  'text-amber-400',
+  'website-visitor':     'text-emerald-400',
+  'linkedin-outreach':   'text-blue-400',
+  'meeting-prep':        'text-teal-400',
+  'lookalike-discovery': 'text-fuchsia-400',
+  'closed-lost-revival': 'text-rose-400',
+  'pipeline-ops':        'text-orange-400',
+  'geo-analyst':         'text-flame',
+  'company-profiler':    'text-yellow-400',
+};
 
 function friendlyToolName(name: string): string {
   // snake_case → Title Case, but keep domain-specific prefixes readable.
@@ -190,7 +231,18 @@ export function ChatSurface({
           const starterPrompts = Array.isArray(fm.starter_prompts)
             ? (fm.starter_prompts as unknown[]).filter((p): p is string => typeof p === 'string')
             : [];
-          return { slug, name, starterPrompts };
+          const icon = typeof fm.icon === 'string' ? fm.icon : '';
+          // Tagline = first non-empty prose line of the agent body,
+          // trimmed to ~80 chars. Gives the gallery card a one-line
+          // "what does this agent do" instead of showing the technical
+          // slug. Falls back to empty string — the render skips the row.
+          const body = (r.body ?? '').trim();
+          const firstLine = body
+            .split('\n')
+            .map((l) => l.trim())
+            .find((l) => l && !l.startsWith('#') && !l.startsWith('-') && !l.startsWith('*'));
+          const tagline = firstLine ? firstLine.replace(/^[*_`]+/, '').slice(0, 120) : '';
+          return { slug, name, starterPrompts, icon, tagline };
         }),
       );
       rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -470,23 +522,38 @@ export function ChatSurface({
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {(agentOptions.data ?? []).map((a) => {
                     const picked = effectiveAgent === a.slug;
+                    const Icon = AGENT_ICONS[a.icon] ?? Bot;
+                    const accent = AGENT_ACCENTS[a.slug] ?? 'text-muted dark:text-[#8C837C]';
                     return (
                       <button
                         key={a.slug}
                         type="button"
                         onClick={() => setPickedAgent(a.slug)}
                         className={
-                          'text-left p-3 bg-white dark:bg-[#1F1B15] border rounded-xl transition-colors flex items-start gap-2.5 ' +
+                          'text-left p-4 bg-white dark:bg-[#1F1B15] border rounded-xl transition-all flex flex-col gap-2 h-full group ' +
                           (picked
-                            ? 'border-flame ring-1 ring-flame/40'
-                            : 'border-line dark:border-[#2A241D] hover:border-flame/60')
+                            ? 'border-flame ring-1 ring-flame/40 shadow-sm'
+                            : 'border-line dark:border-[#2A241D] hover:border-flame/60 hover:-translate-y-0.5')
                         }
                       >
-                        <Bot className={`w-4 h-4 shrink-0 mt-0.5 ${picked ? 'text-flame' : 'text-muted dark:text-[#8C837C]'}`} />
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{a.name}</div>
-                          <div className="text-[10px] text-muted dark:text-[#8C837C] truncate font-mono mt-0.5">{a.slug}</div>
+                        <div className="flex items-start gap-2.5">
+                          <div className={
+                            'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ' +
+                            (picked
+                              ? 'bg-flame/10'
+                              : 'bg-cream dark:bg-[#0F0D0A] group-hover:bg-flame/5')
+                          }>
+                            <Icon className={`w-4 h-4 ${picked ? 'text-flame' : accent}`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{a.name}</div>
+                          </div>
                         </div>
+                        {a.tagline && (
+                          <div className="text-[11px] text-muted dark:text-[#8C837C] line-clamp-2 leading-snug">
+                            {a.tagline}
+                          </div>
+                        )}
                       </button>
                     );
                   })}

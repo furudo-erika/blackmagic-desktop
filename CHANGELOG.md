@@ -2,6 +2,23 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.18 — 2026-04-21
+
+### Changed
+- **Agent gallery cards now look like agents, not clones.** 0.4.16's
+  cards all rendered the same generic Bot icon next to the name and
+  showed the bare slug underneath — the grid was a wall of
+  identical briefcase-ish tiles with technical kebab-case strings
+  that told the user nothing. Each card now pulls its frontmatter
+  `icon:` (Radar for GEO Analyst, Linkedin for LinkedIn Outreach,
+  Calendar for Meeting Prep, etc) and renders it inside a rounded
+  icon tile with a per-agent accent color. The slug is gone,
+  replaced by a tagline pulled from the agent's own body — the
+  first real prose line, so "Research Agent" reads "You are the
+  Research + Chat agent — the default generalist." instead of
+  "researcher". Hover adds a subtle lift; the picked agent keeps
+  its flame ring. Cards feel like distinct agents now.
+
 ## 0.4.17 — 2026-04-21
 
 ### Fixed
