@@ -156,14 +156,10 @@ export function Sidebar() {
     queryFn: api.listRuns,
     refetchInterval: 10_000,
   });
-  const liveRunCount = useMemo(() => {
+  // "Live" = run hasn't produced a final.md yet. Cap by a 2-minute
+  // ceiling so orphaned runs from a crashed daemon don't pulse forever.
+  const liveRuns = useMemo(() => {
     const list = runs.data?.runs ?? [];
-    // "Live" = run hasn't produced a final.md yet. Cap by a 2-minute
-    // ceiling and also treat any run with a non-zero `turns` counter as
-    // complete — an older ceiling (10m) + a missing `done` flag caused
-    // the badge to stick at "2 live" after every run had finished (QA
-    // BUG-003). We also refetch on focus so switching back clears stale
-    // state without requiring a project switch.
     const liveCutoffMs = Date.now() - 2 * 60 * 1000;
     return list.filter((r) => {
       if (r.done) return false;
@@ -171,14 +167,22 @@ export function Sidebar() {
       if ((r.tokensOut ?? 0) > 0) return false;
       const started = runStartedMs(r.runId);
       return started != null && started >= liveCutoffMs;
-    }).length;
+    });
   }, [runs.data]);
+  const liveRunCount = liveRuns.length;
 
-  // When anything is "live" the whole sidebar adopts a subtle breathing
-  // flame dot on every nav item, matching the Runs live-count pill. The
-  // Runs row itself already has its own indicator, so we only forward
-  // `breathing` to every other row.
-  const isBreathing = liveRunCount > 0;
+  // Which specific agents are live right now. Only those rows in the
+  // Team section pulse — earlier versions lit every nav item in the
+  // sidebar whenever any run was live, which looked like the entire
+  // app was busy even when only one agent was working.
+  const liveAgentSlugs = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of liveRuns) {
+      const slug = (r.agent ?? '').toLowerCase();
+      if (slug) s.add(slug);
+    }
+    return s;
+  }, [liveRuns]);
 
   // Runs badge reconciliation — refetch when the window regains focus so
   // the count clears promptly after a run finishes in the background.
@@ -248,27 +252,26 @@ export function Sidebar() {
         <SidebarSection label="Team">
           {teamItems.map((agent) => {
             const Icon = SIDEBAR_AGENT_ICONS[agent.icon] ?? Bot;
-            // Single static cockpit at /team?slug=X. Works for any vault
-            // agent (slug resolved at runtime via searchParams) and for
-            // the hardcoded fallback slugs. /team/[slug] still resolves
-            // for old bookmarks.
+            // Only the agent actually running right now pulses — earlier
+            // versions lit every Team item whenever any run was live,
+            // which made the whole sidebar look busy for no reason.
             return (
               <SidebarNavItem
                 key={agent.slug}
                 href={`/team?slug=${encodeURIComponent(agent.slug)}`}
                 label={agent.name}
                 icon={Icon}
-                breathing={isBreathing}
+                breathing={liveAgentSlugs.has(agent.slug.toLowerCase())}
               />
             );
           })}
         </SidebarSection>
 
         <SidebarSection label="Work">
-          <SidebarNavItem href="/playbooks" label="Skills" icon={BookOpen} breathing={isBreathing} />
-          <SidebarNavItem href="/sequences" label="Sequences" icon={Repeat} breathing={isBreathing} />
-          <SidebarNavItem href="/triggers" label="Triggers" icon={Zap} breathing={isBreathing} />
-          <SidebarNavItem href="/geo" label="GEO" icon={Radar} breathing={isBreathing} />
+          <SidebarNavItem href="/playbooks" label="Skills" icon={BookOpen} />
+          <SidebarNavItem href="/sequences" label="Sequences" icon={Repeat} />
+          <SidebarNavItem href="/triggers" label="Triggers" icon={Zap} />
+          <SidebarNavItem href="/geo" label="GEO" icon={Radar} />
           <SidebarNavItem
             href="/runs"
             label="Runs"
@@ -278,12 +281,12 @@ export function Sidebar() {
         </SidebarSection>
 
         <SidebarSection label="Vault">
-          <SidebarNavItem href="/companies" label="Companies" icon={Building2} breathing={isBreathing} />
-          <SidebarNavItem href="/contacts" label="Contacts" icon={Users} breathing={isBreathing} />
-          <SidebarNavItem href="/deals" label="Deals" icon={Briefcase} breathing={isBreathing} />
-          <SidebarNavItem href="/org" label="Org tree" icon={GitBranch} breathing={isBreathing} />
-          <SidebarNavItem href="/ontology" label="Knowledge graph" icon={Network} breathing={isBreathing} />
-          <SidebarNavItem href="/vault" label="Files" icon={FolderTree} breathing={isBreathing} />
+          <SidebarNavItem href="/companies" label="Companies" icon={Building2} />
+          <SidebarNavItem href="/contacts" label="Contacts" icon={Users} />
+          <SidebarNavItem href="/deals" label="Deals" icon={Briefcase} />
+          <SidebarNavItem href="/org" label="Org tree" icon={GitBranch} />
+          <SidebarNavItem href="/ontology" label="Knowledge graph" icon={Network} />
+          <SidebarNavItem href="/vault" label="Files" icon={FolderTree} />
         </SidebarSection>
 
         <SidebarSection label="System">
@@ -291,11 +294,10 @@ export function Sidebar() {
             href="/onboarding/bootstrap"
             label="Profile company"
             icon={Sparkles}
-            breathing={isBreathing}
           />
-          <SidebarNavItem href="/integrations" label="Integrations" icon={Plug} breathing={isBreathing} />
-          <SidebarNavItem href="/agents" label="Agent roles" icon={Bot} breathing={isBreathing} />
-          <SidebarNavItem href="/settings" label="Settings" icon={SettingsIcon} breathing={isBreathing} />
+          <SidebarNavItem href="/integrations" label="Integrations" icon={Plug} />
+          <SidebarNavItem href="/agents" label="Agent roles" icon={Bot} />
+          <SidebarNavItem href="/settings" label="Settings" icon={SettingsIcon} />
         </SidebarSection>
       </nav>
 

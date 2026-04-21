@@ -186,8 +186,8 @@ export default function AgentCockpit() {
     }
     return [
       {
-        title: `Kick off ${a.name}`,
-        prompt: `You are the ${a.name}. Walk me through the first thing you would do for my project. Read what you need from the vault (us/, companies/, contacts/, signals/) and reply with: (1) the concrete first step, (2) the tools you would call, (3) what output I should expect. No pitches — be specific.`,
+        title: `Run ${a.name} end-to-end`,
+        prompt: `You are the ${a.name}. Execute your full loop for my project now — don't describe what you would do, actually do it. Read what you need from the vault (us/, companies/, contacts/, signals/, playbooks/), call whatever tools you need, write your outputs to the vault, and only stop if you hit a blocker that genuinely requires a human decision (missing credential, ambiguous policy, destructive action). When you stop, say so in one line with the exact resolution I need to give you. Otherwise: run to completion and summarize what you wrote.`,
       },
     ];
   }, [agentQ.data]);

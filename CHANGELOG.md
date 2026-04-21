@@ -2,6 +2,27 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.9 — 2026-04-21
+
+### Fixed
+- **Sidebar breathing light is now per-agent, not global.** Earlier
+  versions lit every nav item (Skills, Companies, Integrations,
+  Settings…) whenever any run was live, which made the whole
+  sidebar look busy for no reason. Breathing is now scoped to the
+  specific Team row whose agent has a live run. Non-Team rows no
+  longer pulse — the Runs row's `liveCount` pill covers "how many
+  agents are running total".
+
+### Changed
+- **Cockpit starter prompt asks agents to execute, not narrate.**
+  The default "Kick off <Agent>" starter used to say "walk me
+  through the first thing you would do … reply with: (1) concrete
+  first step, (2) tools you would call, (3) expected output". That
+  reliably produced essays instead of work. New starter "Run
+  <Agent> end-to-end" tells the agent to actually execute, only
+  stopping for genuinely ambiguous human decisions, and to summarize
+  what it wrote when done.
+
 ## 0.4.8 — 2026-04-21
 
 ### Fixed
