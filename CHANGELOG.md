@@ -2,6 +2,19 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.16 — 2026-04-21
+
+### Changed
+- **Agent gallery is now always laid flat on the empty chat page.**
+  0.4.15 put the gallery in the empty state but hid it the moment
+  an agent was picked (starter prompts replaced it). The gallery
+  now stays visible above the starter prompts in a 4-column grid,
+  and the currently-picked agent gets a flame-colored ring so
+  there's no confusion about which agent will handle the next
+  message. Starter-prompts heading also names the agent
+  ("Starter prompts for GEO Analyst") so the two sections don't
+  feel disconnected.
+
 ## 0.4.15 — 2026-04-21
 
 ### Fixed

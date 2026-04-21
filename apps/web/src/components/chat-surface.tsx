@@ -456,42 +456,50 @@ export function ChatSurface({
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {messages.length === 0 && (
-          <div className="max-w-3xl mx-auto py-8">
-            {/* Agent picker gallery — replaces the Team sidebar section
-                dropped in 0.4.15. Each agent card swaps the active agent
-                and offers their starter prompt as a click-to-run. Clicking
-                the card header itself just switches agents; clicking a
-                prompt fills the composer. */}
-            {derivedScenarios.length === 0 && (agentOptions.data?.length ?? 0) > 0 && (
-              <>
+          <div className="max-w-5xl mx-auto py-6 space-y-8">
+            {/* Agent gallery — always visible in the empty state, not
+                tucked behind the header dropdown. Each card switches the
+                active agent for this thread; the currently-picked agent
+                gets a flame-colored ring so there's no confusion about
+                which agent will handle the next message. */}
+            {(agentOptions.data?.length ?? 0) > 0 && (
+              <div>
                 <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-3">
-                  Pick an agent
+                  Agents
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
-                  {(agentOptions.data ?? []).map((a) => (
-                    <button
-                      key={a.slug}
-                      type="button"
-                      onClick={() => setPickedAgent(a.slug)}
-                      className="text-left p-3 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl hover:border-flame transition-colors flex items-start gap-2.5"
-                    >
-                      <Bot className="w-4 h-4 shrink-0 mt-0.5 text-flame" />
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{a.name}</div>
-                        <div className="text-[11px] text-muted dark:text-[#8C837C] truncate font-mono">{a.slug}</div>
-                      </div>
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                  {(agentOptions.data ?? []).map((a) => {
+                    const picked = effectiveAgent === a.slug;
+                    return (
+                      <button
+                        key={a.slug}
+                        type="button"
+                        onClick={() => setPickedAgent(a.slug)}
+                        className={
+                          'text-left p-3 bg-white dark:bg-[#1F1B15] border rounded-xl transition-colors flex items-start gap-2.5 ' +
+                          (picked
+                            ? 'border-flame ring-1 ring-flame/40'
+                            : 'border-line dark:border-[#2A241D] hover:border-flame/60')
+                        }
+                      >
+                        <Bot className={`w-4 h-4 shrink-0 mt-0.5 ${picked ? 'text-flame' : 'text-muted dark:text-[#8C837C]'}`} />
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{a.name}</div>
+                          <div className="text-[10px] text-muted dark:text-[#8C837C] truncate font-mono mt-0.5">{a.slug}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              </>
+              </div>
             )}
 
             {derivedScenarios.length > 0 && (
-              <>
+              <div>
                 <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-3">
-                  {effectiveAgent ? 'Starter prompts' : 'Try one of these'}
+                  {effectiveAgent ? `Starter prompts for ${agentOptions.data?.find((x) => x.slug === effectiveAgent)?.name ?? effectiveAgent}` : 'Try one of these'}
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {derivedScenarios.map((s) => (
                     <button
                       key={s.title}
@@ -506,7 +514,7 @@ export function ChatSurface({
                     </button>
                   ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
         )}
