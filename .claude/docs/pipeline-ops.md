@@ -30,7 +30,7 @@ vault.
 
 ## Trigger
 
-- **`swan-weekly-pipeline-health`** (`daemon/src/vault.ts` ≈ line 2227)
+- **`gtm-weekly-pipeline-health`** (`daemon/src/vault.ts` ≈ line 2227)
   — cron `0 8 * * 1` (Mondays 08:00). Note this trigger fires the
   `revops-pipeline-health` playbook rather than the agent directly; the
   playbook ultimately calls this agent.

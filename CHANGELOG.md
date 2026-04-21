@@ -638,7 +638,7 @@ All notable changes to BlackMagic AI. Dates in UTC.
 
 ### Changed
 - **Sidebar Team is now vault-backed.** The Team section used to be
-  a hardcoded Swan-style GTM list (Website Visitor Agent, LinkedIn
+  a hardcoded GTM list (Website Visitor Agent, LinkedIn
   Outreach Agent, …). It now reads `agents/*.md` from the active
   project's vault and lists whatever role files exist there. Each
   entry links to the agent's definition in the vault editor so you

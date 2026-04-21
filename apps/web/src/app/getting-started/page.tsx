@@ -63,7 +63,7 @@ const SETUP_STEPS: Step[] = [
   {
     n: 3,
     title: 'Connect at least one integration',
-    hint: "EnrichLayer (LinkedIn enrich) and Apify (company + contact scrapers) unlock most of the Swan-style flows. Gmail/Slack wire up draft approvals.",
+    hint: "EnrichLayer (LinkedIn enrich) and Apify (company + contact scrapers) unlock most of the GTM flows. Gmail/Slack wire up draft approvals.",
     href: '/integrations',
     icon: Plug,
     cta: 'Connect integrations',
@@ -71,7 +71,7 @@ const SETUP_STEPS: Step[] = [
   {
     n: 4,
     title: 'Install the brand-monitor presets',
-    hint: "Turns on the daily brand + news scans and the weekly competitor sweep. Also installs the three Swan-style triggers: visitor sweep, ICP tuning, and pipeline health.",
+    hint: "Turns on the daily brand + news scans and the weekly competitor sweep. Also installs the three GTM triggers: visitor sweep, ICP tuning, and pipeline health.",
     href: '/triggers',
     icon: Zap,
     cta: 'Install presets',
@@ -240,7 +240,7 @@ export default function GettingStartedPage() {
             <Users className="w-4 h-4 text-flame shrink-0 mt-0.5" />
             <div className="min-w-0 text-[12px] text-muted dark:text-[#8C837C] leading-relaxed">
               <strong className="text-ink dark:text-[#F5F1EA]">
-                What &quot;Swan-style&quot; means here.
+                What&apos;s in the GTM starter pack.
               </strong>{' '}
               Out-of-the-box you get 8 GTM playbooks (visitor ID, signal-based
               outbound, lead qualification, deep contact enrichment, ICP

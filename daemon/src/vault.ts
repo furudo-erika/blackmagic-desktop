@@ -1286,7 +1286,7 @@ When the tool returns:
 - Reply with: (a) one-sentence TL;DR, (b) the trigger event, (c) the path written
 `,
 
-  // === High-intent visitor (Swan visitor ID) ===
+  // === High-intent visitor ===
   'visitor-deanonymize.md': `---
 kind: playbook
 name: visitor-deanonymize
@@ -1848,15 +1848,15 @@ Daily industry news scan.
    whether it suggests any outbound angle this week.
 `,
 
-  // === Swan-style GTM pack =================================================
-  // Out-of-the-box equivalents of getswan.com's core flows. Each plays well
-  // with zero integrations configured (falls back to web_fetch + the model's
-  // built-in web_search) and better if ENRICHLAYER_API_KEY / APIFY_API_KEY
-  // are set.
+  // === GTM starter pack ====================================================
+  // Out-of-the-box equivalents of the canonical GTM-automation flows. Each
+  // plays well with zero integrations configured (falls back to web_fetch
+  // + the model's built-in web_search) and better if ENRICHLAYER_API_KEY /
+  // APIFY_API_KEY are set.
   'visitor-identify.md': `---
 kind: playbook
 name: visitor-identify
-group: swan-gtm
+group: gtm-starter
 agent: researcher
 inputs: [{ name: date, required: false }]
 ---
@@ -1896,7 +1896,7 @@ Sweep anonymous visitor logs, de-anonymise to companies, score for ICP fit.
   'signal-based-outbound.md': `---
 kind: playbook
 name: signal-based-outbound
-group: swan-gtm
+group: gtm-starter
 agent: sdr
 inputs: []
 ---
@@ -1937,7 +1937,7 @@ Draft contextual outbound emails anchored on the latest signal per company.
   'lead-qualify.md': `---
 kind: playbook
 name: lead-qualify
-group: swan-gtm
+group: gtm-starter
 agent: researcher
 inputs: [{ name: contact_path, required: true }]
 ---
@@ -1977,7 +1977,7 @@ Score a contact for ICP fit and label with a tier.
   'enrich-contact-deep.md': `---
 kind: playbook
 name: enrich-contact-deep
-group: swan-gtm
+group: gtm-starter
 agent: researcher
 inputs: [{ name: contact_path, required: true }]
 ---
@@ -2016,7 +2016,7 @@ Deep enrichment beyond a basic LinkedIn scrape.
   'icp-tune.md': `---
 kind: playbook
 name: icp-tune
-group: swan-gtm
+group: gtm-starter
 agent: researcher
 inputs: []
 ---
@@ -2054,7 +2054,7 @@ RevOps weekly: learn the ICP from what's actually working.
   'demand-gen-content-brief.md': `---
 kind: playbook
 name: demand-gen-content-brief
-group: swan-gtm
+group: gtm-starter
 agent: researcher
 inputs: [{ name: keyword, required: false }]
 ---
@@ -2089,7 +2089,7 @@ Demand-gen: produce a content brief anchored on a target keyword.
   'sales-account-research.md': `---
 kind: playbook
 name: sales-account-research
-group: swan-gtm
+group: gtm-starter
 agent: researcher
 inputs: [{ name: domain, required: true }]
 ---
@@ -2128,7 +2128,7 @@ Sales rep one-pager: who they are, why now, who to open with.
   'revops-pipeline-health.md': `---
 kind: playbook
 name: revops-pipeline-health
-group: swan-gtm
+group: gtm-starter
 agent: ae
 inputs: [{ name: stale_days, required: false }]
 ---
@@ -2322,7 +2322,7 @@ touches:
 
 # Post-signal 5-touch
 
-For contacts who tripped a Swan-style signal (visitor-id, competitor
+For contacts who tripped a high-intent signal (visitor-id, competitor
 switch, funding, high-intent brand mention). Enroll right after the
 signal-based-outbound playbook drafts its first touch.
 `,
@@ -2370,14 +2370,14 @@ Daily 07:00 industry-news digest, keyed off positioning + ICP keywords
 from \`us/market/\`. Results land in \`signals/news/<date>.md\`.
 `,
 
-  // ── Swan-style GTM triggers ─────────────────────────────────────────────
-  // These assume the Swan-style starter playbooks exist in every vault
+  // ── GTM triggers ────────────────────────────────────────────────────────
+  // These assume the GTM starter playbooks exist in every vault
   // (seeded by DEFAULT_PLAYBOOKS). Visitor sweep expects an external pixel
   // or script to be writing to signals/visitors/<date>.json — without that
   // the playbook no-ops gracefully.
-  'swan-daily-visitor-sweep.md': `---
+  'gtm-daily-visitor-sweep.md': `---
 kind: trigger
-name: swan-daily-visitor-sweep
+name: gtm-daily-visitor-sweep
 schedule: '0 8 * * 1-5'
 playbook: visitor-identify
 enabled: true
@@ -2388,9 +2388,9 @@ external pixel or script to drop that file (see the getting-started
 guide). De-anonymises to companies, scores ICP fit, promotes top
 accounts to \`companies/\` + \`contacts/\`.
 `,
-  'swan-weekly-icp-tune.md': `---
+  'gtm-weekly-icp-tune.md': `---
 kind: trigger
-name: swan-weekly-icp-tune
+name: gtm-weekly-icp-tune
 schedule: '0 9 * * 1'
 playbook: icp-tune
 enabled: true
@@ -2400,9 +2400,9 @@ Monday 09:00 RevOps sweep. Reads what's currently in \`companies/\` +
 \`contacts/\` + \`deals/closed-won/\`, identifies shared traits of your
 winners, and refines \`us/market/icp.md\` with evidence-cited edits.
 `,
-  'swan-weekly-pipeline-health.md': `---
+  'gtm-weekly-pipeline-health.md': `---
 kind: trigger
-name: swan-weekly-pipeline-health
+name: gtm-weekly-pipeline-health
 schedule: '0 8 * * 1'
 playbook: revops-pipeline-health
 enabled: true
