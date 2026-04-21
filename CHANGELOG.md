@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.1 — 2026-04-21
+
+### Fixed
+- **Chat 呼吸灯 now persists through the whole run.** The thinking
+  bubble previously had a lone `animate-pulse` dot that vanished the
+  moment streaming text started, so during long replies the UI
+  looked idle. Upgraded to the same animate-ping halo the sidebar
+  and cockpit use, and pinned a second breathing dot next to the
+  Chat title that stays on for the full duration of `sendMut.isPending`
+  — streaming phase included.
+
 ## 0.4.0 — 2026-04-21
 
 ### Added

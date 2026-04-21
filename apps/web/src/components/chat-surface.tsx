@@ -266,11 +266,23 @@ export function ChatSurface({
       }
     >
       <header className="px-6 py-3 border-b border-line dark:border-[#2A241D] flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold text-ink dark:text-[#F5F1EA] truncate">{title}</h1>
-          {subtitle && (
-            <p className="text-[12px] text-muted dark:text-[#8C837C] truncate">{subtitle}</p>
+        <div className="min-w-0 flex items-center gap-2">
+          {sendMut.isPending && (
+            <span
+              className="relative flex h-2 w-2 shrink-0"
+              aria-label="agent running"
+              title="agent running"
+            >
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-flame" />
+            </span>
           )}
+          <div className="min-w-0">
+            <h1 className="text-base font-semibold text-ink dark:text-[#F5F1EA] truncate">{title}</h1>
+            {subtitle && (
+              <p className="text-[12px] text-muted dark:text-[#8C837C] truncate">{subtitle}</p>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <label className="inline-flex items-center gap-1.5 text-[11px] text-muted dark:text-[#8C837C]">
@@ -329,7 +341,10 @@ export function ChatSurface({
             <div className="flex justify-start">
               <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-4 py-3 text-sm max-w-[85%] space-y-1.5">
                 <div className="flex items-center gap-2 text-muted dark:text-[#8C837C]">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-flame animate-pulse" />
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-flame" />
+                  </span>
                   {streamingTools.length > 0 ? 'working…' : 'thinking…'}
                 </div>
                 {streamingTools.length > 0 && (
