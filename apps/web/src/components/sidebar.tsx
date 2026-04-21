@@ -37,9 +37,37 @@ import {
   Users,
   Briefcase,
   Zap,
+  Bot,
+  Globe,
+  Linkedin,
+  CalendarClock,
+  Copy,
+  RotateCcw,
+  Activity,
+  Radar,
+  Send,
+  Search as SearchIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../lib/api';
+
+// Icon string (from agent frontmatter `icon:`) → lucide component.
+// Mirrors the names seeded in daemon/src/vault.ts DEFAULT_AGENTS. Falls
+// back to Bot for any unmapped icon.
+const AGENT_ICON_MAP: Record<string, LucideIcon> = {
+  Bot,
+  Globe,
+  Linkedin,
+  CalendarClock,
+  Copy,
+  RotateCcw,
+  Activity,
+  Radar,
+  Briefcase,
+  Send,
+  Search: SearchIcon,
+  Sparkles,
+};
 
 function newThreadId(): string {
   const d = new Date();
@@ -97,6 +125,46 @@ export function Sidebar() {
     () => (runs.data?.runs ?? []).filter((r) => !r.done).length,
     [runs.data],
   );
+
+  // Team section — read agents/*.md from the vault so the list matches
+  // the actual agents seeded in the project (Company Profiler pinned
+  // first, then alpha). Hidden while loading so we don't flash a stale
+  // list during project switches.
+  const teamAgents = useQuery({
+    queryKey: ['sidebar-agents'],
+    queryFn: async () => {
+      const tree = await api.vaultTree();
+      const files = tree.tree.filter(
+        (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
+      );
+      const rows = await Promise.all(files.map(async (f) => {
+        const r = await api.readFile(f.path);
+        const fm = r.frontmatter ?? {};
+        const slug = f.path.replace(/^agents\//, '').replace(/\.md$/, '');
+        const name = typeof fm.name === 'string' ? fm.name : slug;
+        const icon = typeof fm.icon === 'string' ? fm.icon : '';
+        const pin = typeof fm.pin === 'string' ? fm.pin : '';
+        return { slug, name, icon, pin };
+      }));
+      rows.sort((a, b) => {
+        const aPin = a.pin === 'first' ? 0 : 1;
+        const bPin = b.pin === 'first' ? 0 : 1;
+        if (aPin !== bPin) return aPin - bPin;
+        return a.name.localeCompare(b.name);
+      });
+      return rows;
+    },
+    staleTime: 60_000,
+  });
+  // Slugs of agents that have at least one live run — drives the breathing
+  // dot so users see which agent is actually working right now.
+  const liveAgentSlugs = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of runs.data?.runs ?? []) {
+      if (!r.done && typeof r.agent === 'string') s.add(r.agent.toLowerCase());
+    }
+    return s;
+  }, [runs.data]);
 
   // Cmd+K command palette
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -162,6 +230,25 @@ export function Sidebar() {
         <NavRow icon={Inbox}           label="Inbox"     href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
         <NavRow icon={LayoutDashboard} label="Dashboard" href="/dashboard" pathname={pathname} />
 
+        {(teamAgents.data?.length ?? 0) > 0 && (
+          <>
+            <SectionLabel>Team</SectionLabel>
+            {(teamAgents.data ?? []).map((a) => {
+              const Icon = AGENT_ICON_MAP[a.icon] ?? Bot;
+              return (
+                <NavRow
+                  key={a.slug}
+                  icon={Icon}
+                  label={a.name}
+                  href={`/team?slug=${encodeURIComponent(a.slug)}`}
+                  pathname={pathname}
+                  breathing={liveAgentSlugs.has(a.slug.toLowerCase())}
+                />
+              );
+            })}
+          </>
+        )}
+
         <SectionLabel>Work</SectionLabel>
         <NavRow icon={BookOpen} label="Playbooks" href="/playbooks" pathname={pathname} />
         <NavRow icon={Zap}      label="Triggers"  href="/triggers"  pathname={pathname} />
@@ -221,6 +308,7 @@ function NavRow({
   exact,
   badge,
   live,
+  breathing,
 }: {
   icon: LucideIcon;
   label: string;
@@ -229,8 +317,22 @@ function NavRow({
   exact?: boolean;
   badge?: number;
   live?: number;
+  breathing?: boolean;
 }) {
-  const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(href + '/');
+  // Team rows use /team?slug=X so the bare pathname match won't hit.
+  // Match the slug query segment for that case.
+  const isActive = (() => {
+    if (exact) return pathname === href;
+    if (href.startsWith('/team?')) {
+      const slug = new URL(href, 'http://x').searchParams.get('slug');
+      if (typeof window !== 'undefined' && slug) {
+        const cur = new URL(window.location.href).searchParams.get('slug');
+        return pathname.startsWith('/team') && cur === slug;
+      }
+      return false;
+    }
+    return pathname === href || pathname.startsWith(href + '/');
+  })();
   return (
     <Link
       href={href}
@@ -241,7 +343,15 @@ function NavRow({
           : 'text-ink/80 dark:text-[#E6E0D8]/80 hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 hover:text-ink dark:hover:text-[#F5F1EA]')
       }
     >
-      <Icon className="w-4 h-4 shrink-0" />
+      <span className="relative shrink-0">
+        <Icon className="w-4 h-4" />
+        {breathing && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-flame" />
+          </span>
+        )}
+      </span>
       <span className="flex-1 truncate">{label}</span>
       {live != null && live > 0 && (
         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-flame">

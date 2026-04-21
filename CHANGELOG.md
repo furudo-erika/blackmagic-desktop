@@ -2,6 +2,22 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.26 — 2026-04-21
+
+### Restored
+- **Team section is back in the sidebar.** 0.4.15 dropped the per-
+  agent row list in favor of the chat-gallery picker; users missed
+  it because agents are a primary navigation surface, not just a
+  chat-mode toggle. Team section now reads `agents/*.md` from the
+  active vault and renders one row per agent — Company Profiler
+  pinned first (via frontmatter `pin: first`), rest alpha-sorted,
+  each with its own lucide icon pulled from frontmatter `icon:`
+  (Radar for GEO Analyst, Linkedin for LinkedIn Outreach, etc). The
+  breathing-flame dot is back too: the icon of any agent with a
+  live run pulses, so you can scan the sidebar and know exactly
+  which agent is working right now. Rows route to the /team cockpit
+  with the right slug.
+
 ## 0.4.25 — 2026-04-21
 
 ### Changed
