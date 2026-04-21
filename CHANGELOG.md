@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.3.10 — 2026-04-21
+
+### Added
+- **Sidebar breathing light while a run is live.** Every nav item
+  (Skills, Sequences, Triggers, Companies, Contacts, Deals, Org,
+  Knowledge graph, Files, Integrations, Agent roles, Settings, Team
+  agents) now shows the same animate-ping flame dot that the Runs
+  row uses whenever `liveCount > 0`. Gives the whole sidebar a
+  shared "呼吸灯" pulse so it's obvious at a glance that an agent is
+  working, even when you've navigated away from /runs.
+
 ## 0.3.9 — 2026-04-21
 
 ### Changed

@@ -53,6 +53,11 @@ type SidebarNavItemProps = {
   liveCount?: number;
   /** Small red dot on the icon. */
   alert?: boolean;
+  /** Breathing flame dot on the icon — used to signal "an agent is
+   *  currently running and may touch this section". Rendered with the
+   *  same animate-ping halo as the Runs `liveCount` pill so the whole
+   *  sidebar reads as active together. */
+  breathing?: boolean;
   /** Extra trailing element rendered after badges. */
   trailing?: ReactNode;
 };
@@ -66,6 +71,7 @@ export function SidebarNavItem({
   badgeTone = 'default',
   liveCount,
   alert = false,
+  breathing = false,
   trailing,
 }: SidebarNavItemProps) {
   const pathname = usePathname() || '/';
@@ -85,6 +91,12 @@ export function SidebarNavItem({
         <Icon className="w-4 h-4" />
         {alert && (
           <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-flame shadow-[0_0_0_2px_var(--sidebar-bg,#F5F1EA)]" />
+        )}
+        {breathing && !alert && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-flame" />
+          </span>
         )}
       </span>
       <span className="flex-1 truncate">{label}</span>
