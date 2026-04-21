@@ -2,6 +2,29 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.5 — 2026-04-21
+
+### Changed
+- **Agent cockpit is now an interactive workspace.** Clicking an
+  agent used to land on a read-only "what it can do / tools / runs"
+  page with a separate "Chat with X" button that page-jumped you
+  away. Now the cockpit embeds ChatSurface inline: chat on the
+  left (scoped to that agent, its own thread), skills + recent
+  runs + tools in the right rail. No more hop to /Chat, no more
+  "what do I do" confusion — the chat input is the primary action.
+- **Empty state points at chat.** When an agent has zero skills
+  (like the new GEO Analyst), the "Skills" rail says "just chat on
+  the left" instead of the old confusing "Add a playbook with
+  agent: <slug>" message. A default starter prompt ("Kick off
+  <Agent>…") is seeded into the empty chat so there's always one
+  obvious next move.
+- **Chat agent picker switches threads.** Selecting a different
+  agent now swaps the thread to that agent's own history
+  (`bm-team-thread-<slug>`). The picker label reads "Agent:" with
+  tooltip "Switch agents — each one has its own thread so you can
+  run many in parallel". Swapping back to Default (Research Agent)
+  restores the global chat thread.
+
 ## 0.4.4 — 2026-04-21
 
 ### Fixed

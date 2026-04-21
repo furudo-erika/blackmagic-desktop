@@ -135,19 +135,30 @@ export function ChatSurface({
     el.style.overflowY = el.scrollHeight > 320 ? 'auto' : 'hidden';
   }, [input]);
 
-  const isGlobal = threadKey === 'bm-last-thread';
+  // When the picker changes which agent routes the conversation, also
+  // switch the persisted thread. Each agent keeps its own history under
+  // `bm-team-thread-<slug>`, so picking "Deal Manager" here loads that
+  // agent's past messages instead of mixing conversations.
+  const effectiveThreadKey = pickedAgent
+    ? `bm-team-thread-${pickedAgent}`
+    : threadKey;
+  const isGlobal = effectiveThreadKey === 'bm-last-thread';
 
   useEffect(() => {
     function syncThread() {
       if (typeof window === 'undefined') return;
-      const last = localStorage.getItem(threadKey);
+      const last = localStorage.getItem(effectiveThreadKey);
       if (last && last !== threadId) loadThread(last);
       else if (!last && !threadId) {
         const id = newThreadId();
         setThreadId(id);
-        localStorage.setItem(threadKey, id);
+        localStorage.setItem(effectiveThreadKey, id);
       }
     }
+    // Reset visible state when threadKey changes so stale messages from
+    // the previous agent don't flash before the new thread loads.
+    setThreadId('');
+    setMessages([]);
     syncThread();
     if (isGlobal) {
       window.addEventListener('storage', syncThread);
@@ -161,7 +172,7 @@ export function ChatSurface({
     }
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadId, threadKey, isGlobal]);
+  }, [effectiveThreadKey, isGlobal]);
 
   async function loadThread(id: string) {
     try {
@@ -285,15 +296,18 @@ export function ChatSurface({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <label className="inline-flex items-center gap-1.5 text-[11px] text-muted dark:text-[#8C837C]">
+          <label
+            className="inline-flex items-center gap-1.5 text-[11px] text-muted dark:text-[#8C837C]"
+            title="Switch agents — each one has its own thread so you can run many in parallel"
+          >
             <Bot className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Agent:</span>
             <select
               value={effectiveAgent ?? ''}
               onChange={(e) => setPickedAgent(e.target.value || undefined)}
-              className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md px-2 py-1 text-[12px] text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
-              title="Route this message to a specific agent"
+              className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md px-2 py-1 text-[12px] text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame cursor-pointer"
             >
-              <option value="">auto (researcher)</option>
+              <option value="">Default (Research Agent)</option>
               {(agentOptions.data ?? []).map((a) => (
                 <option key={a.slug} value={a.slug}>{a.name}</option>
               ))}

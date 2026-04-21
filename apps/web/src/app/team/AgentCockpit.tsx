@@ -3,13 +3,14 @@
 /**
  * /team?slug=<agent> — cockpit for one agent.
  *
- * Not another chat. The main Chat already handles conversation. This
- * page earns its click by showing:
- *   - identity + tools
- *   - status strip (last run + drafts produced + live/idle)
- *   - skills the agent owns (playbooks filterable by fm.agent / group)
- *   - recent runs by this agent
- *   - footer CTA to open Chat with this agent preselected
+ * Layout:
+ *   - slim header (identity · status strip)
+ *   - body: ChatSurface (left, fills) · right rail with skills + runs
+ *
+ * Chat lives inside the cockpit so the user can interact with the
+ * agent without a page-jump. Each agent gets its own thread via
+ * threadKey=`bm-team-thread-<slug>`, so multiple agents run in
+ * parallel, each keeping its own history.
  */
 
 import Link from 'next/link';
@@ -24,7 +25,6 @@ import {
   Copy,
   Globe,
   History,
-  Inbox,
   Linkedin,
   MessageSquare,
   RotateCcw,
@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 
 import { api } from '../../lib/api';
+import { ChatSurface, type ChatScenario } from '../../components/chat-surface';
 import { PlaybookCard, type Playbook } from '../../components/playbook-card';
 import { AGENTS, getAgent } from '../../config/agents';
 
@@ -77,18 +78,24 @@ type VaultAgent = {
   icon: string;
   description: string;
   tools: string[];
+  starterPrompts: string[];
 };
 
 async function loadVaultAgent(slug: string): Promise<VaultAgent | null> {
   try {
     const r = await api.readFile(`agents/${slug}.md`);
     const fm = r.frontmatter ?? {};
+    const description = r.body.trim().split('\n').find((l) => l.trim().length > 0)?.replace(/^#+\s*/, '') ?? '';
+    const starterPrompts = Array.isArray((fm as any).starter_prompts)
+      ? (fm as any).starter_prompts.map(String).filter(Boolean)
+      : [];
     return {
       slug,
       name: typeof fm.name === 'string' && fm.name ? fm.name : slug,
       icon: typeof fm.icon === 'string' ? fm.icon : 'Bot',
-      description: r.body.trim().split('\n').find((l) => l.trim().length > 0)?.replace(/^#+\s*/, '') ?? '',
+      description,
       tools: Array.isArray(fm.tools) ? fm.tools.map(String) : [],
+      starterPrompts,
     };
   } catch {
     return null;
@@ -106,10 +113,16 @@ export default function AgentCockpit() {
       if (!slug) return null;
       const vault = await loadVaultAgent(slug);
       if (vault) return vault;
-      // Fallback: hardcoded AGENTS (legacy slugs) so links don't break.
       const a = getAgent(slug);
       if (!a) return null;
-      return { slug: a.slug, name: a.name, icon: a.icon, description: a.description, tools: [] };
+      return {
+        slug: a.slug,
+        name: a.name,
+        icon: a.icon,
+        description: a.description,
+        tools: [],
+        starterPrompts: a.starterPrompts ?? [],
+      };
     },
     enabled: !!slug,
   });
@@ -190,17 +203,36 @@ export default function AgentCockpit() {
 
   const agent = agentQ.data;
   const Icon = ICONS[agent.icon] ?? Bot;
+  const playbooks = playbooksQ.data ?? [];
+
+  // Build chat scenarios from the agent's own starter_prompts (if any).
+  // Falls back to a single contextual starter so the chat-empty state
+  // never looks bare — the user always has ONE obvious next action.
+  const scenarios: ChatScenario[] = useMemo(() => {
+    if (agent.starterPrompts.length > 0) {
+      return agent.starterPrompts.map((p) => ({
+        title: p.length > 48 ? p.slice(0, 45) + '…' : p,
+        prompt: p,
+      }));
+    }
+    return [
+      {
+        title: `Kick off ${agent.name}`,
+        prompt: `You are the ${agent.name}. Walk me through the first thing you would do for my project. Read what you need from the vault (us/, companies/, contacts/, signals/) and reply with: (1) the concrete first step, (2) the tools you would call, (3) what output I should expect. No pitches — be specific.`,
+      },
+    ];
+  }, [agent.name, agent.starterPrompts]);
 
   return (
-    <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A]">
+    <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A] min-h-0">
       {/* Header */}
-      <header className="shrink-0 border-b border-line dark:border-[#2A241D] px-6 py-4 flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D]">
+      <header className="shrink-0 border-b border-line dark:border-[#2A241D] px-6 py-3 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D]">
           <Icon className="w-4 h-4 text-ink dark:text-[#F5F1EA]" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-semibold text-ink dark:text-[#F5F1EA] truncate">
+            <h1 className="text-[15px] font-semibold text-ink dark:text-[#F5F1EA] truncate">
               {agent.name}
             </h1>
             <span className="text-[10px] font-mono text-muted dark:text-[#8C837C] truncate">{slug}</span>
@@ -215,82 +247,60 @@ export default function AgentCockpit() {
             )}
           </div>
           {agent.description && (
-            <p className="mt-1 text-[12px] text-muted dark:text-[#8C837C] line-clamp-2">{agent.description}</p>
+            <p className="text-[11px] text-muted dark:text-[#8C837C] truncate">{agent.description}</p>
           )}
         </div>
-        <Link
-          href={`/?agent=${encodeURIComponent(slug)}`}
-          className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-flame text-white text-[12px] font-medium hover:opacity-90"
-        >
-          <MessageSquare className="w-3.5 h-3.5" /> Chat with {agent.name}
-        </Link>
+        <div className="hidden md:flex items-center gap-4 text-[11px] font-mono text-muted dark:text-[#8C837C] shrink-0">
+          <span className="inline-flex items-center gap-1.5">
+            <History className="w-3 h-3" /> last run {timeAgo(lastRunMs)}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Wrench className="w-3 h-3" /> {agent.tools.length} tools
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Bot className="w-3 h-3" /> {playbooks.length} skills
+          </span>
+        </div>
       </header>
 
-      {/* Status strip */}
-      <div className="shrink-0 border-b border-line dark:border-[#2A241D] px-6 py-3 flex items-center gap-6 text-[11px] font-mono text-muted dark:text-[#8C837C]">
-        <span className="inline-flex items-center gap-1.5">
-          <History className="w-3 h-3" />
-          last run {timeAgo(lastRunMs)}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Wrench className="w-3 h-3" />
-          {agent.tools.length} tools
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Bot className="w-3 h-3" />
-          {playbooksQ.data?.length ?? 0} skills
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Inbox className="w-3 h-3" />
-          {agentRuns.length} runs shown
-        </span>
-      </div>
+      {/* Body: chat left, skills+runs right */}
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_340px]">
+        {/* Chat scoped to this agent */}
+        <div className="min-h-0 border-r border-line dark:border-[#2A241D]">
+          <ChatSurface
+            agent={slug}
+            threadKey={`bm-team-thread-${slug}`}
+            title={`Chat with ${agent.name}`}
+            scenarios={scenarios}
+          />
+        </div>
 
-      {/* Body: two columns on wide screens */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-6 py-5 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-          {/* Skills */}
+        {/* Right rail: skills + recent runs + tools */}
+        <aside className="min-h-0 overflow-y-auto bg-cream-light dark:bg-[#17140F] px-4 py-4 space-y-5">
           <section>
             <div className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C] mb-2">
-              What it can do
+              Skills {agent.name} can run
             </div>
             {playbooksQ.isLoading && (
               <div className="text-[12px] text-muted dark:text-[#8C837C]">loading…</div>
             )}
-            {playbooksQ.data && playbooksQ.data.length === 0 && (
-              <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-5 text-[13px] text-muted dark:text-[#8C837C]">
-                No skills map to this agent yet. Add a <code>playbooks/*.md</code> with
-                {' '}<code>agent: {slug}</code> in the frontmatter, or chat with it directly.
+            {!playbooksQ.isLoading && playbooks.length === 0 && (
+              <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4 text-[12px] text-muted dark:text-[#8C837C] leading-relaxed">
+                No canned skills for this agent — just chat on the left. To
+                wire up a one-click skill, add a{' '}
+                <code className="font-mono text-[11px]">playbooks/*.md</code>{' '}
+                with <code className="font-mono text-[11px]">agent: {slug}</code> in
+                its frontmatter.
               </div>
             )}
             <div className="space-y-2">
-              {(playbooksQ.data ?? []).map((pb) => (
+              {playbooks.map((pb) => (
                 <PlaybookCard key={pb.path} pb={pb} />
               ))}
             </div>
-
-            {/* Tools */}
-            {agent.tools.length > 0 && (
-              <div className="mt-6">
-                <div className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C] mb-2">
-                  Tools
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {agent.tools.map((t) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border border-line dark:border-[#2A241D] text-muted dark:text-[#8C837C] bg-white dark:bg-[#1F1B15]"
-                    >
-                      <Wrench className="w-2.5 h-2.5" /> {t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </section>
 
-          {/* Recent runs */}
-          <aside>
+          <section>
             <div className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C] mb-2">
               Recent runs
             </div>
@@ -298,30 +308,32 @@ export default function AgentCockpit() {
               <div className="text-[12px] text-muted dark:text-[#8C837C]">loading…</div>
             )}
             {!runsQ.isLoading && agentRuns.length === 0 && (
-              <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4 text-[12px] text-muted dark:text-[#8C837C]">
-                No runs yet. Trigger a skill on the left or chat with the agent to see activity here.
+              <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-3 text-[12px] text-muted dark:text-[#8C837C]">
+                No runs yet. Send a message on the left or trigger a skill.
               </div>
             )}
-            <ul className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl divide-y divide-line dark:divide-[#2A241D] overflow-hidden">
-              {agentRuns.map((r) => (
-                <li key={r.runId}>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/runs?runId=${encodeURIComponent(r.runId)}`)}
-                    className="w-full text-left px-3 py-2 hover:bg-cream-light dark:hover:bg-[#17140F]"
-                  >
-                    <div className="text-[12px] text-ink dark:text-[#E6E0D8] truncate">
-                      {r.preview || r.runId}
-                    </div>
-                    <div className="mt-0.5 text-[10px] font-mono text-muted dark:text-[#8C837C] flex items-center gap-2">
-                      <span>{timeAgo(runStartedMs(r.runId))}</span>
-                      <span>· {r.toolCalls ?? 0} tools</span>
-                      <span>· {r.done ? 'done' : 'running'}</span>
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {agentRuns.length > 0 && (
+              <ul className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl divide-y divide-line dark:divide-[#2A241D] overflow-hidden">
+                {agentRuns.map((r) => (
+                  <li key={r.runId}>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/runs?runId=${encodeURIComponent(r.runId)}`)}
+                      className="w-full text-left px-3 py-2 hover:bg-cream-light dark:hover:bg-[#17140F]"
+                    >
+                      <div className="text-[12px] text-ink dark:text-[#E6E0D8] truncate">
+                        {r.preview || r.runId}
+                      </div>
+                      <div className="mt-0.5 text-[10px] font-mono text-muted dark:text-[#8C837C] flex items-center gap-2">
+                        <span>{timeAgo(runStartedMs(r.runId))}</span>
+                        <span>· {r.toolCalls ?? 0} tools</span>
+                        <span>· {r.done ? 'done' : 'running'}</span>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             {agentRuns.length > 0 && (
               <Link
                 href="/runs"
@@ -330,8 +342,26 @@ export default function AgentCockpit() {
                 all runs →
               </Link>
             )}
-          </aside>
-        </div>
+          </section>
+
+          {agent.tools.length > 0 && (
+            <section>
+              <div className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C] mb-2">
+                Tools
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {agent.tools.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border border-line dark:border-[#2A241D] text-muted dark:text-[#8C837C] bg-white dark:bg-[#1F1B15]"
+                  >
+                    <Wrench className="w-2.5 h-2.5" /> {t}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+        </aside>
       </div>
     </div>
   );
