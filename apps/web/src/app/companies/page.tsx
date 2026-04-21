@@ -362,6 +362,11 @@ export default function CompaniesPage() {
                         not a valid domain
                       </span>
                     )}
+                    {!domain && (
+                      <span className="text-[11px] text-muted dark:text-[#8C837C]">
+                        enter a domain to enable
+                      </span>
+                    )}
                     <Button variant="ghost" onClick={() => setShowEnrich(false)}>Cancel</Button>
                     {message && (
                       <span className="text-[11px] text-muted dark:text-[#8C837C]">{message}</span>

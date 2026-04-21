@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.13 — 2026-04-21
+
+### Fixed
+- **Real brand logos on integration cards.** 0.4.11 shipped colored
+  tiles with initials ("H", "A", "SF", "飞", "MB", …) as a
+  placeholder. Swapped for actual brand SVGs (Simple Icons paths,
+  MIT licensed) — HubSpot sprocket, Salesforce cloud, Slack hash,
+  Gmail envelope, Feishu/Lark bubble, Metabase dot-chart, Supabase
+  lightning. Each path renders in white on the brand's colored
+  background tile.
+
 ## 0.4.12 — 2026-04-21
 
 ### Fixed
