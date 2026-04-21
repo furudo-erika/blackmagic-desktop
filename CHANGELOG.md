@@ -2,6 +2,23 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.28 — 2026-04-21
+
+### Added
+- **Seven new integrations** targeting indie-hacker workflows:
+  Cal.com (scheduling), Discord and Telegram (messaging/community),
+  Notion (knowledge base), Linear and GitHub (engineering), Stripe
+  (payments). Each appears as a card on the Integrations page with
+  its canonical brand mark. Credential storage reuses the existing
+  per-user `~/BlackMagic/.bm/integrations.json` vault — nothing
+  leaves the machine. OAuth is flagged for GitHub, Linear, and
+  Notion (they all ship paste-token fallbacks until the hosted OAuth
+  apps are registered); Cal.com, Discord, Telegram, and Stripe are
+  API-key/bot-token flows from day one. Grouping reshuffled to
+  surface new categories: Scheduling, Knowledge, Engineering, and
+  Payments alongside the existing CRM, Sales, Messaging, and Data
+  groups.
+
 ## 0.4.27 — 2026-04-21
 
 ### Changed

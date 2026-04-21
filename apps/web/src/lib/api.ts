@@ -10,7 +10,14 @@ export type IntegrationProvider =
   | 'gmail'
   | 'feishu'
   | 'metabase'
-  | 'supabase';
+  | 'supabase'
+  | 'calcom'
+  | 'discord'
+  | 'telegram'
+  | 'notion'
+  | 'linear'
+  | 'github'
+  | 'stripe';
 
 export type Integration = {
   provider: IntegrationProvider;
