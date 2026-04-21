@@ -242,10 +242,18 @@ export function ChatSurface({
             .map((l) => l.trim())
             .find((l) => l && !l.startsWith('#') && !l.startsWith('-') && !l.startsWith('*'));
           const tagline = firstLine ? firstLine.replace(/^[*_`]+/, '').slice(0, 120) : '';
-          return { slug, name, starterPrompts, icon, tagline };
+          const pin = typeof fm.pin === 'string' ? fm.pin : '';
+          return { slug, name, starterPrompts, icon, tagline, pin };
         }),
       );
-      rows.sort((a, b) => a.name.localeCompare(b.name));
+      // Sort: `pin: first` agents always lead (Company Profiler onboarding
+      // flow relies on this), then alphabetical by display name.
+      rows.sort((a, b) => {
+        const aPin = a.pin === 'first' ? 0 : 1;
+        const bPin = b.pin === 'first' ? 0 : 1;
+        if (aPin !== bPin) return aPin - bPin;
+        return a.name.localeCompare(b.name);
+      });
       return rows;
     },
     staleTime: 60_000,
@@ -449,12 +457,12 @@ export function ChatSurface({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sendMut.isPending]);
 
-  function send() {
-    const text = input.trim();
+  function send(override?: string) {
+    const text = (override ?? input).trim();
     if (!text || sendMut.isPending) return;
     const next: Msg[] = [...messages, { role: 'user', content: text }];
     setMessages(next);
-    setInput('');
+    if (!override) setInput('');
     sendMut.mutate(next);
   }
 
@@ -509,6 +517,19 @@ export function ChatSurface({
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {messages.length === 0 && (
           <div className="max-w-5xl mx-auto py-6 space-y-8">
+            {/* Onboarding nudge — if a `pin: first` agent exists (Company
+                Profiler by convention), promote it above the gallery
+                with a one-click "Run now" so new users profile their
+                company on first launch. Every other agent's output is
+                generic until us/ has real data from the profiler. */}
+            <ProfilerOnboardingBanner
+              agents={agentOptions.data ?? []}
+              onRun={(slug, prompt) => {
+                setPickedAgent(slug);
+                send(prompt);
+              }}
+            />
+
             {/* Agent gallery — always visible in the empty state, not
                 tucked behind the header dropdown. Each card switches the
                 active agent for this thread; the currently-picked agent
@@ -631,7 +652,7 @@ export function ChatSurface({
             style={{ minHeight: 40, maxHeight: 320 }}
           />
           <button
-            onClick={send}
+            onClick={() => send()}
             disabled={sendMut.isPending || !input.trim()}
             className="h-10 px-4 rounded-lg bg-flame text-white text-sm font-medium hover:opacity-90 disabled:opacity-40 flex items-center gap-1.5"
           >
@@ -781,3 +802,81 @@ function MessageFooter({ content }: { content: string }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Onboarding banner — promotes the Company Profiler above the agent gallery
+// with a one-click "Run now" CTA. Dismissed state persists per-vault in
+// localStorage so it doesn't badger the user after they've profiled once.
+// Renders only when:
+//   - a `pin: first` agent exists in the vault (Company Profiler by
+//     convention seeded by the daemon)
+//   - the user hasn't dismissed the banner
+//   - the banner hasn't been dismissed by "Run now" completing before
+// ---------------------------------------------------------------------------
+function ProfilerOnboardingBanner({
+  agents,
+  onRun,
+}: {
+  agents: Array<{ slug: string; name: string; icon: string; tagline: string; starterPrompts: string[]; pin?: string }>;
+  onRun: (slug: string, prompt: string) => void;
+}) {
+  const pinned = agents.find((a) => a.pin === 'first');
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('bm-profiler-banner-dismissed');
+      if (v === '1') setDismissed(true);
+    } catch {}
+  }, []);
+  if (!pinned || dismissed) return null;
+  function dismiss() {
+    try { localStorage.setItem('bm-profiler-banner-dismissed', '1'); } catch {}
+    setDismissed(true);
+  }
+  const Icon = AGENT_ICONS[pinned.icon] ?? Sparkles;
+  const prompt =
+    pinned.starterPrompts?.[0] ||
+    `You are the ${pinned.name}. Profile my company end-to-end — crawl the domain + docs, infer the ICP, competitors, voice, and populate the \`us/\` tree. This is the first thing to run on a fresh vault; every other agent reads from \`us/\` so this kicks everything off.`;
+  return (
+    <div className="relative bg-gradient-to-br from-flame/10 to-flame/5 border border-flame/40 rounded-xl p-5 flex items-start gap-4">
+      <div className="w-10 h-10 rounded-lg bg-flame/20 flex items-center justify-center shrink-0">
+        <Icon className="w-5 h-5 text-flame" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="text-[14px] font-semibold text-ink dark:text-[#F5F1EA]">
+            Start here: run {pinned.name}
+          </h3>
+          <span className="text-[10px] uppercase tracking-wider font-mono text-flame font-semibold">
+            1 · onboarding
+          </span>
+        </div>
+        <p className="text-[12.5px] text-muted dark:text-[#E6E0D8] mt-1 leading-relaxed">
+          Every other agent in this workspace reads from your
+          <code className="mx-1 px-1 rounded bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] text-[11px] font-mono">us/</code>
+          folder — company profile, ICP, voice, competitors. {pinned.name} crawls your
+          domain + docs, populates all of it, and unlocks the rest of the roster. Takes
+          about a minute.
+        </p>
+        <div className="flex items-center gap-2 mt-3">
+          <button
+            type="button"
+            onClick={() => onRun(pinned.slug, prompt)}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-flame text-white text-[12.5px] font-medium hover:opacity-90"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Run now
+          </button>
+          <button
+            type="button"
+            onClick={dismiss}
+            className="h-8 px-3 rounded-md text-[11.5px] text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]"
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

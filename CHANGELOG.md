@@ -2,6 +2,23 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.25 — 2026-04-21
+
+### Changed
+- **Company Profiler now leads the agent gallery + has a "Run now"
+  onboarding banner.** The chat empty-state gallery used to sort
+  agents strictly alphabetical, so the Profiler got buried behind
+  Closed-Lost Revival / Deal Manager. Gallery now honors the
+  `pin: first` frontmatter field — any agent seeded with
+  `pin: first` floats to the very top of the grid, then the rest
+  sorts A-Z. Above the gallery, a flame-tinted banner promotes the
+  pinned agent with a one-click "Run now" button that auto-selects
+  the agent + dispatches its starter prompt (falls back to a
+  bootstrap prompt if the agent has none). The banner is
+  dismissable and remembers dismissal per-vault in localStorage —
+  once you've profiled once it gets out of the way. New users hit
+  `/` and the very next move is visibly "Run Company Profiler".
+
 ## 0.4.24 — 2026-04-21
 
 ### Added
