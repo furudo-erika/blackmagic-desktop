@@ -2,6 +2,38 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.24 — 2026-04-21
+
+### Added
+- **Entity activity + assignee + runs — the Multica-inspired agent
+  interaction foundation.** Every company, contact, and deal can now
+  carry an `assignee` in frontmatter, have its own append-only
+  activity log at `signals/activity/<kind>/<slug>.jsonl`, and filter
+  agent runs by entity via the new `entity_ref` field stamped into
+  `runs/<id>/meta.json`. New daemon routes:
+  - `GET/POST /api/entity/activity?path=…` — list + post comments
+  - `GET/PUT /api/entity/assignee?path=…` — read + set assignee
+  - `GET /api/entity/runs?path=…` — runs scoped to this entity
+- **Mention-triggered agent runs.** `@agent-slug` inside an entity
+  comment enqueues a run for that agent, scoped to the entity. The
+  run's `entity_ref` ties it back so the UI can show it in the live
+  card + history on that entity's page.
+- **Mention inheritance.** Replying in a comment thread without an
+  explicit `@` inherits the parent's mentions — the looped-in agent
+  stays looped-in for follow-up replies without needing a repeat @.
+- **Assignment-triggered runs.** Setting an entity's assignee to an
+  agent in the right-rail picker auto-enqueues a run where the agent
+  reads that entity and executes its loop against it. Reassigning
+  to a different agent re-triggers; assigning to a member or
+  unassigning does not.
+- **`/entity/[kind]/[slug]` detail route.** New Multica-style entity
+  view with: breadcrumbs → title + subtitle → AgentLiveCard for
+  running runs → entity body → Activity feed with threaded comments
+  (@ mentions rendered in flame) → Run history (collapsible list) →
+  right-rail Properties with the MEMBERS / AGENTS Assignee picker.
+  Accessible directly via URL; list-page drawer migration lands
+  next release.
+
 ## 0.4.23 — 2026-04-21
 
 ### Changed
