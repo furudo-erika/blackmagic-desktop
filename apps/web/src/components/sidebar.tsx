@@ -272,25 +272,24 @@ export function Sidebar() {
           />
         </div>
 
-        <SidebarSection label="Team">
-          {teamItems.map((agent) => {
-            const Icon = SIDEBAR_AGENT_ICONS[agent.icon] ?? Bot;
-            // Only the agent actually running right now pulses — earlier
-            // versions lit every Team item whenever any run was live,
-            // which made the whole sidebar look busy for no reason.
-            return (
-              <SidebarNavItem
-                key={agent.slug}
-                href={agent.href}
-                label={agent.name}
-                icon={Icon}
-                breathing={liveAgentSlugs.has(agent.slug.toLowerCase())}
-              />
-            );
-          })}
+        {/*
+          Team section was removed in 0.4.15. Before, every seeded agent had
+          its own sidebar row — ten rows of near-identical icons that bloated
+          the nav and hid the primary Chat entry point. Agents are now picked
+          from the chat surface's Agent dropdown + empty-state gallery so the
+          sidebar stays short. `liveAgentSlugs` + `teamItems` are still
+          computed above because the breathing-light logic might light up a
+          chat row in the near future. If that doesn't land, strip them.
+        */}
+
+        <SidebarSection label="Vault">
+          <SidebarNavItem href="/companies" label="Companies" icon={Building2} />
+          <SidebarNavItem href="/contacts" label="Contacts" icon={Users} />
+          <SidebarNavItem href="/deals" label="Deals" icon={Briefcase} />
+          <SidebarNavItem href="/vault" label="Files" icon={FolderTree} />
         </SidebarSection>
 
-        <SidebarSection label="Work">
+        <SidebarSection label="Automations">
           <SidebarNavItem href="/playbooks" label="Skills" icon={BookOpen} />
           <SidebarNavItem href="/sequences" label="Sequences" icon={Repeat} />
           <SidebarNavItem href="/triggers" label="Triggers" icon={Zap} />
@@ -303,18 +302,8 @@ export function Sidebar() {
           />
         </SidebarSection>
 
-        <SidebarSection label="Vault">
-          <SidebarNavItem href="/companies" label="Companies" icon={Building2} />
-          <SidebarNavItem href="/contacts" label="Contacts" icon={Users} />
-          <SidebarNavItem href="/deals" label="Deals" icon={Briefcase} />
-          <SidebarNavItem href="/org" label="Org tree" icon={GitBranch} />
-          <SidebarNavItem href="/ontology" label="Knowledge graph" icon={Network} />
-          <SidebarNavItem href="/vault" label="Files" icon={FolderTree} />
-        </SidebarSection>
-
         <SidebarSection label="System">
           <SidebarNavItem href="/integrations" label="Integrations" icon={Plug} />
-          <SidebarNavItem href="/agents" label="Agent roles" icon={Bot} />
           <SidebarNavItem href="/settings" label="Settings" icon={SettingsIcon} />
         </SidebarSection>
       </nav>

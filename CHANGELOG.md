@@ -2,6 +2,43 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.15 — 2026-04-21
+
+### Fixed
+- **Upgrade loop + zombie daemons.** Three linked bugs that left
+  users stuck on an "out of date" prompt with 10+ dead daemon
+  processes and a broken install. First, `daemonProcess.kill()`
+  only ran on `window-all-closed`, which on macOS doesn't fire on
+  app relaunches — so every auto-upgrade cycle piled another
+  daemon onto the stack. Cleanup now runs on `before-quit` +
+  `will-quit` with a SIGTERM → SIGKILL escalation. Second, the
+  upgrade dialog closed instantly when clicked and showed no
+  feedback, so users clicked again and spawned a second brew
+  process that collided on the download lock; there's now an
+  `upgradeInProgress` guard plus a native macOS notification
+  ("Downloading the latest version. The app will reopen in about
+  a minute.") so the click clearly did something. Third, the
+  upgrade shell script now force-kills any lingering
+  `/Applications/BlackMagic AI.app` processes and clears stale
+  brew `.incomplete` download locks before running `brew upgrade`,
+  so a killed prior attempt can't brick the next one.
+
+### Changed
+- **Sidebar is less cluttered.** Dropped the per-agent Team
+  section entirely — ten near-identical rows bloated the nav and
+  buried the primary Chat entry point. Agents are now picked from
+  the chat surface itself: the Agent dropdown in the header and a
+  gallery of agent cards in the chat empty state. Renamed the
+  "Work" section to "Automations". Pruned "Agent roles", "Org
+  tree", and "Knowledge graph" from the main sidebar (still
+  reachable by URL if anyone relied on them).
+- **Chat empty state now routes through agents.** With no messages
+  in the thread, the chat shows either a grid of agent cards
+  ("Pick an agent") or — once one is selected — that agent's own
+  starter prompts pulled live from its vault frontmatter. One
+  click on a card swaps the routing agent; one click on a starter
+  prompt fills the composer.
+
 ## 0.4.14 — 2026-04-21
 
 ### Changed

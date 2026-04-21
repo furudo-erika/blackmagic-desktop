@@ -252,6 +252,7 @@ async function fetchLatestCaskVersion() {
 // packaging to R2 again, so anything comparing against version.json
 // would lie.
 async function enforceMinVersion() {
+  if (upgradeInProgress) return;
   const current = app.getVersion();
   const target = await fetchLatestCaskVersion();
   if (!target) return;
@@ -308,12 +309,20 @@ function resolveBrewPath() {
   return null;
 }
 
+// Guard against double-firing: users would hit the upgrade button a
+// second time when the first attempt showed no feedback, spawning two
+// brew processes that collided on the download lock and both failed.
+// Once true, further version-gate prompts no-op.
+let upgradeInProgress = false;
+
 // Spawn a detached upgrader shell script, then quit this app so brew can
 // move the new .app bundle into /Applications. The script waits for the
 // current process to exit, runs `brew upgrade`, and re-opens the app.
 // Output is captured to a log in the user's Library/Logs so a failed
 // upgrade leaves a breadcrumb instead of vanishing silently.
 function launchBrewUpgradeAndRelaunch(brewPath) {
+  if (upgradeInProgress) return;
+  upgradeInProgress = true;
   const { spawn } = require('node:child_process');
   const fs = require('node:fs');
   const path = require('node:path');
@@ -321,6 +330,18 @@ function launchBrewUpgradeAndRelaunch(brewPath) {
   const logDir = path.join(os.homedir(), 'Library', 'Logs', 'BlackMagic AI');
   try { fs.mkdirSync(logDir, { recursive: true }); } catch {}
   const logPath = path.join(logDir, `auto-upgrade-${Date.now()}.log`);
+
+  // Before we exit, tell the user via a native notification that the
+  // upgrade has actually started and the app will reopen. Without this
+  // the whole experience was: dialog closes → desktop is empty for 60s
+  // → hopefully the app reappears, so users assumed the click did
+  // nothing and clicked again.
+  try {
+    spawn('/usr/bin/osascript', [
+      '-e',
+      'display notification "Downloading the latest version. The app will reopen automatically in about a minute." with title "BlackMagic AI" subtitle "Upgrade started"',
+    ], { detached: true, stdio: 'ignore' }).unref();
+  } catch {}
   const pid = process.pid;
   const script = `#!/bin/sh
 set -u
@@ -331,6 +352,14 @@ for i in $(seq 1 60); do
   if ! kill -0 ${pid} 2>/dev/null; then break; fi
   sleep 0.5
 done
+# Clean any abandoned zombie daemon processes from prior upgrade attempts.
+# macOS won't let brew replace the .app while any process in it is alive.
+pkill -9 -f "/Applications/BlackMagic AI.app" 2>/dev/null || true
+# Clear stale download locks from a killed earlier upgrade — otherwise
+# brew refuses with "A brew upgrade process has already locked ..." and
+# exits 1, leaving the user on the old version.
+rm -f ~/Library/Caches/Homebrew/downloads/*BlackMagic*incomplete* 2>/dev/null || true
+rm -f ~/Library/Caches/Homebrew/Cask/blackmagic-ai--*.incomplete 2>/dev/null || true
 echo "[$(date -u +%FT%TZ)] refreshing tap: ${brewPath} update --quiet"
 "${brewPath}" update --quiet
 echo "[$(date -u +%FT%TZ)] running: ${brewPath} upgrade --cask blackmagic-ai --greedy"
@@ -394,13 +423,44 @@ app.whenReady().then(async () => {
   }
 });
 
+// Kill the daemon child reliably. Previously we only sent SIGTERM on
+// window-all-closed, but on macOS that event fires only when the user
+// closes the last window (≠ quitting), so fast app restarts + auto-
+// upgrade relaunches piled up zombie daemon processes — users were
+// seeing ten+ copies of the daemon after a few upgrade prompts.
+// `before-quit` + `will-quit` are the real shutdown hooks; sigterm
+// first, then escalate to sigkill if the child is still alive after
+// 2s.
+function stopDaemon() {
+  if (!daemonProcess) return;
+  const proc = daemonProcess;
+  daemonProcess = null;
+  try { proc.kill('SIGTERM'); } catch {}
+  setTimeout(() => {
+    try { proc.kill('SIGKILL'); } catch {}
+  }, 2000).unref?.();
+}
+
+app.on('before-quit', stopDaemon);
+app.on('will-quit', stopDaemon);
+
 app.on('window-all-closed', () => {
-  if (daemonProcess) {
-    try { daemonProcess.kill(); } catch {}
-  }
+  // On non-darwin platforms closing the last window quits the app.
+  // On macOS we stay alive for the dock/activate behavior — but that
+  // means stopDaemon() must not run here, it runs on before-quit.
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
+
+// Belt-and-suspenders: if this Electron process is killed externally
+// (Force Quit, upgrade script, crash), the SIGINT/SIGTERM handlers
+// still try to take the daemon down with us.
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => {
+    stopDaemon();
+    app.exit(0);
+  });
+}

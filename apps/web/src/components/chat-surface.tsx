@@ -187,7 +187,10 @@ export function ChatSurface({
           const fm = r.frontmatter ?? {};
           const slug = f.path.replace(/^agents\//, '').replace(/\.md$/, '');
           const name = typeof fm.name === 'string' && fm.name ? fm.name : slug;
-          return { slug, name };
+          const starterPrompts = Array.isArray(fm.starter_prompts)
+            ? (fm.starter_prompts as unknown[]).filter((p): p is string => typeof p === 'string')
+            : [];
+          return { slug, name, starterPrompts };
         }),
       );
       rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -195,6 +198,30 @@ export function ChatSurface({
     },
     staleTime: 60_000,
   });
+
+  // When the caller didn't pass explicit scenarios but an agent is active,
+  // pull that agent's starter_prompts from its vault file and surface them
+  // as click-to-run scenario cards. Falls back to a single "Run X end-to-
+  // end" starter so every agent has at least one obvious move.
+  const derivedScenarios: ChatScenario[] = (() => {
+    if (scenarios.length > 0) return scenarios;
+    if (!effectiveAgent) return [];
+    const a = agentOptions.data?.find((x) => x.slug === effectiveAgent);
+    if (!a) return [];
+    if (a.starterPrompts.length > 0) {
+      return a.starterPrompts.map((p) => ({
+        title: p.length > 48 ? p.slice(0, 45) + '…' : p,
+        prompt: p,
+      }));
+    }
+    return [
+      {
+        title: `Run ${a.name} end-to-end`,
+        prompt: `You are the ${a.name}. Execute your full loop for my project now — don't describe what you would do, actually do it. Only stop if you hit a genuine blocker that needs a human decision.`,
+      },
+    ];
+  })();
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -428,23 +455,59 @@ export function ChatSurface({
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        {messages.length === 0 && scenarios.length > 0 && (
-          <div className="max-w-3xl mx-auto py-10">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {scenarios.map((s) => (
-                <button
-                  key={s.title}
-                  type="button"
-                  onClick={() => setInput(s.prompt)}
-                  className="text-left p-3 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl hover:border-flame transition-colors"
-                >
-                  <div className="text-[12px] font-semibold text-ink dark:text-[#F5F1EA]">{s.title}</div>
-                  <div className="text-[11px] text-muted dark:text-[#8C837C] line-clamp-2 mt-1">
-                    {s.prompt.slice(0, 140)}…
-                  </div>
-                </button>
-              ))}
-            </div>
+        {messages.length === 0 && (
+          <div className="max-w-3xl mx-auto py-8">
+            {/* Agent picker gallery — replaces the Team sidebar section
+                dropped in 0.4.15. Each agent card swaps the active agent
+                and offers their starter prompt as a click-to-run. Clicking
+                the card header itself just switches agents; clicking a
+                prompt fills the composer. */}
+            {derivedScenarios.length === 0 && (agentOptions.data?.length ?? 0) > 0 && (
+              <>
+                <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-3">
+                  Pick an agent
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
+                  {(agentOptions.data ?? []).map((a) => (
+                    <button
+                      key={a.slug}
+                      type="button"
+                      onClick={() => setPickedAgent(a.slug)}
+                      className="text-left p-3 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl hover:border-flame transition-colors flex items-start gap-2.5"
+                    >
+                      <Bot className="w-4 h-4 shrink-0 mt-0.5 text-flame" />
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{a.name}</div>
+                        <div className="text-[11px] text-muted dark:text-[#8C837C] truncate font-mono">{a.slug}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {derivedScenarios.length > 0 && (
+              <>
+                <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-3">
+                  {effectiveAgent ? 'Starter prompts' : 'Try one of these'}
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {derivedScenarios.map((s) => (
+                    <button
+                      key={s.title}
+                      type="button"
+                      onClick={() => setInput(s.prompt)}
+                      className="text-left p-3 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl hover:border-flame transition-colors"
+                    >
+                      <div className="text-[12px] font-semibold text-ink dark:text-[#F5F1EA]">{s.title}</div>
+                      <div className="text-[11px] text-muted dark:text-[#8C837C] line-clamp-2 mt-1">
+                        {s.prompt.slice(0, 140)}…
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
         <div className="max-w-3xl mx-auto space-y-4">
