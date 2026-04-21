@@ -2,6 +2,20 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.3.12 — 2026-04-21
+
+### Added
+- **Seed six GTM persona agents into every vault.** The vault-backed
+  sidebar in 0.3.11 correctly showed whatever was in `agents/*.md`,
+  which for most projects meant just `ae`, `researcher`, `sdr`. Now
+  every vault also seeds `website-visitor.md`, `linkedin-outreach.md`,
+  `meeting-prep.md`, `lookalike-discovery.md`,
+  `closed-lost-revival.md`, and `pipeline-ops.md` with real system
+  prompts, tool allowlists, and Lucide-icon frontmatter. Existing
+  vaults pick them up on next daemon start (missing-files-only
+  write). Users can edit or delete any of them — sidebar reflects
+  whatever is on disk.
+
 ## 0.3.11 — 2026-04-21
 
 ### Changed
