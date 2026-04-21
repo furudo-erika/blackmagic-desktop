@@ -2,7 +2,7 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
-## 0.5.0 — 2026-04-21
+## 0.4.3 — 2026-04-21
 
 ### Added
 - **GEO Analyst agent** (`agents/geo-analyst.md`), seeded to every
