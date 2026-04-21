@@ -44,7 +44,7 @@ export function EntityDetail({
   children,
 }: {
   entityPath: string;
-  title: string;
+  title: React.ReactNode;
   subtitle?: string;
   breadcrumbs?: Array<{ label: string; href?: string }>;
   headerRight?: React.ReactNode;

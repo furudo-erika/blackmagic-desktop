@@ -2,6 +2,45 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.31 — 2026-04-22
+
+### Changed
+- **Agent cockpit rebuilt as a Linear-style entity page.** The old
+  `/team?slug=…` view was a slim chat header with a right rail of
+  skills and runs — visually noisy and disconnected from the rest
+  of the app's entity surfaces (company / contact / deal all use
+  the activity-feed + Properties-rail layout). The cockpit now
+  renders through the same `EntityDetail` component: breadcrumbs
+  (`Team → <agent>`), a big title with live/idle dot, the agent's
+  description as subtitle, the activity feed with threaded @-
+  mention comments underneath, run history, and a sticky right-
+  rail Properties card showing Status (Running / Idle), Last run,
+  Skills count, Tools count, and the Assignee picker. Because the
+  activity-log / assignee / runs APIs accept any vault path,
+  `agents/<slug>.md` is now a first-class entity you can assign
+  tasks to, comment on with @-mentions, and watch a run timeline
+  for — same interaction vocabulary as the rest of the product.
+  Starter prompts render as one-click cards above the skills list
+  and dispatch into `/runs` directly. EntityDetail's `title` prop
+  accepts React nodes now so we can inline the icon tile + live
+  dot into the header.
+- **Skills browser (formerly Playbooks) rebuilt as a Claude-Skills-
+  style 3-pane browser.** The old single-column accordion made you
+  scroll 10 cards deep to find anything. The page now splits into
+  `[ skills list | file tree | skill content ]`: the left column
+  groups skills by their frontmatter `group:` (GTM starter pack,
+  Building blocks, Research, …) and hyperlinks each row with a
+  selected-state flame border; the middle column shows the
+  selected skill's file layout (`SKILL.md` always present, with
+  placeholder `config/` and `templates/` folders staged for future
+  multi-file skills); the right column renders a
+  Claude-Skills-shaped detail view — an 8×2 frontmatter table
+  (name / version / agent / author / inputs), an Inputs form, a
+  primary "Run skill" button, the SKILL.md body in a monospaced
+  reader, and a breadcrumb trail above it all
+  (`playbooks › slug › SKILL.md`). URL state lives in a `?skill=`
+  param so deep links work and the first skill auto-selects.
+
 ## 0.4.30 — 2026-04-22
 
 ### Fixed
