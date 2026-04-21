@@ -331,17 +331,55 @@ function launchBrewUpgradeAndRelaunch(brewPath) {
   try { fs.mkdirSync(logDir, { recursive: true }); } catch {}
   const logPath = path.join(logDir, `auto-upgrade-${Date.now()}.log`);
 
-  // Before we exit, tell the user via a native notification that the
-  // upgrade has actually started and the app will reopen. Without this
-  // the whole experience was: dialog closes → desktop is empty for 60s
-  // → hopefully the app reappears, so users assumed the click did
-  // nothing and clicked again.
+  // Pre-create the log file so the progress Terminal has something to
+  // tail — otherwise `tail -f` would spin on a non-existent path.
+  try { fs.writeFileSync(logPath, `[upgrade log] ${new Date().toISOString()}\n`, 'utf-8'); } catch {}
+
+  // Open a Terminal.app window that tails the upgrade log. This gives the
+  // user a real visible window showing brew's download progress + install
+  // steps in real time, so the "I clicked upgrade and nothing happened"
+  // experience is gone. Terminal auto-closes when the tail's sentinel file
+  // appears (upgrade-complete.flag), then relaunches the app.
+  const flagPath = path.join(logDir, `upgrade-done-${Date.now()}.flag`);
+  const progressCmd = [
+    `clear`,
+    `printf '\\e]0;BlackMagic AI — Upgrading\\a'`,
+    `echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'`,
+    `echo '   BlackMagic AI — Upgrading via Homebrew'`,
+    `echo '   This window will close + reopen the app when done.'`,
+    `echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'`,
+    `echo`,
+    // Follow the log file, but also exit the tail as soon as the flag
+    // file appears. The subshell running tail watches the flag in the
+    // background and kills itself when it sees it.
+    `( tail -f "${logPath}" & tpid=$!; while [ ! -f "${flagPath}" ]; do sleep 0.5; done; sleep 2; kill $tpid 2>/dev/null )`,
+    `echo`,
+    `echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'`,
+    `echo '   Upgrade finished. Reopening BlackMagic AI…'`,
+    `echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'`,
+    `sleep 1`,
+    // Close this Terminal tab/window. `osascript` runs outside the bundle
+    // being replaced so it's safe.
+    `osascript -e 'tell application "Terminal" to close (every window whose name contains "Upgrading")' 2>/dev/null || true`,
+  ].join('; ').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   try {
     spawn('/usr/bin/osascript', [
       '-e',
-      'display notification "Downloading the latest version. The app will reopen automatically in about a minute." with title "BlackMagic AI" subtitle "Upgrade started"',
+      `tell application "Terminal" to do script "${progressCmd}"`,
+      '-e',
+      'tell application "Terminal" to activate',
     ], { detached: true, stdio: 'ignore' }).unref();
-  } catch {}
+  } catch {
+    // Fallback: silent notification. User won't see progress but at least
+    // knows something is happening.
+    try {
+      spawn('/usr/bin/osascript', [
+        '-e',
+        'display notification "Downloading the latest version. Watch ~/Library/Logs/BlackMagic AI/auto-upgrade-*.log for progress." with title "BlackMagic AI" subtitle "Upgrade started"',
+      ], { detached: true, stdio: 'ignore' }).unref();
+    } catch {}
+  }
+
   const pid = process.pid;
   const script = `#!/bin/sh
 set -u
@@ -380,7 +418,14 @@ if [ "$status" -eq 0 ]; then
     echo "[$(date -u +%FT%TZ)] reinstall exit=$status"
   fi
 fi
+echo "[$(date -u +%FT%TZ)] done; signalling progress Terminal to close"
+# Signal the progress Terminal (tail -f) that we're done. It watches for
+# this file and kills its tail + closes the window.
+touch "${flagPath}"
 if [ "$status" -eq 0 ]; then
+  # Brief pause so the Terminal has time to show the "Upgrade finished"
+  # banner before we relaunch the app on top of it.
+  sleep 2
   open -a "BlackMagic AI"
 else
   /usr/bin/osascript -e 'display notification "brew upgrade failed — see ~/Library/Logs/BlackMagic AI" with title "BlackMagic AI"'

@@ -2,6 +2,19 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.17 — 2026-04-21
+
+### Fixed
+- **Upgrade now opens a real progress window.** Previous versions
+  silently exited the app and spawned brew in the background — from
+  the user's perspective the screen just went blank for 60 seconds,
+  which looked broken and led to frantic re-clicking. Clicking
+  "Upgrade and relaunch" now opens a Terminal.app window titled
+  "BlackMagic AI — Upgrading" that tails the real-time brew log, so
+  you watch download percentages and install steps scroll live. The
+  Terminal auto-closes when brew finishes (flag-file handshake), and
+  the app reopens on top. No more silent upgrade loop.
+
 ## 0.4.16 — 2026-04-21
 
 ### Changed
