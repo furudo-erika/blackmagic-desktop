@@ -2,6 +2,43 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.61 — 2026-04-22
+
+### Added
+- **Pre-flight readiness modal for agents + skills.** Clicking Run now
+  pops a modal that verifies the thing is actually ready to run before
+  spawning anything: listed **integrations** must be connected,
+  listed **us/\* files** must exist and not be the seed template,
+  listed **CLI tools** must be in PATH. Missing pieces surface as:
+  - integration chip → one-click "Connect" button that jumps to
+    sidebar → Tools → \<provider\>;
+  - us/\* file chip → inline "Fill now" textarea that writes back to
+    the vault, preflight re-checks automatically on save;
+  - CLI chip → copy-pasteable install command
+    (`npm install -g apidog-cli` etc).
+  Required inputs from the skill's `inputs:` frontmatter render as
+  form fields in the same modal, prefilled with defaults. Only when
+  every gate is green does the Run button un-disable. Escape hatch:
+  "Run anyway →" sends `force: true` to the daemon for users who
+  know what they're doing.
+- **`/api/preflight/:kind/:slug` daemon endpoint** — reads the
+  resource's `requires:` frontmatter (`integrations`, `us_files`,
+  `cli`, `optional_integrations`) and returns a structured
+  `{ ready, missing, optional_integrations, inputs, optional_inputs }`.
+  `POST /api/agent/run` now refuses to start with 412 + the
+  preflight payload unless the caller sets `force: true`, so agents
+  can't accidentally run blind to a missing key.
+- **`requires:` frontmatter on every new default skill** — brand-
+  monitor-apify, competitor-radar, doc-leads-discover,
+  linkedin-intel-weekly, reddit-pulse (all need Apify + us/market/\*
+  files), api-endpoint-test (needs apidog-cli + node),
+  kol-discover / kol-score / kol-outreach-draft (creator-marketing
+  chain with Apify + us/brand + us/market/icp), gsc-content-brief
+  (needs GSC integration), cms-blog-stats / cms-publish-draft (soft
+  requirement — Ghost OR WordPress, checked at call time). Existing
+  skills without `requires:` keep working unchanged — absence = no
+  gates.
+
 ## 0.4.59 — 2026-04-22
 
 ### Fixed

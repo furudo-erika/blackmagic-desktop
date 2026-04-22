@@ -923,9 +923,32 @@ async function main() {
     }
   });
 
+  // Pre-flight readiness for an agent or skill. Called by the UI before
+  // the user fires a run, so we can put up a modal listing "connect
+  // Apify", "fill us/market/competitors.md", "install apidog-cli" etc.
+  // instead of letting the agent spawn and fail halfway through.
+  app.get('/api/preflight/:kind/:slug', async (c) => {
+    const kind = c.req.param('kind');
+    if (kind !== 'agent' && kind !== 'skill') {
+      return c.json({ error: 'kind must be agent or skill' }, 400);
+    }
+    const { preflight } = await import('./preflight.js');
+    return c.json(await preflight(kind, c.req.param('slug')));
+  });
+
   app.post('/api/agent/run', async (c) => {
-    const body = await c.req.json<{ agent: string; task: string }>();
+    const body = await c.req.json<{ agent: string; task: string; force?: boolean }>();
     try {
+      // Respect the explicit force escape hatch — user already clicked
+      // past the preflight modal. Otherwise block runs that would crash
+      // mid-way for missing integrations.
+      if (!body.force && body.agent) {
+        const { preflight } = await import('./preflight.js');
+        const p = await preflight('agent', body.agent);
+        if (!p.ready) {
+          return c.json({ error: 'preflight_failed', preflight: p }, 412);
+        }
+      }
       const result = await runAgent({
         agent: body.agent,
         task: body.task,

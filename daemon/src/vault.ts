@@ -1135,7 +1135,7 @@ Enrich the contact at \`{{contact_path}}\` using EnrichLayer.
    add one to frontmatter first".
 2. Call \`enrich_contact_linkedin({ linkedinUrl: <url> })\`. If the tool
    returns an \`error\` mentioning ENRICHLAYER_API_KEY, surface that
-   verbatim — the user has to paste their key in Settings → Integration keys
+   verbatim — the user has to paste their key in sidebar → Tools → Integration keys
    before this playbook works.
 3. Map the returned profile into frontmatter fields and write them back with
    \`edit_file\`. Specifically set (only if present in the response):
@@ -1904,6 +1904,10 @@ name: brand-monitor-apify
 group: signals
 agent: researcher
 inputs: []
+requires:
+  integrations: [apify]
+  us_files: [us/company.md]
+  optional_integrations: [feishu, slack, discord, telegram]
 ---
 
 Heavy brand-monitor scan via Apify (Reddit + Twitter/X).
@@ -1916,7 +1920,7 @@ Heavy brand-monitor scan via Apify (Reddit + Twitter/X).
 - Confirm \`APIFY_API_TOKEN\` is reachable. If \`scrape_apify_actor\`
   returns an "APIFY_API_TOKEN not set" error on the first call, surface
   that verbatim and stop — the user has to paste their Apify token in
-  Integrations → Apify before this skill can run.
+  Tools → Apify before this skill can run.
 
 ## Steps
 
@@ -1959,6 +1963,10 @@ name: competitor-radar
 group: signals
 agent: researcher
 inputs: []
+requires:
+  integrations: [apify]
+  us_files: [us/market/competitors.md]
+  optional_integrations: [feishu, slack, discord, telegram]
 ---
 
 Weekly competitor teardown via Apify scraping.
@@ -2000,6 +2008,10 @@ name: doc-leads-discover
 group: signals
 agent: sdr
 inputs: []
+requires:
+  integrations: [apify]
+  us_files: [us/market/icp.md]
+  optional_integrations: [amazon_ses]
 ---
 
 Discover companies whose ICP fingerprint matches ours via Apify
@@ -2042,6 +2054,10 @@ name: linkedin-intel-weekly
 group: signals
 agent: researcher
 inputs: []
+requires:
+  integrations: [apify]
+  us_files: [us/market/competitors.md]
+  optional_integrations: [unipile, feishu, slack]
 ---
 
 Weekly LinkedIn intelligence on competitors + KOLs.
@@ -2085,6 +2101,10 @@ name: reddit-pulse
 group: signals
 agent: researcher
 inputs: []
+requires:
+  integrations: [apify]
+  us_files: [us/company.md, us/market/positioning.md]
+  optional_integrations: [feishu, slack, discord, telegram]
 ---
 
 Daily Reddit narrative pulse around the user's brand + category.
@@ -2129,9 +2149,11 @@ name: api-endpoint-test
 group: engineering
 agent: researcher
 inputs:
-  - { name: base_url, required: true }
-  - { name: auth_hint, required: false }
-  - { name: routes_hint, required: false }
+  - { name: base_url, required: true, description: "The production/staging HTTPS URL the tests should hit, e.g. https://api.example.com" }
+  - { name: auth_hint, required: false, description: "Auth scheme: 'bearer', 'basic user:pass', 'api-key X-Api-Key: …', or 'cookie'. Leave blank if endpoints are public." }
+  - { name: routes_hint, required: false, description: "Optional: path to the routes/ folder or an openapi.yaml the skill should parse." }
+requires:
+  cli: [apidog-cli, node]
 ---
 
 Generate and run a comprehensive API test suite against \`{{base_url}}\`
@@ -2194,13 +2216,16 @@ inputs:
   - { name: segment, required: false, description: "Keyword(s) describing the creators we want (e.g. 'backend developer', 'product designer'). Defaults to us/market/positioning.md category terms." }
   - { name: region, required: false, description: "Geo filter — ISO country code or a region name. Default: worldwide." }
   - { name: limit, required: false, description: "Max KOLs. Default 50, cap 200." }
+requires:
+  integrations: [apify]
+  us_files: [us/market/positioning.md]
 ---
 
 Discover LinkedIn KOLs in our category via Apify, score them
 shallow-to-deep, save to \`kol/discovered-<YYYY-MM-DD>.csv\`.
 
 ## Pre-flight
-- \`APIFY_API_TOKEN\` must be set (Integrations → Apify).
+- \`APIFY_API_TOKEN\` must be set (Tools → Apify).
 - If \`{{segment}}\` is empty, read category keywords from
   \`us/market/positioning.md\` frontmatter \`category:\` field.
 - If all category inputs are still seed templates, stop with a
@@ -2233,6 +2258,8 @@ group: creator-marketing
 agent: researcher
 inputs:
   - { name: csv_path, required: true, description: "Path to a KOL CSV (e.g. kol/discovered-<date>.csv)." }
+requires:
+  us_files: [us/market/icp.md]
 ---
 
 Score each KOL in \`{{csv_path}}\` against our ICP and historical
@@ -2266,8 +2293,11 @@ name: kol-outreach-draft
 group: creator-marketing
 agent: sdr
 inputs:
-  - { name: csv_path, required: true }
+  - { name: csv_path, required: true, description: "CSV produced by kol-discover + kol-score (e.g. kol/discovered-<date>.csv)." }
   - { name: max_drafts, required: false, description: "Default 20." }
+requires:
+  us_files: [us/brand/voice.md, us/brand/messaging.md]
+  optional_integrations: [amazon_ses, unipile]
 ---
 
 Draft personalized LinkedIn DMs (or emails if we have their email) for
@@ -2289,8 +2319,10 @@ sends automatically.**
    from \`CLAUDE.md\`.
 5. Call \`draft_create({ channel: <"linkedin_dm" | "email">, to:
    <profile_url or email>, subject: <for email only>, body, tool:
-   <"manual" for linkedin_dm | "send_email" for email> })\` per
-   recipient. Drafts land in \`drafts/\` for approval.
+   <"linkedin_send_dm" for linkedin_dm | "send_email" for email> })\`
+   per recipient. Drafts land in \`drafts/\` for approval. LinkedIn
+   drafts auto-route through the user's Unipile account on approve
+   (never cookie-based). Email drafts auto-route through Amazon SES.
 6. Update the CSV row \`status\` to "drafted" and \`drafted_at\` to now.
 7. Call \`notify({ subject: "<n> KOL outreach drafts pending review",
    body: <list of names + draft paths>, urgency: "normal" })\`.
@@ -2306,6 +2338,9 @@ group: seo
 agent: researcher
 inputs:
   - { name: days, required: false, description: "Lookback window. Default 28." }
+requires:
+  integrations: [gsc]
+  optional_integrations: [feishu, slack]
 ---
 
 Generate next week's content brief from Google Search Console data.
@@ -2316,7 +2351,7 @@ zero/near-zero impressions — new content opportunity).
 
 ## Pre-flight
 - GSC integration connected (service-account JSON + site_url in
-  Integrations → Google Search Console).
+  Tools → Google Search Console).
 - \`us/market/keywords.md\` lists target keywords (one per line).
   If absent, work only from GSC data we observe.
 
@@ -2347,13 +2382,16 @@ zero/near-zero impressions — new content opportunity).
 `,
 
   // === CMS skills =========================================================
+  // Note: no requires.integrations — this skill works with EITHER Ghost
+  // OR WordPress, and requires.integrations is AND-ed. cms_list_posts
+  // surfaces the missing-CMS error at call time.
   'cms-blog-stats.md': `---
 kind: skill
 name: cms-blog-stats
 group: content
 agent: researcher
 inputs:
-  - { name: platform, required: false, description: "ghost | wordpress. Auto-detect if omitted." }
+  - { name: platform, required: false, description: "ghost | wordpress. Auto-detect if omitted.", enum: [ghost, wordpress] }
 ---
 
 Overview of the connected CMS blog: total posts, recent activity,
@@ -2379,7 +2417,7 @@ group: content
 agent: researcher
 inputs:
   - { name: draft_path, required: true, description: "Path under drafts/ to a markdown post." }
-  - { name: platform, required: false }
+  - { name: platform, required: false, enum: [ghost, wordpress] }
 ---
 
 Push a reviewed draft from \`drafts/\` to the connected CMS as a
@@ -3041,7 +3079,7 @@ Daily 09:00 brand monitor across Reddit + Twitter via Apify. Reads
 keywords from \`us/company.md\`. Writes \`signals/mentions/<date>.md\`.
 Notifies via every messaging integration the user has connected
 (Slack / Discord / Telegram / Feishu / Email). Enable after pasting
-\`APIFY_API_TOKEN\` in Integrations → Apify.
+\`APIFY_API_TOKEN\` in sidebar → Tools → Apify.
 `,
   'apify-competitor-radar.md': `---
 kind: trigger

@@ -223,7 +223,7 @@ export async function sendEmailViaBestProvider(
   if (tried.length === 0) {
     return {
       ok: false,
-      error: 'no email provider connected — paste Amazon SES credentials in Integrations → Amazon SES',
+      error: 'No email provider connected. Open the sidebar → Tools → Amazon SES and paste your credentials (access_key_id + secret_access_key + region + from). Also: bottom-left gear icon works to get there.',
       triedProviders: ['none-connected'],
     };
   }

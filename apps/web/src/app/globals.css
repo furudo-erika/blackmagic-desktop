@@ -105,3 +105,15 @@ html.dark .prose-bm th { background: #17140F; }
 .prose-bm hr { border: none; border-top: 1px solid rgba(55,50,47,0.1); margin: 1.8em 0; }
 html.dark .prose-bm hr { border-top-color: #2A241D; }
 .prose-bm img { max-width: 100%; border-radius: 8px; }
+
+/* "SAVED · paste to replace" placeholders should be readable, not ghost-dim.
+   Browser default places ::placeholder at ~0.4 opacity; we lift saved-state
+   placeholders to full opacity + flame accent so users can actually see
+   "this key is connected" instead of squinting at an invisible hint. */
+input::placeholder {
+  opacity: 0.9;
+}
+html.dark input::placeholder {
+  opacity: 0.85;
+  color: #A89F96;
+}

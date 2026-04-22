@@ -149,7 +149,7 @@ const GROUPS: Group[] = [
       {
         provider: 'unipile',
         name: 'Unipile',
-        description: 'LinkedIn and multi-channel messaging via Unipile API.',
+        description: 'LinkedIn account management + DM + connection requests via Unipile (the canonical, non-ToS-grey path — replaces the old li_at cookie hack). Pricing: https://www.unipile.com/pricing-api/. Paste your API key + the instance URL Unipile gave you (https://api…unipile.com:…).',
         oauth: false,
         endpointField: true,
         brandColor: '#0066FF',
@@ -361,8 +361,8 @@ export default function IntegrationsPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Integrations"
-        subtitle="Connect external systems so agents can read and write real data — CRMs, messaging, sales tools."
+        title="Tools"
+        subtitle="Paste API keys for the services your agents should read / write — CRMs, messaging, email providers, scrapers. BYOK, local-only: keys live in .bm/integrations.json and mirror to <vault>/.env. (This page was called Integrations previously — same thing.)"
         icon={Plug}
       />
       <PageBody maxWidth="5xl">

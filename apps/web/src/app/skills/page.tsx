@@ -26,6 +26,7 @@ import {
   Search,
   Sparkles,
 } from 'lucide-react';
+import { PreflightModal } from '../../components/preflight-modal';
 
 type PlaybookInput = { name: string; required?: boolean };
 type Playbook = {
@@ -251,6 +252,7 @@ function SkillDetail({ pb }: { pb: Playbook }) {
 
   const [values, setValues] = useState<Record<string, string>>({});
   const [result, setResult] = useState<{ ok: true; runId: string } | { ok: false; err: string } | null>(null);
+  const [preflightOpen, setPreflightOpen] = useState(false);
 
   // Reset input state and result when the user switches skills.
   useEffect(() => {
@@ -358,13 +360,31 @@ function SkillDetail({ pb }: { pb: Playbook }) {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => run.mutate()}
+            onClick={() => setPreflightOpen(true)}
             disabled={run.isPending || !canRun}
             className="inline-flex items-center gap-1.5 bg-flame text-white text-[13px] font-medium px-3.5 py-1.5 rounded-md hover:bg-flame/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Play className="w-3.5 h-3.5" />
             {run.isPending ? 'Invoking…' : `Invoke via ${agent}`}
           </button>
+          {preflightOpen && (
+            <PreflightModal
+              kind="skill"
+              slug={slug}
+              onCancel={() => setPreflightOpen(false)}
+              onRun={({ inputs: extra, force }) => {
+                // Merge modal-collected inputs onto the user's existing
+                // values, then fire. `force` is ignored server-side for
+                // skills (their agent run can't skip preflight today),
+                // but we still close the modal so we're not blocking.
+                setValues((prev) => ({ ...prev, ...extra }));
+                setPreflightOpen(false);
+                // Defer to next tick so `setValues` commits before render().
+                setTimeout(() => run.mutate(), 0);
+                void force;
+              }}
+            />
+          )}
           <span className="text-[11px] text-muted dark:text-[#8C837C]">
             (skills run inside an agent — this kicks off a one-off invocation)
           </span>

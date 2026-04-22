@@ -210,7 +210,7 @@ export default function SettingsPage() {
                   type="password"
                   value={enrichDraft}
                   onChange={(e) => setEnrichDraft(e.target.value)}
-                  placeholder={intKeys.data?.enrichlayer_api_key ? '••• (saved)' : 'proxycurl-compatible key'}
+                  placeholder={intKeys.data?.enrichlayer_api_key ? '✓ SAVED · paste to replace' : 'proxycurl-compatible key'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -222,7 +222,7 @@ export default function SettingsPage() {
                   type="password"
                   value={apifyDraft}
                   onChange={(e) => setApifyDraft(e.target.value)}
-                  placeholder={intKeys.data?.apify_api_key ? '••• (saved)' : 'apify_api_… token'}
+                  placeholder={intKeys.data?.apify_api_key ? '✓ SAVED · paste to replace' : 'apify_api_… token'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -234,7 +234,7 @@ export default function SettingsPage() {
                   type="password"
                   value={hubspotDraft}
                   onChange={(e) => setHubspotDraft(e.target.value)}
-                  placeholder={intKeys.data?.hubspot_api_key ? '••• (saved)' : 'pat-… Private App token'}
+                  placeholder={intKeys.data?.hubspot_api_key ? '✓ SAVED · paste to replace' : 'pat-… Private App token'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -246,7 +246,7 @@ export default function SettingsPage() {
                   type="password"
                   value={apolloDraft}
                   onChange={(e) => setApolloDraft(e.target.value)}
-                  placeholder={intKeys.data?.apollo_api_key ? '••• (saved)' : 'Apollo API key'}
+                  placeholder={intKeys.data?.apollo_api_key ? '✓ SAVED · paste to replace' : 'Apollo API key'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -258,7 +258,7 @@ export default function SettingsPage() {
                   type="password"
                   value={attioDraft}
                   onChange={(e) => setAttioDraft(e.target.value)}
-                  placeholder={intKeys.data?.attio_api_key ? '••• (saved)' : 'Attio API key (Bearer token)'}
+                  placeholder={intKeys.data?.attio_api_key ? '✓ SAVED · paste to replace' : 'Attio API key (Bearer token)'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -270,7 +270,7 @@ export default function SettingsPage() {
                   type="text"
                   value={feishuAppIdDraft}
                   onChange={(e) => setFeishuAppIdDraft(e.target.value)}
-                  placeholder={intKeys.data?.feishu_app_id ? '••• (saved)' : 'cli_xxxxxxxxxxxx'}
+                  placeholder={intKeys.data?.feishu_app_id ? '✓ SAVED · paste to replace' : 'cli_xxxxxxxxxxxx'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -282,7 +282,7 @@ export default function SettingsPage() {
                   type="password"
                   value={feishuAppSecretDraft}
                   onChange={(e) => setFeishuAppSecretDraft(e.target.value)}
-                  placeholder={intKeys.data?.feishu_app_secret ? '••• (saved)' : 'app secret'}
+                  placeholder={intKeys.data?.feishu_app_secret ? '✓ SAVED · paste to replace' : 'app secret'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -294,7 +294,7 @@ export default function SettingsPage() {
                   type="password"
                   value={feishuWebhookDraft}
                   onChange={(e) => setFeishuWebhookDraft(e.target.value)}
-                  placeholder={intKeys.data?.feishu_webhook_url ? '••• (saved)' : 'https://open.feishu.cn/open-apis/bot/v2/hook/…'}
+                  placeholder={intKeys.data?.feishu_webhook_url ? '✓ SAVED · paste to replace' : 'https://open.feishu.cn/open-apis/bot/v2/hook/…'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -306,7 +306,7 @@ export default function SettingsPage() {
                   type="text"
                   value={metabaseUrlDraft}
                   onChange={(e) => setMetabaseUrlDraft(e.target.value)}
-                  placeholder={intKeys.data?.metabase_site_url ? '••• (saved)' : 'https://metabase.yourco.com'}
+                  placeholder={intKeys.data?.metabase_site_url ? '✓ SAVED · paste to replace' : 'https://metabase.yourco.com'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -318,7 +318,7 @@ export default function SettingsPage() {
                   type="password"
                   value={metabaseKeyDraft}
                   onChange={(e) => setMetabaseKeyDraft(e.target.value)}
-                  placeholder={intKeys.data?.metabase_api_key ? '••• (saved)' : 'mb_api_… (Admin → API Keys)'}
+                  placeholder={intKeys.data?.metabase_api_key ? '✓ SAVED · paste to replace' : 'mb_api_… (Admin → API Keys)'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -330,7 +330,7 @@ export default function SettingsPage() {
                   type="text"
                   value={supabaseUrlDraft}
                   onChange={(e) => setSupabaseUrlDraft(e.target.value)}
-                  placeholder={intKeys.data?.supabase_url ? '••• (saved)' : 'https://xxxx.supabase.co'}
+                  placeholder={intKeys.data?.supabase_url ? '✓ SAVED · paste to replace' : 'https://xxxx.supabase.co'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -342,7 +342,7 @@ export default function SettingsPage() {
                   type="password"
                   value={supabaseKeyDraft}
                   onChange={(e) => setSupabaseKeyDraft(e.target.value)}
-                  placeholder={intKeys.data?.supabase_service_role_key ? '••• (saved)' : 'service_role eyJhbGci…'}
+                  placeholder={intKeys.data?.supabase_service_role_key ? '✓ SAVED · paste to replace' : 'service_role eyJhbGci…'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -354,7 +354,7 @@ export default function SettingsPage() {
                   type="password"
                   value={slackDraft}
                   onChange={(e) => setSlackDraft(e.target.value)}
-                  placeholder={intKeys.data?.slack_webhook_url ? '••• (saved)' : 'https://hooks.slack.com/services/…'}
+                  placeholder={intKeys.data?.slack_webhook_url ? '✓ SAVED · paste to replace' : 'https://hooks.slack.com/services/…'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -366,7 +366,7 @@ export default function SettingsPage() {
                   type="password"
                   value={resendDraft}
                   onChange={(e) => setResendDraft(e.target.value)}
-                  placeholder={intKeys.data?.resend_api_key ? '••• (saved)' : 're_… API key'}
+                  placeholder={intKeys.data?.resend_api_key ? '✓ SAVED · paste to replace' : 're_… API key'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
@@ -378,18 +378,18 @@ export default function SettingsPage() {
                   type="text"
                   value={fromEmailDraft}
                   onChange={(e) => setFromEmailDraft(e.target.value)}
-                  placeholder={intKeys.data?.from_email ? '••• (saved)' : 'Name <you@yourdomain.com>'}
+                  placeholder={intKeys.data?.from_email ? '✓ SAVED · paste to replace' : 'Name <you@yourdomain.com>'}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
                 />
               </div>
               <div className="flex items-start gap-2">
                 <label className="w-36 mt-1.5 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
-                  LinkedIn cookie
+                  LinkedIn cookie <span className="block text-[9px] normal-case tracking-normal text-flame mt-0.5">deprecated — use Tools → Unipile</span>
                 </label>
                 <textarea
                   value={linkedinCookieDraft}
                   onChange={(e) => setLinkedinCookieDraft(e.target.value)}
-                  placeholder={intKeys.data?.linkedin_cookie ? '••• (saved) — paste new li_at=… to rotate' : 'li_at=…; JSESSIONID=…  (optional, required only for DM automation — ToS-grey-area)'}
+                  placeholder={intKeys.data?.linkedin_cookie ? '✓ SAVED · paste new li_at=… to rotate' : 'LEGACY — paste your li_at cookie here only if you cannot use Unipile. Prefer sidebar → Tools → Unipile for LinkedIn automation (stable, non-ToS-grey).'}
                   rows={2}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono resize-none"
                 />

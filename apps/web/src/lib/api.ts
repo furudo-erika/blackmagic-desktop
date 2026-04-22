@@ -198,10 +198,10 @@ export const api = {
     ),
   deleteChat: (id: string) =>
     request<{ ok: true }>(`/api/chats/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  runAgent: (agent: string, task: string) =>
+  runAgent: (agent: string, task: string, opts?: { force?: boolean }) =>
     request<{ runId: string; final: string; tokensIn: number; tokensOut: number; costCents: number }>(
       '/api/agent/run',
-      { method: 'POST', body: JSON.stringify({ agent, task }) },
+      { method: 'POST', body: JSON.stringify({ agent, task, force: opts?.force }) },
     ),
   listRuns: () =>
     request<{ runs: Array<{ runId: string; agent: string; model: string; preview?: string; tokensIn: number; tokensOut: number; costCents: number; toolCalls: number; turns: number; done?: boolean; status?: 'running' | 'completed' | 'failed' | 'blocked' | 'canceled' }> }>(
@@ -212,6 +212,19 @@ export const api = {
       `/api/agent/runs/${encodeURIComponent(id)}/stop`,
       { method: 'POST' },
     ),
+  preflight: (kind: 'agent' | 'skill', slug: string) =>
+    request<{
+      ready: boolean;
+      missing: {
+        integrations: Array<{ kind: 'integration'; provider: string; label: string; hint: string }>;
+        us_files: Array<{ kind: 'us_file'; path: string; hint: string; exists: boolean; isSeed: boolean }>;
+        cli: Array<{ kind: 'cli'; name: string; install: string }>;
+      };
+      optional_integrations: Array<{ kind: 'integration'; provider: string; label: string; hint: string }>;
+      inputs: Array<{ name: string; required: boolean; description?: string; enum?: string[]; default?: unknown }>;
+      optional_inputs: Array<{ name: string; required: boolean; description?: string; enum?: string[]; default?: unknown }>;
+      error?: string;
+    }>(`/api/preflight/${kind}/${encodeURIComponent(slug)}`),
   getRun: (id: string) =>
     request<{
       meta: any;

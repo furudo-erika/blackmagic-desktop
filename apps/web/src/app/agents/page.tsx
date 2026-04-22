@@ -20,6 +20,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PreflightModal } from '../../components/preflight-modal';
 import {
   Bot, Sparkles, Search, Briefcase, Globe, Linkedin,
   CalendarClock, Copy as CopyIcon, RotateCcw, Activity, Radar, Send,
@@ -217,17 +218,24 @@ function AgentsInner() {
   // Kick off a new run for this agent. Refreshes runs query so polling
   // picks it up immediately.
   const kickoff = useMutation({
-    mutationFn: (task: string) => api.runAgent(slug, task),
+    mutationFn: ({ task, force }: { task: string; force?: boolean }) =>
+      api.runAgent(slug, task, { force }),
     onSuccess: () => {
       setDraft('');
       qc.invalidateQueries({ queryKey: ['runs'] });
     },
   });
 
+  const [preflightOpen, setPreflightOpen] = useState(false);
+  const [pendingTask, setPendingTask] = useState<string>('');
+
   function send(text?: string) {
     const v = (text ?? draft).trim();
     if (!v || !slug || kickoff.isPending) return;
-    kickoff.mutate(v);
+    // Run preflight FIRST — if the agent needs Apify / us/* files /
+    // CLI tools, the modal collects those before the run fires.
+    setPendingTask(v);
+    setPreflightOpen(true);
   }
 
   const stopMut = useMutation({
@@ -493,6 +501,27 @@ function AgentsInner() {
           </div>
         )}
       </div>
+
+      {preflightOpen && slug && (
+        <PreflightModal
+          kind="agent"
+          slug={slug}
+          onCancel={() => setPreflightOpen(false)}
+          onRun={({ inputs, force }) => {
+            setPreflightOpen(false);
+            // If the agent accepts extra inputs (from frontmatter
+            // inputs:), append them to the task so the prompt sees them
+            // as "<key>: <value>" lines. Simple, works without a bigger
+            // task-format refactor.
+            const extras = Object.entries(inputs)
+              .filter(([, v]) => v && v.toString().trim())
+              .map(([k, v]) => `${k}: ${v}`)
+              .join('\n');
+            const task = extras ? `${pendingTask}\n\n${extras}` : pendingTask;
+            kickoff.mutate({ task, force });
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -220,7 +220,7 @@ const draft_create: ToolDef = {
       to: { type: 'string' },
       subject: { type: 'string' },
       body: { type: 'string' },
-      tool: { type: 'string', description: 'Which tool should send it. email: "send_email" / "ses" / "gmail.send_email". LinkedIn: MCP tool slug. "manual" for drafts the user will send themselves.' },
+      tool: { type: 'string', description: 'Which tool should send it. email → "send_email" (routes to Amazon SES / Resend). linkedin_dm → "linkedin_send_dm" (Unipile). linkedin_connect → "linkedin_send_invitation" (Unipile). Or "manual" for drafts the user will send themselves.' },
       auto: { type: 'boolean', description: 'Skip the pending gate and fire the send provider immediately. Default false — match the global /outreach setting when unset.' },
     },
     required: ['channel', 'to', 'body', 'tool'],
@@ -286,7 +286,7 @@ const enrich_contact_linkedin: ToolDef = {
   handler: async (args, ctx) => {
     const key = ctx.config.enrichlayer_api_key;
     if (!key) {
-      return { error: 'No ENRICHLAYER_API_KEY configured. Set it in Settings → Integrations, or add enrichlayer_api_key to ~/BlackMagic/.bm/config.toml.' };
+      return { error: 'No ENRICHLAYER_API_KEY configured. Set it in sidebar → Tools, or add enrichlayer_api_key to ~/BlackMagic/.bm/config.toml.' };
     }
     const url = new URL('https://enrichlayer.com/api/v2/linkedin');
     url.searchParams.set('url', args.linkedinUrl);
@@ -317,7 +317,7 @@ const scrape_apify_actor: ToolDef = {
   handler: async (args, ctx) => {
     const key = ctx.config.apify_api_key;
     if (!key) {
-      return { error: 'No APIFY_API_KEY configured. Set it in Settings → Integrations, or add apify_api_key to ~/BlackMagic/.bm/config.toml.' };
+      return { error: 'No APIFY_API_KEY configured. Set it in sidebar → Tools, or add apify_api_key to ~/BlackMagic/.bm/config.toml.' };
     }
     const actor = encodeURIComponent(args.actorId).replace(/%2F/g, '~');
     const url = `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(key)}`;
@@ -364,7 +364,7 @@ const gscTokenCache = new Map<string, { token: string; exp: number }>();
 async function gscAccessToken(): Promise<string> {
   const creds = await readIntegrationCreds('gsc');
   if (!creds?.service_account_json) {
-    throw new Error('No Google Search Console service account connected. Paste the JSON in Integrations → Google Search Console.');
+    throw new Error('No Google Search Console service account connected. Paste the JSON in sidebar → Tools → Google Search Console.');
   }
   const sa = JSON.parse(creds.service_account_json) as {
     client_email: string; private_key: string;
@@ -500,7 +500,7 @@ const cms_list_posts: ToolDef = {
   },
   handler: async (args) => {
     const platform = await resolveCmsPlatform(args.platform);
-    if (!platform) return { error: 'No CMS connected. Paste credentials in Integrations → Ghost or WordPress.' };
+    if (!platform) return { error: 'No CMS connected. Paste credentials in sidebar → Tools → Ghost or WordPress.' };
     const limit = Math.min(typeof args.limit === 'number' ? args.limit : 20, 100);
     const status = typeof args.status === 'string' ? args.status : 'any';
     if (platform === 'ghost') {
@@ -919,7 +919,7 @@ async function resolveHubspotContact(key: string, idOrEmail: string): Promise<{ 
 
 function needsHubspotKey(ctx: ToolCtx) {
   if (!ctx.config.hubspot_api_key) {
-    return { ok: false, error: 'set HUBSPOT_API_KEY in Settings → Integration keys' };
+    return { ok: false, error: 'set HUBSPOT_API_KEY in sidebar → Tools → Integration keys' };
   }
   return null;
 }
@@ -1192,7 +1192,7 @@ async function apolloFetch(
 
 function needsApolloKey(ctx: ToolCtx) {
   if (!ctx.config.apollo_api_key) {
-    return { ok: false, error: 'set APOLLO_API_KEY in Settings → Integration keys' };
+    return { ok: false, error: 'set APOLLO_API_KEY in sidebar → Tools → Integration keys' };
   }
   return null;
 }
@@ -1312,7 +1312,7 @@ async function attioFetch(
 
 function needsAttioKey(ctx: ToolCtx) {
   if (!ctx.config.attio_api_key) {
-    return { ok: false, error: 'set ATTIO_API_KEY in Settings → Integration keys' };
+    return { ok: false, error: 'set ATTIO_API_KEY in sidebar → Tools → Integration keys' };
   }
   return null;
 }
@@ -1515,7 +1515,7 @@ async function feishuAuthed(
   const appId = ctx.config.feishu_app_id;
   const appSecret = ctx.config.feishu_app_secret;
   if (!appId || !appSecret) {
-    return { ok: false, status: 0, data: null, error: 'set FEISHU_APP_ID + FEISHU_APP_SECRET in Settings → Integration keys' };
+    return { ok: false, status: 0, data: null, error: 'set FEISHU_APP_ID + FEISHU_APP_SECRET in sidebar → Tools → Integration keys' };
   }
   const tok = await feishuToken(appId, appSecret);
   if (typeof tok !== 'string') return { ok: false, status: 0, data: null, error: tok.error };
@@ -1555,7 +1555,7 @@ const feishu_notify: ToolDef = {
   },
   handler: async (args, ctx) => {
     const url = ctx.config.feishu_webhook_url;
-    if (!url) return { ok: false, error: 'set FEISHU_WEBHOOK_URL in Settings → Integration keys' };
+    if (!url) return { ok: false, error: 'set FEISHU_WEBHOOK_URL in sidebar → Tools → Integration keys' };
     const msgType = args.msg_type || (args.card ? 'interactive' : 'text');
     const payload: Record<string, unknown> = { msg_type: msgType };
     if (msgType === 'text') payload.content = { text: String(args.text ?? '') };
@@ -1657,7 +1657,7 @@ function needsMetabase(ctx: ToolCtx): { url: string; key: string } | { ok: false
   const url = (ctx.config.metabase_site_url || '').replace(/\/+$/, '');
   const key = ctx.config.metabase_api_key || '';
   if (!url || !key) {
-    return { ok: false, error: 'set METABASE_SITE_URL + METABASE_API_KEY in Settings → Integration keys' };
+    return { ok: false, error: 'set METABASE_SITE_URL + METABASE_API_KEY in sidebar → Tools → Integration keys' };
   }
   return { url, key };
 }
@@ -1781,7 +1781,7 @@ function needsSupabase(ctx: ToolCtx): { url: string; key: string } | { ok: false
   const url = (ctx.config.supabase_url || '').replace(/\/+$/, '');
   const key = ctx.config.supabase_service_role_key || '';
   if (!url || !key) {
-    return { ok: false, error: 'set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in Settings → Integration keys' };
+    return { ok: false, error: 'set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in sidebar → Tools → Integration keys' };
   }
   return { url, key };
 }
@@ -1962,7 +1962,7 @@ const slack_notify: ToolDef = {
   },
   handler: async (args, ctx) => {
     const url = ctx.config.slack_webhook_url;
-    if (!url) return { ok: false, error: 'set SLACK_WEBHOOK_URL in Settings → Integration keys' };
+    if (!url) return { ok: false, error: 'set SLACK_WEBHOOK_URL in sidebar → Tools → Integration keys' };
     try {
       const payload: Record<string, unknown> = { text: args.text };
       if (args.channel) payload.channel = args.channel;
@@ -2046,7 +2046,7 @@ async function runApifyActor(
   input: Record<string, unknown>,
 ): Promise<{ ok: boolean; status?: number; data?: any; error?: string }> {
   const key = ctx.config.apify_api_key;
-  if (!key) return { ok: false, error: 'set APIFY_API_KEY in Settings → Integration keys' };
+  if (!key) return { ok: false, error: 'set APIFY_API_KEY in sidebar → Tools → Integration keys' };
   const actor = encodeURIComponent(actorId).replace(/%2F/g, '~');
   const url = `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(key)}`;
   try {
@@ -2105,10 +2105,82 @@ const linkedin_enrich_company: ToolDef = {
   },
 };
 
+// Unipile-backed LinkedIn tools. Canonical path for LinkedIn
+// automation — replaces the brittle cookie-based apify scraper.
+// Requires Unipile integration connected (sidebar → Tools → Unipile).
+const linkedin_list_accounts: ToolDef = {
+  name: 'linkedin_list_accounts',
+  description: "List the LinkedIn accounts the user has connected in Unipile. Returns each account's id (use as `account_id` in the other linkedin_* tools), display name, and status. Needs Unipile integration (sidebar → Tools → Unipile).",
+  parameters: { type: 'object', properties: {} },
+  handler: async () => {
+    const { listLinkedInAccounts } = await import('./unipile-linkedin.js');
+    return listLinkedInAccounts();
+  },
+};
+
+const linkedin_send_dm: ToolDef = {
+  name: 'linkedin_send_dm',
+  description: "Send a LinkedIn DM via the user's Unipile account. `recipient` may be a LinkedIn profile URL (we resolve it) or a Unipile provider_id. Respects LinkedIn's own rate limits — Unipile handles throttling server-side. Preferred over linkedin_dm_via_apify (deprecated).",
+  parameters: {
+    type: 'object',
+    properties: {
+      account_id: { type: 'string', description: 'Unipile LinkedIn account id — list via linkedin_list_accounts if unknown.' },
+      recipient: { type: 'string', description: 'Full LinkedIn profile URL or Unipile provider_id.' },
+      text: { type: 'string' },
+      attachments: { type: 'array', items: { type: 'string' }, description: 'Optional array of Unipile attachment ids.' },
+    },
+    required: ['account_id', 'recipient', 'text'],
+  },
+  handler: async (args) => {
+    const { sendLinkedInDm } = await import('./unipile-linkedin.js');
+    return sendLinkedInDm({
+      account_id: args.account_id,
+      recipient: args.recipient,
+      text: args.text,
+      attachments: Array.isArray(args.attachments) ? args.attachments : undefined,
+    });
+  },
+};
+
+const linkedin_send_invitation: ToolDef = {
+  name: 'linkedin_send_invitation',
+  description: "Send a LinkedIn connection request via Unipile. Optional `message` is the blurb shown in the invite (LinkedIn caps at ~300 chars, keep it tight).",
+  parameters: {
+    type: 'object',
+    properties: {
+      account_id: { type: 'string' },
+      recipient: { type: 'string', description: 'LinkedIn profile URL or provider_id.' },
+      message: { type: 'string' },
+    },
+    required: ['account_id', 'recipient'],
+  },
+  handler: async (args) => {
+    const { sendLinkedInInvitation } = await import('./unipile-linkedin.js');
+    return sendLinkedInInvitation({ account_id: args.account_id, recipient: args.recipient, message: args.message });
+  },
+};
+
+const linkedin_get_profile_unipile: ToolDef = {
+  name: 'linkedin_get_profile',
+  description: "Fetch a LinkedIn profile via Unipile. `identifier` can be a profile URL or provider_id. Returns headline, title, company, location, plus Unipile's provider_id for later calls.",
+  parameters: {
+    type: 'object',
+    properties: {
+      account_id: { type: 'string' },
+      identifier: { type: 'string' },
+    },
+    required: ['account_id', 'identifier'],
+  },
+  handler: async (args) => {
+    const { getLinkedInProfile } = await import('./unipile-linkedin.js');
+    return getLinkedInProfile({ account_id: args.account_id, identifier: args.identifier });
+  },
+};
+
 const linkedin_dm_via_apify: ToolDef = {
   name: 'linkedin_dm_via_apify',
   description:
-    "Send a LinkedIn DM via an Apify actor. BRITTLE: needs the user's session cookie (linkedin_cookie) and technically violates LinkedIn ToS — use for personal outreach only. Prefer send_email + a connection request when in doubt.",
+    "DEPRECATED — prefer linkedin_send_dm (Unipile). Send a LinkedIn DM via an Apify actor using the user's li_at cookie. Brittle: breaks on session rotation, ToS-grey-area. Kept only for users who haven't connected Unipile yet.",
   parameters: {
     type: 'object',
     properties: {
@@ -2119,10 +2191,10 @@ const linkedin_dm_via_apify: ToolDef = {
   },
   handler: async (args, ctx) => {
     if (!ctx.config.apify_api_key) {
-      return { ok: false, error: 'set APIFY_API_KEY in Settings → Integration keys' };
+      return { ok: false, error: 'set APIFY_API_KEY in sidebar → Tools → Integration keys' };
     }
     if (!ctx.config.linkedin_cookie) {
-      return { ok: false, error: 'set LINKEDIN_COOKIE in Settings → Integration keys (li_at=…). Note: ToS-grey-area; use cautiously.' };
+      return { ok: false, error: 'set LINKEDIN_COOKIE in sidebar → Tools → Integration keys (li_at=…). Note: ToS-grey-area; use cautiously.' };
     }
     console.warn('[tools] linkedin_dm_via_apify — ToS-grey-area automation; triple-check before enabling in a cron');
     const r = await runApifyActor(ctx, 'apimaestro/linkedin-outreach-send-message-invitation-gpt', {
@@ -2391,6 +2463,10 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   slack_notify,
   send_email,
   linkedin_enrich_company,
+  linkedin_list_accounts,
+  linkedin_send_dm,
+  linkedin_send_invitation,
+  linkedin_get_profile_unipile,
   linkedin_dm_via_apify,
 ];
 
