@@ -2,7 +2,7 @@
 
 import { Target } from 'lucide-react';
 import { PageShell, PageHeader, PageBody } from '../../../components/ui/primitives';
-import { KnowledgeTabs, KnowledgeCard } from '../page';
+import { KnowledgeTabs, KnowledgeCard } from '../../../components/knowledge-tabs';
 
 export default function IcpsPage() {
   return (

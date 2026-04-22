@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.45 — 2026-04-22
+
+### Fixed
+- **0.4.44 build failure: `KnowledgeTabs is not a valid Page export field`.**
+  Next.js disallows non-default exports from `app/<route>/page.tsx`, and the
+  Knowledge sub-pages were importing the tab strip + card components straight
+  from `app/knowledge/page.tsx`. Moved the shared bits into
+  `components/knowledge-tabs.tsx` and updated all four sub-pages to import
+  from there. Cask 0.4.44 never went out — this is the first 0.4.4x release
+  with the Swan-style sidebar reaching brew.
+
 ## 0.4.44 — 2026-04-22
 
 ### Changed

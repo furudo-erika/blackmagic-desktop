@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Tag } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { PageShell, PageHeader, PageBody, Panel } from '../../../components/ui/primitives';
-import { KnowledgeTabs } from '../page';
+import { KnowledgeTabs } from '../../../components/knowledge-tabs';
 
 // Walks every companies/contacts/deals .md frontmatter and rolls up
 // the `tags:` list. Read-only for now — to add a tag, edit the entity.

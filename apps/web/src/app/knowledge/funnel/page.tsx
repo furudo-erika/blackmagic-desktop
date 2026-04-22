@@ -2,7 +2,7 @@
 
 import { Filter } from 'lucide-react';
 import { PageShell, PageHeader, PageBody, Panel } from '../../../components/ui/primitives';
-import { KnowledgeTabs } from '../page';
+import { KnowledgeTabs } from '../../../components/knowledge-tabs';
 
 const STAGES = [
   { name: 'Target', color: '#605A57', desc: "Fits ICP but hasn't engaged yet" },
