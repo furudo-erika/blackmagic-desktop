@@ -2,6 +2,20 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.66 — 2026-04-22
+
+### Fixed
+- **Funnel stages are now clickable.** On
+  `/knowledge/funnel` each of the eight stages (Target, Aware, MQL,
+  SQL, Opportunity, Negotiation, Customer, Closed Lost) was
+  rendering as a static list row with no handler — clicking did
+  nothing. Each row is now a link that deep-links into the Deals
+  page filtered by that stage
+  (`/deals?stage=<name>`). The Deals page reads the `stage` query
+  param, filters by the `stage:` frontmatter field on each deal,
+  and shows a dismissible "stage: <name>" chip in the header so
+  users can clear the filter in one click.
+
 ## 0.4.65 — 2026-04-22
 
 ### Changed

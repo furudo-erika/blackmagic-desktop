@@ -1,6 +1,7 @@
 'use client';
 
-import { Filter } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, Filter } from 'lucide-react';
 import { PageShell, PageHeader, PageBody, Panel } from '../../../components/ui/primitives';
 import { KnowledgeTabs } from '../../../components/knowledge-tabs';
 
@@ -26,19 +27,26 @@ export default function FunnelPage() {
       />
       <PageBody maxWidth="3xl">
         <Panel>
-          <ul className="space-y-2">
+          <ul className="space-y-1">
             {STAGES.map((s, i) => (
-              <li key={s.name} className="flex items-center gap-3">
-                <span
-                  className="w-6 h-6 rounded-full text-[11px] font-mono text-white flex items-center justify-center shrink-0"
-                  style={{ background: s.color }}
+              <li key={s.name}>
+                <Link
+                  href={`/deals?stage=${encodeURIComponent(s.name.toLowerCase())}`}
+                  className="group flex items-center gap-3 rounded-md px-2 py-1.5 -mx-2 hover:bg-cream-light dark:hover:bg-[#1F1B15]"
+                  title={`Show deals in ${s.name}`}
                 >
-                  {i + 1}
-                </span>
-                <span className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] w-32 shrink-0">
-                  {s.name}
-                </span>
-                <span className="text-[12px] text-muted dark:text-[#8C837C] flex-1">{s.desc}</span>
+                  <span
+                    className="w-6 h-6 rounded-full text-[11px] font-mono text-white flex items-center justify-center shrink-0"
+                    style={{ background: s.color }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] w-32 shrink-0">
+                    {s.name}
+                  </span>
+                  <span className="text-[12px] text-muted dark:text-[#8C837C] flex-1">{s.desc}</span>
+                  <ArrowRight className="h-3 w-3 text-muted/60 dark:text-[#6B625C] opacity-0 group-hover:opacity-100 shrink-0" />
+                </Link>
               </li>
             ))}
           </ul>

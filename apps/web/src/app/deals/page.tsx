@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Briefcase, Building2, MessageCircle, ArrowRight } from 'lucide-react';
+import { Briefcase, Building2, MessageCircle, ArrowRight, X } from 'lucide-react';
 import { api } from '../../lib/api';
 
 type Deal = { path: string; state: string; frontmatter: Record<string, unknown> };
@@ -20,6 +21,8 @@ const HEALTH_COLOR: Record<string, string> = {
 };
 
 export default function DealsPage() {
+  const search = useSearchParams();
+  const stageFilter = (search.get('stage') ?? '').trim().toLowerCase();
   const deals = useQuery({
     queryKey: ['deals'],
     queryFn: async (): Promise<Deal[]> => {
@@ -40,9 +43,19 @@ export default function DealsPage() {
 
   return (
     <div className="h-full flex flex-col">
-      <header className="px-6 py-4 border-b border-line">
-        <h1 className="text-lg font-semibold">Deals</h1>
-        <p className="text-xs text-muted">Pipeline from deals/ in your vault.</p>
+      <header className="px-6 py-4 border-b border-line flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">Deals</h1>
+          <p className="text-xs text-muted">Pipeline from deals/ in your vault.</p>
+        </div>
+        {stageFilter && (
+          <Link
+            href="/deals"
+            className="inline-flex items-center gap-1 rounded-full border border-flame/40 bg-flame/5 px-2.5 py-1 text-[11px] font-mono text-flame hover:bg-flame/10"
+          >
+            stage: {stageFilter} <X className="h-3 w-3" />
+          </Link>
+        )}
       </header>
       <div className="h-full overflow-y-auto px-6 py-6">
         {deals.isLoading && <div className="text-sm text-muted">loading…</div>}
@@ -75,7 +88,13 @@ export default function DealsPage() {
         )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {STATES.map((st) => {
-            const list = (deals.data ?? []).filter((d) => d.state === st);
+            const list = (deals.data ?? [])
+              .filter((d) => d.state === st)
+              .filter((d) => {
+                if (!stageFilter) return true;
+                const s = String(d.frontmatter.stage ?? '').trim().toLowerCase();
+                return s === stageFilter;
+              });
             return (
               <div key={st}>
                 <div className="text-xs uppercase tracking-wide text-muted mb-2 font-mono">
