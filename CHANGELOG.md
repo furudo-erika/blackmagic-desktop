@@ -2,6 +2,18 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.56 — 2026-04-22
+
+### Fixed
+- **Agent page — Input panel no longer dumps raw markdown.** The in-flight
+  prompt used to render inside a `<pre>` block that echoed literal `**`,
+  `###`, and list syntax, and the panel happily expanded to 800 chars of
+  it — so a long prompt pushed the whole "Processing / Output" flow way
+  below the fold. Replaced with a one-line summary (markdown syntax
+  stripped to plain text, capped at 140 chars) plus a "Show full prompt"
+  toggle that expands to properly rendered GFM via the shared
+  `<Markdown>` component.
+
 ## 0.4.55 — 2026-04-22
 
 ### Removed

@@ -23,11 +23,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Bot, Sparkles, Search, Briefcase, Globe, Linkedin,
   CalendarClock, Copy as CopyIcon, RotateCcw, Activity, Radar, Send,
-  Play, ChevronRight, FileOutput, FileInput, Loader2, Check, AlertCircle,
+  Play, ChevronRight, ChevronDown, FileOutput, FileInput, Loader2, Check, AlertCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { AgentIcon, hasAgentTheme } from '../../components/agent-icon';
+import { Markdown } from '../../components/markdown';
 
 const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   Bot, Globe, Linkedin, CalendarClock, Copy: CopyIcon, RotateCcw,
@@ -323,9 +324,7 @@ function AgentsInner() {
             status={inputPrompt ? 'collected' : 'awaiting'}
           >
             {inputPrompt ? (
-              <pre className="whitespace-pre-wrap text-[12px] text-ink dark:text-[#E6E0D8] leading-relaxed font-mono">
-                {inputPrompt.length > 800 ? inputPrompt.slice(0, 800) + '…' : inputPrompt}
-              </pre>
+              <InputPreview source={inputPrompt} />
             ) : (
               <div className="space-y-2">
                 <p className="text-[12px] text-muted dark:text-[#8C837C]">
@@ -536,5 +535,55 @@ export default function AgentsPage() {
     <Suspense fallback={<div className="p-8 text-sm text-muted dark:text-[#8C837C]">loading…</div>}>
       <AgentsInner />
     </Suspense>
+  );
+}
+
+// One-line summary of the prompt — markdown headings/emphasis stripped so
+// the collapsed state reads as a plain sentence instead of literal `**` noise.
+function stripMarkdown(s: string): string {
+  return s
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function InputPreview({ source }: { source: string }) {
+  const [open, setOpen] = useState(false);
+  const summary = useMemo(() => {
+    const flat = stripMarkdown(source);
+    return flat.length > 140 ? flat.slice(0, 140) + '…' : flat;
+  }, [source]);
+
+  return (
+    <div>
+      {!open ? (
+        <p className="text-[12px] text-ink dark:text-[#E6E0D8] leading-relaxed">
+          {summary}
+        </p>
+      ) : (
+        <div className="text-[12px] leading-relaxed">
+          <Markdown source={source} />
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="mt-2 inline-flex items-center gap-1 text-[11px] font-mono text-muted dark:text-[#8C837C] hover:text-flame"
+      >
+        {open ? (
+          <>Hide <ChevronDown className="w-3 h-3 rotate-180" /></>
+        ) : (
+          <>Show full prompt <ChevronDown className="w-3 h-3" /></>
+        )}
+      </button>
+    </div>
   );
 }
