@@ -2,6 +2,16 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.65 — 2026-04-22
+
+### Changed
+- **Moved the BlackMagic AI logo to the bottom-left** of the sidebar
+  (previously top-left). The macOS traffic-light gutter stays
+  draggable but is now unbranded; the logo + wordmark sit in the
+  footer row alongside the version string and theme toggle, giving
+  the top of the sidebar more breathing room for the project
+  switcher and nav.
+
 ## 0.4.64 — 2026-04-22
 
 ### Added
