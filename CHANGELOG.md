@@ -2,6 +2,62 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.48 — 2026-04-22
+
+### Added
+- **7 new skills + 3 new BYOK integrations, all generalized from the
+  apidog-team corpus.** None of the skills hardcode a vendor, a
+  keyword, or a notification channel — every config input comes from
+  `us/*` or an integration record.
+
+  **Tier 1 — zero-integration-dependency skills:**
+  - `api-endpoint-test` — generate + run a JSON test suite via
+    `apidog-cli` (free npm package) against any REST backend. Discovers
+    routes from Next/Express/FastAPI code or an OpenAPI spec; covers
+    auth / validation / method / 404 / happy-path. No Apidog account
+    needed.
+  - `kol-discover` → `kol-score` → `kol-outreach-draft` — KOL
+    creator-marketing loop: LinkedIn search via Apify, score against
+    ICP from `us/market/icp.md`, draft approval-gated DMs/emails via
+    `draft_create`. Writes a tracking CSV to `kol/`.
+
+  **Tier 2 — behind new integrations:**
+  - `gsc-content-brief` — REWRITE / PUSH / GAP SEO analysis from
+    Google Search Console Search Analytics. Writes a weekly content
+    brief to `signals/seo/<date>-brief.md`.
+  - `cms-blog-stats` — blog overview across Ghost / WordPress.
+  - `cms-publish-draft` — push a reviewed `drafts/` post to the
+    connected CMS as a draft (never auto-publishes).
+
+- **3 new integrations**:
+  - **Google Search Console** (SEO group) — paste a service-account
+    JSON + the site URL. The daemon signs an RS256 JWT from the
+    private key, exchanges it for an OAuth access token at Google's
+    token endpoint, and caches the token for 55 min per key fingerprint.
+    No OAuth dance for the user — just paste the JSON.
+  - **Ghost** (Content/CMS group) — Admin API key (`<id>:<secret>` hex
+    format) + Admin API URL. HMAC-SHA256 JWT auth per Ghost's spec.
+  - **WordPress** (Content/CMS group) — application-password auth
+    (`user:app_password`) + site URL. Uses the `/wp-json/wp/v2/posts`
+    REST endpoint.
+
+- **3 new agent tools**: `gsc_query` (GSC Search Analytics),
+  `cms_list_posts` (Ghost/WordPress dispatch), `cms_create_draft`
+  (always creates as draft — never publishes). Researcher + SDR
+  agents pick them up via vault migration.
+
+- **Vault templates seeded on `ensureVault()`**:
+  `templates/daily-ops.md`, `templates/weekly-ops.md` — copy-me
+  starting points for recurring ops rhythm notes. New `kol/` skeleton
+  dir for the KOL skill outputs.
+
+### Changed
+- **Integrations paste form learns 3 new shapes**: GSC accepts a
+  JSON blob (auto-detected via leading `{` — same pattern as SES),
+  Ghost shows the `<id>:<secret>` hint, WordPress shows the
+  `user:app_password` hint. The existing `{...}` auto-spread still
+  works uniformly across all JSON-accepting providers.
+
 ## 0.4.47 — 2026-04-22
 
 ### Changed
