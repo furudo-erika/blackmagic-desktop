@@ -2,6 +2,21 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.41 — 2026-04-22
+
+### Changed
+- **/agents goes from 2-pane to 3-pane (Slack-style).** Layout is now
+  `[ agents (240) | threads for selected agent (260) | chat (rest) ]`.
+  The middle pane lists every past chat thread you've had with the
+  selected agent — preview line, message count, "5m / 3h / 2d" relative
+  timestamp — sorted most-recent-first. Click a thread → the right
+  pane reloads ChatSurface against that thread's stored history.
+  `+` at the top of the threads pane mints a fresh thread; per-row
+  hover reveals a delete button. URL state widened to `?slug=&thread=`
+  so any pane is deep-linkable. Switching agents auto-prime the most
+  recent thread (or starts fresh if none exist). All wired through
+  the existing `/api/chats` endpoint — no backend change.
+
 ## 0.4.40 — 2026-04-22
 
 ### Changed
