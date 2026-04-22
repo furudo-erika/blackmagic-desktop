@@ -2,6 +2,29 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.68 — 2026-04-23
+
+### Fixed
+- **Chat sent from Home vanished mid-stream; page "froze" on the
+  empty agent gallery.** Root cause: when you composed on Home, it
+  wrote a fresh `bm-last-thread` + pending prompt to localStorage
+  and routed to `/chat`. The chat surface installs a 1s interval
+  to detect thread changes from other tabs, and the interval's
+  closure captured `threadId` at effect-setup time (right after
+  the setup block resets it to `''`). Every second it compared the
+  new thread ID in localStorage against the stale `''`, decided
+  the thread changed, and called `loadThread()` — which hits
+  `getChat` on a thread the daemon hasn't persisted yet, falls
+  into the catch branch, and runs `setMessages([])`. That wiped
+  the user's message and the in-flight assistant reply mid-stream,
+  so when the mutation finished you were left with
+  `messages.length === 0` + `sendMut.isPending === false`, which
+  is exactly the empty-state agent gallery. Fix: the interval now
+  reads `threadId` through a ref (latest value, no stale
+  closure) and bails out entirely while a send is in flight
+  (`sendPendingRef.current`). Multi-tab sync still works once the
+  current send completes.
+
 ## 0.4.67 — 2026-04-22
 
 ### Added

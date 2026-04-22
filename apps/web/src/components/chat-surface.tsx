@@ -227,6 +227,11 @@ export function ChatSurface({
     }
   }, []);
 
+  // Mirrors sendMut.isPending into a ref so the 1s sync interval can
+  // check it from inside its stale closure. See the detailed comment
+  // on the syncThread effect below.
+  const sendPendingRef = useRef(false);
+
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   // Agent picker — lets the user swap the routing agent inside Chat
   // instead of having to open /team?slug=X first. When the parent
@@ -451,12 +456,27 @@ export function ChatSurface({
     : threadKey;
   const isGlobal = effectiveThreadKey === 'bm-last-thread';
 
+  // Refs mirror state for use inside long-lived closures (the 1s sync
+  // interval installed below). Without these, the interval captures
+  // threadId/sendMut.isPending at effect-setup time (when threadId is
+  // '' from the reset above), so every tick it thinks the thread
+  // changed and re-loads — which in turn clears messages mid-stream
+  // and wipes the in-flight conversation.
+  const threadIdRef = useRef(threadId);
+  useEffect(() => { threadIdRef.current = threadId; }, [threadId]);
+
   useEffect(() => {
     function syncThread() {
       if (typeof window === 'undefined') return;
+      // Don't re-sync while a send is streaming — loadThread's
+      // failure path wipes messages, which would kill the in-flight
+      // assistant reply. The multi-tab use case this sync exists
+      // for (user switches thread in another window) can safely
+      // wait until the current send finishes.
+      if (sendPendingRef.current) return;
       const last = localStorage.getItem(effectiveThreadKey);
-      if (last && last !== threadId) loadThread(last);
-      else if (!last && !threadId) {
+      if (last && last !== threadIdRef.current) loadThread(last);
+      else if (!last && !threadIdRef.current) {
         const id = newThreadId();
         setThreadId(id);
         localStorage.setItem(effectiveThreadKey, id);
@@ -600,6 +620,10 @@ export function ChatSurface({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sendMut.isPending]);
+
+  useEffect(() => {
+    sendPendingRef.current = sendMut.isPending;
+  }, [sendMut.isPending]);
 
   function send(override?: string) {
     const text = (override ?? input).trim();
