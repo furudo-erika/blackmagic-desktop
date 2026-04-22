@@ -43,6 +43,7 @@ import {
   saveIntegration,
   deleteIntegration,
   oauthStartUrl,
+  regenerateEnvMirror,
   type IntegrationProvider,
 } from './integrations.js';
 
@@ -231,6 +232,12 @@ async function main() {
   await ensureVault();
   await geo.ensureGeoSkeleton();
   await loadOAuthStates();
+  // Re-emit <vault>/.env from the current integrations.json so users
+  // who paste BYOK keys before this version pick up the mirror without
+  // having to re-save anything.
+  await regenerateEnvMirror().catch((err) =>
+    console.error('[integrations] env mirror failed:', err),
+  );
   await McpRegistry.start().catch((err) => console.error('[mcp] registry start failed:', err));
 
   const shutdown = (sig: string) => {

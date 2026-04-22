@@ -2,6 +2,49 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.42 — 2026-04-22
+
+### Added
+- **Five Apify-driven Skills, vendor-neutral, ship in every vault.**
+  Generalized from the apidog-team pipelines so any user with their
+  own Apify token gets a real research workflow: `brand-monitor-apify`
+  (Reddit + Twitter/X mention sweep), `competitor-radar` (weekly
+  pricing/changelog/blog diff), `doc-leads-discover` (ICP-signal
+  Google search → approval-gated draft outbound), `linkedin-intel-
+  weekly` (competitors + KOLs profile + post diff), `reddit-pulse`
+  (daily brand + category narrative check). Each reads its watchlist
+  from `us/market/*.md` — no hardcoded keywords, domains, webhooks,
+  or notification providers. Five matching preset triggers ship
+  disabled; flip enabled after pasting your Apify token.
+- **Channel-agnostic `notify` agent tool.** Skills and agents call
+  `notify({ subject, body, urgency })` and the daemon fans the
+  message out to every messaging integration the user has connected:
+  Slack (incoming webhook), Feishu (interactive card with urgency
+  → header colour), Discord (webhook with `@here` for high urgency),
+  Telegram (bot API to a configured chat). No skill names a specific
+  provider — connecting more integrations just adds destinations.
+- **`<vault>/.env` mirror of BYOK integrations.** Every BYOK key
+  (Apify, SES, Feishu, HubSpot, Slack, Notion, …) you save in
+  Integrations now also writes to `<vault>/.env` as plain
+  `KEY=value` pairs (`APIFY_API_TOKEN`, `AWS_ACCESS_KEY_ID`,
+  `SES_FROM`, `FEISHU_WEBHOOK`, …). Vault scripts just
+  `load_dotenv()` and read env vars — no custom JSON parsing. Daemon
+  regenerates `.env` from `integrations.json` on startup so existing
+  connections light up automatically.
+- **`trigger_create` agent tool.** Agents can schedule their own
+  triggers mid-conversation. Tell an agent "run this every Monday at
+  9am" → it calls `trigger_create({ name, cron, skill })` → a
+  `triggers/<name>.md` appears and the cron loop picks it up on the
+  next refresh. Bindings: `skill` (preferred), `agent`, or `shell`.
+
+### Changed
+- **Trigger frontmatter accepts `skill:` as alias for `playbook:`.**
+  Same filesystem (`playbooks/*.md`), same runner — just the
+  user-facing word. Existing `playbook:` triggers keep working.
+- **Researcher + SDR agents gain `notify`, `trigger_create`, and
+  `scrape_apify_actor` via vault migration.** Existing vaults pick
+  these up on next daemon start; new vaults seed them from day one.
+
 ## 0.4.41 — 2026-04-22
 
 ### Changed

@@ -1861,7 +1861,189 @@ const enroll_contact_in_sequence: ToolDef = {
   handler: async (args) => enrollContact(args.contact_path, args.sequence_path),
 };
 
+// Send a notification to every messaging channel the user has connected
+// in Integrations. Channel-agnostic by design: the user picks which
+// integrations to wire up (Slack / Discord / Telegram / Feishu / Email);
+// this tool fans out to all of them. Skills should call this instead of
+// hardcoding any specific provider — that way one user's pipeline ends
+// up in their Slack and another's ends up in their Telegram without the
+// skill knowing or caring.
+//
+// urgency hint: "low" → quiet line, "normal" → default, "high" → @here
+// or equivalent if the channel supports it. Skills SHOULD use "high"
+// sparingly (paged-style alerts only).
+const notify: ToolDef = {
+  name: 'notify',
+  description:
+    "Send a notification to every messaging channel the user has connected (Slack / Discord / Telegram / Feishu / Email). Use this from skills instead of calling a specific channel — the user's BlackMagic Integrations decide where it lands.",
+  parameters: {
+    type: 'object',
+    properties: {
+      subject: { type: 'string', description: 'Short title (≤ 80 chars).' },
+      body: { type: 'string', description: 'Markdown body of the notification.' },
+      urgency: { type: 'string', enum: ['low', 'normal', 'high'], description: 'Default normal.' },
+      link: { type: 'string', description: 'Optional URL the recipient should open.' },
+    },
+    required: ['subject', 'body'],
+  },
+  handler: async (args, ctx) => {
+    // Lazy-load credentials from the same vault file the UI writes to.
+    // Each channel handler is best-effort: a single failure doesn't
+    // block the others.
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const { getVaultRoot } = await import('./paths.js');
+    let store: any = {};
+    try {
+      const raw = await fs.readFile(path.join(getVaultRoot(), '.bm', 'integrations.json'), 'utf-8');
+      store = JSON.parse(raw);
+    } catch {}
+
+    const subject = String(args.subject || '').slice(0, 200);
+    const body = String(args.body || '');
+    const urgency = (args.urgency === 'high' || args.urgency === 'low') ? args.urgency : 'normal';
+    const link = typeof args.link === 'string' ? args.link : '';
+    const text = `*${subject}*\n${body}${link ? `\n${link}` : ''}`;
+
+    const sends: Array<{ channel: string; ok: boolean; detail?: string }> = [];
+
+    async function tryPost(channel: string, url: string, payload: any) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        sends.push({ channel, ok: res.ok, detail: res.ok ? undefined : `${res.status}` });
+      } catch (err) {
+        sends.push({ channel, ok: false, detail: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    // Slack — incoming webhook (config.slack_webhook_url) OR bot token
+    // from integrations.slack. Webhook path is simplest, use it if set.
+    const slackUrl = ctx.config.slack_webhook_url;
+    if (slackUrl) {
+      await tryPost('slack', slackUrl, {
+        text: urgency === 'high' ? `<!here> ${text}` : text,
+      });
+    }
+
+    // Feishu — webhook stored as integrations.feishu.token (or .endpoint).
+    const feishuRec = store.feishu;
+    if (feishuRec?.status === 'connected') {
+      const url = feishuRec.credentials?.endpoint || feishuRec.credentials?.token;
+      if (url && /^https?:\/\//.test(url)) {
+        await tryPost('feishu', url, {
+          msg_type: 'interactive',
+          card: {
+            header: {
+              title: { tag: 'plain_text', content: subject.slice(0, 100) },
+              template: urgency === 'high' ? 'red' : urgency === 'low' ? 'grey' : 'blue',
+            },
+            elements: [
+              { tag: 'div', text: { tag: 'lark_md', content: body.slice(0, 4000) } },
+              ...(link ? [{ tag: 'action', actions: [{ tag: 'button', text: { tag: 'plain_text', content: 'Open' }, url, type: 'primary' }] }] : []),
+            ],
+          },
+        });
+      }
+    }
+
+    // Discord — webhook stored as integrations.discord.endpoint.
+    const discordRec = store.discord;
+    if (discordRec?.status === 'connected') {
+      const url = discordRec.credentials?.endpoint;
+      if (url && /^https?:\/\//.test(url)) {
+        await tryPost('discord', url, {
+          content: urgency === 'high' ? `@here ${text}` : text,
+        });
+      }
+    }
+
+    // Telegram — bot token + a chat_id. Bot API needs a chat to post to;
+    // we pull it from credentials.chat_id (user pastes both when connecting).
+    const tgRec = store.telegram;
+    if (tgRec?.status === 'connected') {
+      const token = tgRec.credentials?.token;
+      const chatId = tgRec.credentials?.chat_id;
+      if (token && chatId) {
+        await tryPost(
+          'telegram',
+          `https://api.telegram.org/bot${token}/sendMessage`,
+          { chat_id: chatId, text, parse_mode: 'Markdown' },
+        );
+      }
+    }
+
+    if (sends.length === 0) {
+      return {
+        ok: false,
+        error: 'No notification channel connected. Connect Slack, Feishu, Discord, or Telegram in Integrations.',
+      };
+    }
+    return { ok: sends.some((s) => s.ok), sends };
+  },
+};
+
+// Schedule a recurring trigger from inside a chat. Used when the user
+// tells an agent "yeah run this every Monday at 9" — the agent calls
+// this tool, a triggers/<name>.md file appears in the vault, and the
+// daemon's cron loop picks it up on the next listTriggers() refresh.
+//
+// Bindings supported: skill (preferred — invokes via the skill's
+// declared agent), agent (raw agent task), or shell (raw command).
+// Exactly one of skill/agent/shell must be set.
+const trigger_create: ToolDef = {
+  name: 'trigger_create',
+  description:
+    "Schedule a recurring trigger that runs a skill, agent, or shell command on a cron. Use when the user asks to automate something — e.g. 'do this every Monday at 9am'. Returns the trigger file path.",
+  parameters: {
+    type: 'object',
+    properties: {
+      name: {
+        type: 'string',
+        description: "Slug for the trigger, e.g. 'weekly-competitor-scan'. Must be lowercase + hyphens.",
+      },
+      cron: {
+        type: 'string',
+        description: "Standard 5-field cron in local time, e.g. '0 9 * * 1' for Mondays at 9am.",
+      },
+      skill: { type: 'string', description: 'Skill slug to invoke (filename in playbooks/, no .md).' },
+      agent: { type: 'string', description: 'Agent slug to invoke directly.' },
+      shell: { type: 'string', description: 'Raw shell command (rare — prefer skill/agent).' },
+      description: { type: 'string', description: 'One-line description shown in the Triggers UI.' },
+      enabled: { type: 'boolean', description: 'Default true.' },
+    },
+    required: ['name', 'cron'],
+  },
+  handler: async (args) => {
+    const slug = String(args.name || '').trim().replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+    if (!slug) return { error: 'name required' };
+    const bindings = ['skill', 'agent', 'shell'].filter((k) => typeof args[k] === 'string' && args[k].length > 0);
+    if (bindings.length === 0) return { error: 'must set one of skill, agent, or shell' };
+    if (bindings.length > 1) return { error: `only one binding allowed, got ${bindings.join('+')}` };
+    const lines: string[] = ['---'];
+    lines.push(`kind: trigger`);
+    lines.push(`name: ${slug}`);
+    lines.push(`cron: '${String(args.cron).replace(/'/g, "''")}'`);
+    if (args.skill) lines.push(`skill: ${args.skill}`);
+    if (args.agent) lines.push(`agent: ${args.agent}`);
+    if (args.shell) lines.push(`shell: ${JSON.stringify(args.shell)}`);
+    lines.push(`enabled: ${args.enabled === false ? 'false' : 'true'}`);
+    lines.push('---');
+    lines.push('');
+    lines.push(args.description || `Auto-created by an agent at ${new Date().toISOString()}.`);
+    lines.push('');
+    const relPath = `triggers/${slug}.md`;
+    await writeVaultFile(relPath, lines.join('\n'));
+    return { ok: true, path: relPath };
+  },
+};
+
 export const BUILTIN_TOOLS: ToolDef[] = [
+  notify,
+  trigger_create,
   read_file,
   write_file,
   edit_file,

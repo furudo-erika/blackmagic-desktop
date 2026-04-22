@@ -1848,6 +1848,242 @@ Daily industry news scan.
    whether it suggests any outbound angle this week.
 `,
 
+  // === Apify-driven scans (heavier, BYOK) ==================================
+  // These five skills shipped from the apidog-team pipelines as
+  // vendor-neutral capabilities every vault gets. They each call Apify
+  // actors via scrape_apify_actor (needs APIFY_API_TOKEN in
+  // .bm/integrations.json → mirrored to <vault>/.env), filter the raw
+  // results, write a dated note under signals/, and call the channel-
+  // agnostic `notify` tool which fans out to whatever messaging
+  // integrations the user has connected (Slack / Discord / Telegram /
+  // Feishu / Email — none of these is hardcoded). Compared to the
+  // web_search-based scans above, these reach a wider corpus (Reddit
+  // comment trees, full Twitter timelines, LinkedIn posts) at the cost
+  // of one Apify run per query.
+  'brand-monitor-apify.md': `---
+kind: skill
+name: brand-monitor-apify
+group: signals
+agent: researcher
+inputs: []
+---
+
+Heavy brand-monitor scan via Apify (Reddit + Twitter/X).
+
+## Pre-flight
+- Read \`us/company.md\` frontmatter for the user's company \`name\`,
+  primary product names, and any \`monitor_keywords\` list. If none of
+  these exist (still the seed template), reply with a one-line
+  "configure us/company.md first — list keywords to monitor" and stop.
+- Confirm \`APIFY_API_TOKEN\` is reachable. If \`scrape_apify_actor\`
+  returns an "APIFY_API_TOKEN not set" error on the first call, surface
+  that verbatim and stop — the user has to paste their Apify token in
+  Integrations → Apify before this skill can run.
+
+## Steps
+
+1. For each keyword (cap at 4, dedupe synonyms), call
+   \`scrape_apify_actor({ actorId: "trudax/reddit-scraper-lite",
+   input: { searches: [<keyword>], maxItems: 50, sort: "new" } })\`.
+   Same for Twitter via \`apidojo/tweet-scraper\` with \`{ searchTerms:
+   [<keyword>], maxTweets: 100 }\`. Run both in parallel where the
+   model supports it.
+2. Dedupe by URL across runs. Filter out:
+     - the user's own social handles (\`us/company.md\` should list
+       owned channels under \`socials:\`)
+     - paid promo / ad copy
+     - bot-shaped accounts (low followers + repetitive content)
+3. Classify each remaining mention as one of:
+   \`positive\` / \`neutral\` / \`question\` / \`negative\` / \`compare\`
+   (compare = "X vs Y" posts).
+4. Write ONE file: \`signals/mentions/<YYYY-MM-DD>.md\` with
+   frontmatter \`kind: signal.mentions, source: apify, date: <iso>,
+   count: <n>\`, then sections: ## Hot now (top 3 by engagement) ·
+   ## Negative · ## Questions worth answering · ## Compare posts.
+   Each item: source link, handle, date, 1-sentence summary.
+5. **Notify.** Call \`notify({ subject: "<n> brand mentions today",
+   body: <markdown summary of top 3 actionable items>, urgency:
+   <"high" if any negative, else "normal"> })\`. The tool fans out to
+   whatever messaging channels (Slack / Discord / Telegram / Feishu /
+   Email) the user has connected in Integrations — never hardcode a
+   specific provider here.
+6. Reply with the count + the single most actionable mention.
+
+## Self-schedule
+If the user asks "do this every day" or similar, call
+\`trigger_create({ name: "daily-brand-monitor", cron: "0 9 * * *",
+skill: "brand-monitor-apify" })\`.
+`,
+
+  'competitor-radar.md': `---
+kind: skill
+name: competitor-radar
+group: signals
+agent: researcher
+inputs: []
+---
+
+Weekly competitor teardown via Apify scraping.
+
+## Pre-flight
+Read \`us/market/competitors.md\`. Each line should contain a
+competitor name + their domain (and optionally LinkedIn URL). If the
+file is empty/seeded, write a one-line
+\`signals/competitors/<YYYY-MM-DD>.md\` saying "competitors not set"
+and stop.
+
+## Steps
+
+1. Cap at 8 competitors. For each:
+   - \`web_fetch\` their /pricing, /careers, and /changelog (or
+     /releases / /blog/feed). Compare against the prior week's
+     snapshot in \`us/competitors/<slug>.md\` if one exists.
+   - Call \`scrape_apify_actor({ actorId:
+     "apify/website-content-crawler", input: { startUrls: [{ url:
+     "<competitor>/blog" }], maxCrawlPages: 5 } })\` for the recent
+     blog list.
+   - \`web_search\` "<competitor> funding OR acquisition OR layoffs"
+     (last 7d) and "<competitor> launch OR release" (last 7d).
+2. For each, summarise: product/positioning shift, pricing changes,
+   hiring signals, news, "so what for us".
+3. Write \`signals/competitors/<YYYY-MM-DD>.md\` with one H2 per
+   competitor and a top-of-file \`## Watch this\` section flagging
+   anything that overlaps our roadmap or pricing.
+4. Update \`us/competitors/<slug>.md\` with the latest snapshot so the
+   next run can diff.
+5. Call \`notify({ subject: "Competitor radar — <n> tracked, <m>
+   to watch", body: <top-3 watch items>, urgency: "normal" })\`.
+6. Reply with the top-3 watch items.
+`,
+
+  'doc-leads-discover.md': `---
+kind: skill
+name: doc-leads-discover
+group: signals
+agent: sdr
+inputs: []
+---
+
+Discover companies whose ICP fingerprint matches ours via Apify
+Google search, draft outbound. **Approve-gated — no auto-send.**
+
+## Pre-flight
+Read \`us/market/icp.md\`. Pull the \`ideal_signals\` list (e.g.
+"uses MkDocs", "API-first SaaS, 50-500 employees", "hiring DX
+engineers"). If empty, stop with "ICP signals not configured".
+
+## Steps
+
+1. Convert each signal into a Google query (e.g. "uses MkDocs" →
+   site:github.com mkdocs.yml inurl:docs). Cap at 5 queries.
+2. For each query, \`scrape_apify_actor({ actorId:
+   "apify/google-search-scraper", input: { queries: [<q>],
+   resultsPerPage: 20 } })\`. Dedupe by domain.
+3. For each unique domain, call \`enrich_company({ domain })\` to
+   pull firmographics, then \`qualify-icp\` (the existing skill) to
+   score. Drop anything below ICP score 60.
+4. For survivors, find a buyer-persona contact via
+   \`enrich_contact({ company, role: <ICP buyer role> })\`.
+5. For each enriched contact, call \`draft_create({ channel: "email",
+   to: <email>, subject: <…>, body: <90-word personalised body
+   citing the signal>, tool: "send_email" })\`. The drafts land in
+   \`drafts/\` and require human approval before send_email fires.
+6. Write \`signals/doc-leads/<YYYY-MM-DD>.md\` summarising what was
+   found / drafted / skipped, with links to each draft file.
+7. Reply with the count of drafts created.
+
+## Why approve-gated
+Cold outbound on automated discovery has high false-positive risk.
+The user reviews each draft in \`drafts/\` before sending — never
+auto-fire \`send_email\` from this skill.
+`,
+
+  'linkedin-intel-weekly.md': `---
+kind: skill
+name: linkedin-intel-weekly
+group: signals
+agent: researcher
+inputs: []
+---
+
+Weekly LinkedIn intelligence on competitors + KOLs.
+
+## Pre-flight
+- \`us/market/competitors.md\` should list competitor LinkedIn URLs.
+- \`us/market/kols.md\` (create if missing) lists 5-15 KOLs to track.
+- \`APIFY_API_TOKEN\` is required. Notifications via \`notify\` tool
+  go to whatever messaging channels the user has connected.
+
+## Steps
+
+1. Build the watchlist: competitor company pages + KOL personal
+   profiles. Cap at 25 total to keep Apify spend bounded.
+2. For each LinkedIn URL, call \`scrape_apify_actor({ actorId:
+   "apimaestro/linkedin-profile-scraper", input: { profileUrls:
+   [<url>], includePosts: true } })\`. Save raw to
+   \`signals/linkedin/raw/<iso-week>/<slug>.json\` for diffing.
+3. Diff each profile's recent posts against last week's snapshot
+   (file in \`signals/linkedin/raw/<prev-iso-week>/\` if present).
+   New posts → score on engagement (likes + comments * 5) and
+   topic relevance to our ICP.
+4. Aggregate: top 10 competitor posts, top 10 KOL posts, plus
+   any role changes or company moves spotted in the profile data.
+5. Write \`signals/linkedin/<iso-week>.md\` with H2 sections:
+   ## Competitor activity · ## KOL activity · ## Role moves ·
+   ## Replyable (KOL posts where we have a credible take).
+6. Call \`notify({ subject: "LinkedIn intel — week <iso-week>", body:
+   <top 3 replyable posts with links>, urgency: "normal" })\`.
+7. Reply with the count + the single highest-engagement post.
+
+## Self-schedule
+"Run this every Monday morning" → \`trigger_create({ name:
+"weekly-linkedin-intel", cron: "0 9 * * 1", skill:
+"linkedin-intel-weekly" })\`.
+`,
+
+  'reddit-pulse.md': `---
+kind: skill
+name: reddit-pulse
+group: signals
+agent: researcher
+inputs: []
+---
+
+Daily Reddit narrative pulse around the user's brand + category.
+
+## Pre-flight
+- \`us/company.md\` provides brand keywords.
+- \`us/market/positioning.md\` provides category keywords (e.g. "API
+  testing tool", "design system").
+- Optional: \`us/market/subreddits.md\` lists target subreddits to
+  watch (e.g. \`r/webdev\`, \`r/api\`).
+
+## Steps
+
+1. Build the search bundle: every brand keyword + the 3 sharpest
+   category phrases. Cap at 6 queries.
+2. For each query, \`scrape_apify_actor({ actorId:
+   "trudax/reddit-scraper-lite", input: { searches: [<q>], maxItems:
+   30, sort: "new" } })\`. If subreddits.md is set, also scrape
+   \`{ startUrls: [{ url: "https://reddit.com/r/<sub>/new" }],
+   maxItems: 20 }\` per listed subreddit.
+3. Classify each post: \`brand-mention\`, \`category-discussion\`,
+   \`competitor-mention\`, \`question\` (someone asking for tool
+   recommendations in our space), or \`noise\` (drop).
+4. For \`question\` posts, draft a one-paragraph reply via
+   \`draft_create({ channel: "reddit", to: <post URL>, body: <…>,
+   tool: "manual" })\` — Reddit replies are always manual.
+5. Write \`signals/reddit/<YYYY-MM-DD>.md\` with sections:
+   ## Brand mentions · ## Category discussions ·
+   ## Competitor mentions · ## Questions to answer (with draft links).
+6. If any \`question\` posts were found, call \`notify({ subject: "<n>
+   Reddit questions to answer today", body: <list with links>,
+   urgency: "high" })\` — those are time-sensitive (Reddit threads
+   die fast).
+7. Reply with the count of question-posts found and the single most
+   urgent one to answer.
+`,
+
   // === GTM starter pack ====================================================
   // Out-of-the-box equivalents of the canonical GTM-automation flows. Each
   // plays well with zero integrations configured (falls back to web_fetch
@@ -2468,6 +2704,78 @@ cited-domain rank, and gap sources; diffs against last Monday's
 snapshot; fires 48h source-drop alerts into \`signals/geo/alerts/\`;
 and bundles the weekly report at \`signals/geo/weekly/<iso-week>.md\`.
 `,
+
+  // ── Apify-driven scans (BYOK) ───────────────────────────────────────────
+  // Skill-backed presets that ship with every vault. Each invokes one
+  // of the five Apify-driven skills via the user's own APIFY_API_TOKEN
+  // (mirrored from .bm/integrations.json into <vault>/.env). Default
+  // disabled because they cost the user real $$ per Apify run — flip
+  // \`enabled: true\` after you've pasted the token + tuned the
+  // \`us/market/*\` watchlists.
+  'apify-brand-monitor.md': `---
+kind: trigger
+name: apify-brand-monitor
+cron: '0 9 * * *'
+skill: brand-monitor-apify
+enabled: false
+---
+
+Daily 09:00 brand monitor across Reddit + Twitter via Apify. Reads
+keywords from \`us/company.md\`. Writes \`signals/mentions/<date>.md\`.
+Notifies via every messaging integration the user has connected
+(Slack / Discord / Telegram / Feishu / Email). Enable after pasting
+\`APIFY_API_TOKEN\` in Integrations → Apify.
+`,
+  'apify-competitor-radar.md': `---
+kind: trigger
+name: apify-competitor-radar
+cron: '0 10 * * 1'
+skill: competitor-radar
+enabled: false
+---
+
+Monday 10:00 competitor radar. Reads watchlist from
+\`us/market/competitors.md\`, scrapes pricing/changelog/blog via Apify
++ web_fetch, diffs against last week, writes
+\`signals/competitors/<date>.md\` with a top-of-file Watch list.
+`,
+  'apify-doc-leads.md': `---
+kind: trigger
+name: apify-doc-leads
+cron: '0 11 * * 1-5'
+skill: doc-leads-discover
+enabled: false
+---
+
+Weekday 11:00 ICP signal discovery via Apify Google search. Drafts
+outbound emails to \`drafts/\` — approval-gated, no auto-send. Enable
+after configuring \`us/market/icp.md\` with \`ideal_signals\`.
+`,
+  'apify-linkedin-intel.md': `---
+kind: trigger
+name: apify-linkedin-intel
+cron: '0 9 * * 1'
+skill: linkedin-intel-weekly
+enabled: false
+---
+
+Monday 09:00 weekly LinkedIn intel scan over competitors + KOLs.
+Diffs each profile against last week's snapshot, writes
+\`signals/linkedin/<iso-week>.md\`. Requires LinkedIn URLs in
+\`us/market/competitors.md\` and \`us/market/kols.md\`.
+`,
+  'apify-reddit-pulse.md': `---
+kind: trigger
+name: apify-reddit-pulse
+cron: '0 14 * * 1-5'
+skill: reddit-pulse
+enabled: false
+---
+
+Weekday 14:00 Reddit narrative pulse. Scrapes brand + category
+queries via Apify, drafts manual replies for tool-recommendation
+threads, writes \`signals/reddit/<date>.md\`.
+`,
 };
 
 // Idempotent: writes any missing preset trigger files and reports which
@@ -2545,7 +2853,7 @@ export async function ensureVault(): Promise<{ created: boolean }> {
       const fm = parsed.data as any;
       const tools: string[] = Array.isArray(fm.tools) ? fm.tools.slice() : [];
       let changed = false;
-      for (const need of ['draft_create', 'enroll_contact_in_sequence', 'enrich_contact', 'enrich_contact_linkedin']) {
+      for (const need of ['draft_create', 'enroll_contact_in_sequence', 'enrich_contact', 'enrich_contact_linkedin', 'trigger_create', 'scrape_apify_actor', 'notify']) {
         if (!tools.includes(need)) { tools.push(need); changed = true; }
       }
       if (changed) {

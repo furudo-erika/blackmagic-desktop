@@ -44,11 +44,18 @@ async function listTriggers(): Promise<TriggerSpec[]> {
       const schedule = typeof fm.schedule === 'string'
         ? fm.schedule
         : typeof fm.cron === 'string' ? fm.cron : undefined;
+      // `skill:` is the user-facing alias for `playbook:` — same filesystem
+      // (skills live in playbooks/ for now), same runner. Trigger files
+      // emitted by the trigger_create tool use `skill:`; legacy presets
+      // use `playbook:`. Accept either.
+      const playbookOrSkill = typeof fm.playbook === 'string'
+        ? fm.playbook
+        : typeof fm.skill === 'string' ? fm.skill : undefined;
       specs.push({
         name: fm.name ?? path.basename(f, '.md'),
         schedule,
         webhook: fm.webhook === true,
-        playbook: fm.playbook,
+        playbook: playbookOrSkill,
         agent: typeof fm.agent === 'string' ? fm.agent : undefined,
         shell: typeof fm.shell === 'string' ? fm.shell : undefined,
         cwd: typeof fm.cwd === 'string' ? fm.cwd : undefined,
