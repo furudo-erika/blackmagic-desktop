@@ -2,6 +2,18 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.55 — 2026-04-22
+
+### Removed
+- **Onboarding announcement bar deleted.** The banner's "Run now"
+  button was unclickable in Electron (the draggable `-webkit-app-region`
+  was swallowing pointer events inside the banner) and the layout fixes
+  only ever made it less broken, not actually usable. Rather than keep
+  patching it, ripped it out entirely — `OnboardingBanner` component
+  removed, no longer mounted in `AppShell`. The Getting-started
+  checklist on the homepage already covers the same "run your first
+  agent" nudge without blocking a strip across the top of the app.
+
 ## 0.4.54 — 2026-04-22
 
 ### Changed
