@@ -36,10 +36,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <LoginGate>
           <div className="flex flex-col h-screen">
             <UpgradeBanner />
-            <OnboardingBanner />
             <div className="flex flex-1 min-h-0">
               <Sidebar />
-              <main className="flex-1 overflow-hidden">{children}</main>
+              <main className="flex-1 overflow-hidden flex flex-col min-w-0">
+                <OnboardingBanner />
+                <div className="flex-1 overflow-hidden">{children}</div>
+              </main>
             </div>
           </div>
         </LoginGate>

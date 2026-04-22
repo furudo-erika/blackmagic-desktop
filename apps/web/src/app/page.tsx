@@ -27,7 +27,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight } from 'lucide-react';
+import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, CheckCircle2, Circle } from 'lucide-react';
 import { api } from '../lib/api';
 
 function newThreadId(): string {
@@ -64,6 +64,7 @@ export default function HomePage() {
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.listRuns, refetchInterval: 5_000 });
   const chats = useQuery({ queryKey: ['chats'], queryFn: api.listChats });
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.listProjects });
+  const vaultTree = useQuery({ queryKey: ['vault-tree'], queryFn: api.vaultTree, staleTime: 60_000 });
 
   const pending = useMemo(
     () => (drafts.data?.drafts ?? []).filter((d) => (d.status ?? 'pending') === 'pending'),
@@ -80,6 +81,69 @@ export default function HomePage() {
       .slice(0, 4),
     [chats.data],
   );
+
+  // GitHub-style activity heatmap — 14 weeks × 7 days of run counts,
+  // keyed by YYYY-MM-DD. Run timestamps come from the runId itself
+  // (see runStartedMs), so no new API call is needed.
+  const heatmap = useMemo(() => {
+    const days = 14 * 7; // 98 days
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    // Align to end-of-week (Saturday) so the grid finishes on a full column.
+    const end = new Date(today);
+    end.setDate(end.getDate() + (6 - end.getDay()));
+    const start = new Date(end);
+    start.setDate(start.getDate() - (days - 1));
+
+    const counts = new Map<string, number>();
+    for (const r of runs.data?.runs ?? []) {
+      const ms = runStartedMs(r.runId);
+      if (!ms) continue;
+      const d = new Date(ms);
+      d.setHours(0, 0, 0, 0);
+      if (d < start || d > end) continue;
+      const key = d.toISOString().slice(0, 10);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+
+    const cells: Array<{ key: string; date: Date; count: number; future: boolean }> = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      cells.push({ key, date: d, count: counts.get(key) ?? 0, future: d > today });
+    }
+    const max = Math.max(1, ...cells.map((c) => c.count));
+    const total = cells.reduce((n, c) => n + c.count, 0);
+    return { cells, max, total, start, end };
+  }, [runs.data]);
+
+  // Today's progress strip.
+  const todayRuns = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return (runs.data?.runs ?? []).filter((r) => {
+      const ms = runStartedMs(r.runId);
+      return ms != null && ms >= start.getTime();
+    });
+  }, [runs.data]);
+
+  // Getting-started checklist — derived from what the user has done.
+  const agentCount = useMemo(
+    () => (vaultTree.data?.tree ?? []).filter(
+      (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
+    ).length,
+    [vaultTree.data],
+  );
+  const totalRuns = runs.data?.runs?.length ?? 0;
+  const totalDrafts = drafts.data?.drafts?.length ?? 0;
+  const steps = [
+    { label: 'Open a project vault', done: !!projects.data?.active },
+    { label: 'Install an agent', done: agentCount > 0, href: '/agents' },
+    { label: 'Run your first agent', done: totalRuns > 0, href: '/agents' },
+    { label: 'Review a draft before sending', done: totalDrafts > 0, href: '/outreach' },
+  ];
+  const stepsDone = steps.filter((s) => s.done).length;
 
   const orgName = projects.data?.projects.find((p) => p.id === projects.data?.active)?.name ?? 'BlackMagic';
 
@@ -159,8 +223,110 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Cards */}
-        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Today strip — live KPIs at a glance */}
+        <div className="mt-8 grid grid-cols-4 gap-px bg-line dark:bg-[#2A241D] border border-line dark:border-[#2A241D] rounded-xl overflow-hidden">
+          <Stat label="Today" value={todayRuns.length} hint="runs" href="/runs" />
+          <Stat label="Running" value={running.length} hint="now" tone={running.length > 0 ? 'flame' : undefined} href="/runs" />
+          <Stat label="Approvals" value={pending.length} hint="pending" tone={pending.length > 0 ? 'flame' : undefined} href="/outreach" />
+          <Stat label="Threads" value={chats.data?.threads?.length ?? 0} hint="total" href="/chat" />
+        </div>
+
+        {/* Activity heatmap + getting-started */}
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
+          <section className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4">
+            <header className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Activity className="w-3.5 h-3.5 text-muted dark:text-[#8C837C]" />
+                <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C]">
+                  Activity
+                </h2>
+              </div>
+              <div className="text-[10px] font-mono text-muted dark:text-[#8C837C] tabular-nums">
+                {heatmap.total} runs · 14 weeks
+              </div>
+            </header>
+            <Heatmap cells={heatmap.cells} max={heatmap.max} />
+            <footer className="mt-3 flex items-center justify-between text-[10px] font-mono text-muted dark:text-[#8C837C]">
+              <span>
+                {heatmap.start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                {' → '}
+                {heatmap.end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </span>
+              <span className="flex items-center gap-1.5">
+                less
+                <span className="w-2.5 h-2.5 rounded-[2px] bg-line dark:bg-[#2A241D]" />
+                <span className="w-2.5 h-2.5 rounded-[2px] bg-flame/25" />
+                <span className="w-2.5 h-2.5 rounded-[2px] bg-flame/55" />
+                <span className="w-2.5 h-2.5 rounded-[2px] bg-flame/80" />
+                <span className="w-2.5 h-2.5 rounded-[2px] bg-flame" />
+                more
+              </span>
+            </footer>
+          </section>
+
+          <section className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4">
+            <header className="flex items-center justify-between mb-3">
+              <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C]">
+                Getting started
+              </h2>
+              <span className="text-[10px] font-mono tabular-nums text-muted dark:text-[#8C837C]">
+                {stepsDone}/{steps.length}
+              </span>
+            </header>
+            <div className="h-1 bg-cream-light dark:bg-[#17140F] rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full bg-flame transition-all"
+                style={{ width: `${(stepsDone / steps.length) * 100}%` }}
+              />
+            </div>
+            <ul className="space-y-1.5">
+              {steps.map((s) => (
+                <li key={s.label}>
+                  {s.href ? (
+                    <Link href={s.href} className="flex items-center gap-2 text-[12px] hover:text-flame">
+                      {s.done ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-flame shrink-0" />
+                      ) : (
+                        <Circle className="w-3.5 h-3.5 text-muted dark:text-[#6B625C] shrink-0" />
+                      )}
+                      <span className={s.done ? 'text-muted dark:text-[#8C837C] line-through' : 'text-ink dark:text-[#E6E0D8]'}>
+                        {s.label}
+                      </span>
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-2 text-[12px]">
+                      {s.done ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-flame shrink-0" />
+                      ) : (
+                        <Circle className="w-3.5 h-3.5 text-muted dark:text-[#6B625C] shrink-0" />
+                      )}
+                      <span className={s.done ? 'text-muted dark:text-[#8C837C] line-through' : 'text-ink dark:text-[#E6E0D8]'}>
+                        {s.label}
+                      </span>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        {/* Live rows — running + pending + recent threads, compact */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card
+            icon={Activity}
+            label="Running now"
+            count={running.length}
+            href="/runs"
+            empty="No agents running."
+            items={running.slice(0, 3).map((r) => ({
+              key: r.runId,
+              title: r.preview || r.runId,
+              meta: `${r.agent} · ${timeAgo(runStartedMs(r.runId))}`,
+              href: `/runs?runId=${encodeURIComponent(r.runId)}`,
+            }))}
+            countTone="flame"
+          />
           <Card
             icon={Inbox}
             label="Pending approvals"
@@ -173,20 +339,6 @@ export default function HomePage() {
               meta: d.tool,
               href: `/outreach`,
             }))}
-          />
-          <Card
-            icon={Activity}
-            label="Running jobs"
-            count={running.length}
-            href="/runs"
-            empty="No agents running."
-            items={running.slice(0, 3).map((r) => ({
-              key: r.runId,
-              title: r.preview || r.runId,
-              meta: `${r.agent} · ${timeAgo(runStartedMs(r.runId))}`,
-              href: `/runs?runId=${encodeURIComponent(r.runId)}`,
-            }))}
-            countTone="flame"
           />
           <Card
             icon={MessageSquare}
@@ -208,6 +360,79 @@ export default function HomePage() {
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  hint,
+  href,
+  tone,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  href: string;
+  tone?: 'flame';
+}) {
+  return (
+    <Link
+      href={href}
+      className="bg-white dark:bg-[#1F1B15] px-4 py-3 hover:bg-cream-light dark:hover:bg-[#17140F] transition-colors"
+    >
+      <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C]">
+        {label}
+      </div>
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span className={
+          'text-[22px] font-semibold tabular-nums leading-none ' +
+          (tone === 'flame' ? 'text-flame' : 'text-ink dark:text-[#F5F1EA]')
+        }>
+          {value}
+        </span>
+        <span className="text-[10px] font-mono text-muted dark:text-[#8C837C]">{hint}</span>
+      </div>
+    </Link>
+  );
+}
+
+function Heatmap({
+  cells,
+  max,
+}: {
+  cells: Array<{ key: string; date: Date; count: number; future: boolean }>;
+  max: number;
+}) {
+  // Group into columns of 7 (Sun..Sat). cells[] is ordered chronologically
+  // starting from Sunday, so every 7 cells is one week column.
+  const weeks: typeof cells[] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  function tone(count: number, future: boolean): string {
+    if (future) return 'bg-transparent';
+    if (count === 0) return 'bg-cream-light dark:bg-[#17140F] border border-line/60 dark:border-[#2A241D]';
+    const ratio = count / max;
+    if (ratio < 0.25) return 'bg-flame/25';
+    if (ratio < 0.5) return 'bg-flame/55';
+    if (ratio < 0.8) return 'bg-flame/80';
+    return 'bg-flame';
+  }
+
+  return (
+    <div className="flex gap-[3px] overflow-x-auto">
+      {weeks.map((week, wi) => (
+        <div key={wi} className="flex flex-col gap-[3px]">
+          {week.map((c) => (
+            <div
+              key={c.key}
+              title={c.future ? '' : `${c.key} · ${c.count} run${c.count === 1 ? '' : 's'}`}
+              className={`w-3 h-3 rounded-[3px] ${tone(c.count, c.future)}`}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }

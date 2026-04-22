@@ -2,6 +2,34 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.54 — 2026-04-22
+
+### Changed
+- **Homepage is now a real dashboard, not empty panels.** Replaced the
+  three always-empty "Pending / Running / Recent threads" cards with a
+  layered control center:
+  - A 4-cell KPI strip at the top — Today's runs, Running now, Pending
+    approvals, Total threads — each a link into the relevant page.
+  - A 14-week **activity heatmap** (GitHub contribution-graph style,
+    14×7 dot grid) that colors each day by how many agent runs started.
+    Tooltips on hover, flame-tinted scale, legend underneath. Pulls
+    timestamps straight from `runId` — no new API surface.
+  - A **Getting started** checklist in the side column with a flame
+    progress bar: vault opened → agent installed → first run → first
+    draft reviewed. Steps auto-tick as the user completes them.
+  - Compact "Running now / Pending approvals / Recent threads" rows
+    demoted below the fold so the first screen is information, not
+    emptiness.
+
+### Fixed
+- **Announcement bar no longer eats the top of the sidebar.** The
+  onboarding banner used to render full-width above the sidebar, which
+  pushed the whole sidebar down and left a visually broken strip over
+  the app chrome. Moved it inside the main content column so the
+  sidebar runs from the very top; also dropped the 88px traffic-light
+  gutter since the banner no longer sits behind the macOS window
+  controls.
+
 ## 0.4.53 — 2026-04-22
 
 ### Added
