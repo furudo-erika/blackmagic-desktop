@@ -2,6 +2,31 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.43 — 2026-04-22
+
+### Changed
+- **Sidebar reshuffled to feel less like a graveyard of links.** "New
+  chat" is gone — it duplicated what an empty Chat does for free. The
+  `Chat` row is now collapsible (default collapsed): click the chevron
+  to reveal your last 10 threads (preview text, click → load thread,
+  with a small `+ New chat` at the top of the expanded list). Threads
+  fetch lazily — `listChats` only fires when you actually expand the
+  section, so the closed sidebar makes zero extra requests. Section
+  label `Work` renamed to `Intelligence` to match the surrounding
+  product vocabulary.
+- **GEO promoted to a top-level sidebar row.** Previously the only way
+  to reach the GEO dashboard from the chrome was either a tab inside
+  Dashboard or ⌘K — easy to miss, and the user couldn't tell from the
+  nav that GEO existed at all. New `Radar` icon row sits right under
+  Dashboard. Tab strip inside Dashboard/GEO stays so they still feel
+  like one tabbed surface.
+- **/agents back to 2-pane.** The middle "threads for this agent"
+  column added in 0.4.41 was redundant once the sidebar Chat section
+  exposes thread history globally. Layout is again
+  `[ agent list (240) | ChatSurface ]`. URL state shrinks back to
+  `?slug=`. Per-agent thread persistence still works under the hood
+  via `bm-team-thread-<slug>` localStorage slots.
+
 ## 0.4.42 — 2026-04-22
 
 ### Added

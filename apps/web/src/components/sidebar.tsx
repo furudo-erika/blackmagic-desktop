@@ -188,6 +188,29 @@ export function Sidebar() {
     router.push('/');
   }
 
+  // Recent chat threads — populates the collapsible Chat section under
+  // the main nav. Default collapsed so the sidebar stays compact;
+  // expanding lazy-fires the listChats query.
+  const [chatExpanded, setChatExpanded] = useState(false);
+  const recentChats = useQuery({
+    queryKey: ['sidebar-chats'],
+    queryFn: api.listChats,
+    enabled: chatExpanded,
+    refetchInterval: chatExpanded ? 30_000 : false,
+  });
+  const recentThreads = useMemo(() => {
+    return (recentChats.data?.threads ?? [])
+      .slice()
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+      .slice(0, 10);
+  }, [recentChats.data]);
+  function openThread(threadId: string) {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('bm-last-thread', threadId);
+    }
+    router.push('/');
+  }
+
   return (
     <aside className="w-[220px] shrink-0 bg-cream-light dark:bg-[#17140F] border-r border-line dark:border-[#2A241D] flex flex-col min-h-0">
       {/* macOS traffic-light gutter */}
@@ -221,18 +244,76 @@ export function Sidebar() {
           not buttons — they group the rows underneath visually without
           introducing an extra click. */}
       <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-3 pt-1">
-        <ActionRow icon={SquarePen} label="New chat" kbd="⌘N" onClick={startNewThread} />
-        <ActionRow icon={Search}    label="Search"   kbd="⌘K" onClick={() => setPaletteOpen(true)} />
+        <ActionRow icon={Search} label="Search" kbd="⌘K" onClick={() => setPaletteOpen(true)} />
 
         <div className="h-px bg-line dark:bg-[#2A241D] my-2 mx-2" />
 
-        <NavRow icon={MessageSquare}   label="Chat"      href="/"          pathname={pathname} exact />
+        {/* Chat: collapsible row that reveals recent threads. Header
+            click navigates to /, chevron toggles the thread list. */}
+        <div>
+          <div className={
+            'flex items-center rounded-md ' +
+            (pathname === '/' ? 'bg-white dark:bg-[#1F1B15]' : 'hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
+          }>
+            <Link
+              href="/"
+              className="flex-1 flex items-center gap-2 px-2 py-1.5 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
+            >
+              <MessageSquare className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
+              <span className="truncate">Chat</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => setChatExpanded((v) => !v)}
+              aria-label={chatExpanded ? 'Collapse chat history' : 'Expand chat history'}
+              title={chatExpanded ? 'Hide history' : 'Show history'}
+              className="px-1.5 py-1.5 text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]"
+            >
+              <ChevronDown
+                className={'w-3 h-3 transition-transform ' + (chatExpanded ? '' : '-rotate-90')}
+              />
+            </button>
+          </div>
+          {chatExpanded && (
+            <ul className="ml-5 pl-2 border-l border-line dark:border-[#2A241D] mt-0.5 mb-1 space-y-0.5">
+              <li>
+                <button
+                  type="button"
+                  onClick={startNewThread}
+                  className="w-full text-left flex items-center gap-1.5 px-2 py-1 rounded-md text-[11.5px] text-muted dark:text-[#8C837C] hover:text-flame hover:bg-white/60 dark:hover:bg-[#1F1B15]/60"
+                >
+                  <SquarePen className="w-3 h-3" /> New chat
+                </button>
+              </li>
+              {recentChats.isLoading && (
+                <li className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">loading…</li>
+              )}
+              {!recentChats.isLoading && recentThreads.length === 0 && (
+                <li className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">No history yet.</li>
+              )}
+              {recentThreads.map((t) => (
+                <li key={t.threadId}>
+                  <button
+                    type="button"
+                    onClick={() => openThread(t.threadId)}
+                    title={t.preview || t.threadId}
+                    className="w-full text-left px-2 py-1 rounded-md text-[11.5px] text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 truncate"
+                  >
+                    {t.preview || '(empty thread)'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <NavRow icon={Inbox}           label="Inbox"     href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
         <NavRow icon={LayoutDashboard} label="Dashboard" href="/dashboard" pathname={pathname} />
+        <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} />
 
         <NavRow icon={Bot} label="Agents" href="/agents" pathname={pathname} live={liveAgentSlugs.size} />
 
-        <SectionLabel>Work</SectionLabel>
+        <SectionLabel>Intelligence</SectionLabel>
         <NavRow icon={Zap}      label="Triggers"  href="/triggers"  pathname={pathname} />
         <NavRow icon={History}  label="Runs"      href="/runs"      pathname={pathname} live={liveRunCount} />
         <NavRow icon={Sparkles} label="Ontology"  href="/ontology"  pathname={pathname} />
