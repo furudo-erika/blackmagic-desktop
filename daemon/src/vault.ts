@@ -2507,6 +2507,62 @@ zero/near-zero impressions — new content opportunity).
 "weekly-gsc-brief", cron: "0 9 * * 1", skill: "gsc-content-brief" })\`.
 `,
 
+  // === GA4 traffic brief ===================================================
+  'ga-traffic-brief.md': `---
+kind: skill
+name: ga-traffic-brief
+group: analytics
+agent: researcher
+inputs:
+  - { name: days, required: false, description: "Lookback window. Default 28." }
+requires:
+  integrations: [google_analytics]
+  optional_integrations: [feishu, slack, gsc]
+---
+
+Weekly traffic brief from Google Analytics 4. Pairs with
+\`gsc-content-brief\` (GSC = queries that *could* land; GA = sessions
+that *actually* landed + what they did next). Three signal types per
+page: SURGE (sessions up ≥50% WoW), DROP (sessions down ≥30% WoW),
+CONVERT (page with above-average engagement rate and conversions).
+
+## Pre-flight
+- Google Analytics integration connected (service-account JSON +
+  numeric property_id, via Integrations → Google Analytics). The
+  service account needs Viewer access on the GA4 property.
+- Optional: \`us/market/funnel.md\` for conversion definitions — if
+  absent, we use GA's default \`conversions\` metric.
+
+## Steps
+
+1. Call \`ga_top_pages({ limit: 50 })\` over the default 28-day
+   window (or \`{{days}}\` if set). Save this as "current window".
+2. Call \`ga_top_pages({ startDate: "56daysAgo", endDate: "29daysAgo",
+   limit: 50 })\` for the prior 28-day window. Join by pagePath to
+   compute WoW delta on sessions.
+3. Call \`ga_run_report({ dimensions: ["sessionDefaultChannelGroup"],
+   metrics: ["sessions","activeUsers","engagementRate","conversions"] })\`
+   for channel-mix.
+4. Classify pages:
+     - **SURGE**: sessions up ≥50% WoW AND ≥200 sessions this window
+     - **DROP**: sessions down ≥30% WoW AND ≥200 sessions prior
+     - **CONVERT**: engagementRate above property average AND
+       conversions > 0 (pages worth pushing more traffic to)
+5. Write \`signals/analytics/<YYYY-MM-DD>-brief.md\` with
+   frontmatter \`kind: signal.analytics, date: <iso>,
+   window_days: <n>\` and H2 sections: ## Surge · ## Drop ·
+   ## Convert · ## Channel mix. Max 10 items per signal section.
+6. Call \`notify({ subject: "Weekly GA brief: <s> surges, <d> drops,
+   <c> converters", body: <top items>, urgency: "normal" })\`.
+7. Reply with the single highest-leverage action (e.g. "Page X
+   dropped 40% WoW — investigate" or "Page Y has 8% engagement rate
+   vs 3% site avg — push more traffic").
+
+## Self-schedule
+"Run this every Monday morning" → \`trigger_create({ name:
+"weekly-ga-brief", cron: "0 9 * * 1", skill: "ga-traffic-brief" })\`.
+`,
+
   // === CMS skills =========================================================
   // Note: no requires.integrations — this skill works with EITHER Ghost
   // OR WordPress, and requires.integrations is AND-ed. cms_list_posts
@@ -3409,7 +3465,7 @@ export async function ensureVault(): Promise<{ created: boolean }> {
       const fm = parsed.data as any;
       const tools: string[] = Array.isArray(fm.tools) ? fm.tools.slice() : [];
       let changed = false;
-      for (const need of ['draft_create', 'enroll_contact_in_sequence', 'enrich_contact', 'enrich_contact_linkedin', 'trigger_create', 'scrape_apify_actor', 'notify', 'gsc_query', 'cms_list_posts', 'cms_create_draft']) {
+      for (const need of ['draft_create', 'enroll_contact_in_sequence', 'enrich_contact', 'enrich_contact_linkedin', 'trigger_create', 'scrape_apify_actor', 'notify', 'gsc_query', 'ga_run_report', 'ga_top_pages', 'ga_realtime', 'cms_list_posts', 'cms_create_draft']) {
         if (!tools.includes(need)) { tools.push(need); changed = true; }
       }
       if (changed) {

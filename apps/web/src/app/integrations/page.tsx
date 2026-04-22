@@ -76,6 +76,10 @@ const BRAND_PATHS: Record<IntegrationProvider, string> = {
   // glyph (no Google trademark).
   gsc:
     'M10.5 3a7.5 7.5 0 015.92 12.08l4.75 4.75-1.34 1.34-4.75-4.75A7.5 7.5 0 1110.5 3zm0 2a5.5 5.5 0 100 11 5.5 5.5 0 000-11zm.5 2.5v2h2v1.5h-2v2H9.5v-2h-2V9.5h2v-2H11z',
+  // Google Analytics — stylized bar chart (three ascending bars with
+  // rounded tops). Generic analytics glyph, no Google trademark.
+  google_analytics:
+    'M6 20a2 2 0 01-2-2v-3a2 2 0 114 0v3a2 2 0 01-2 2zm6 0a2 2 0 01-2-2V9a2 2 0 114 0v9a2 2 0 01-2 2zm6 0a2 2 0 01-2-2V5a2 2 0 114 0v13a2 2 0 01-2 2z',
   // Ghost — simple ghost silhouette. Matches Ghost's brand mark shape
   // without using their registered logo.
   ghost:
@@ -286,6 +290,18 @@ const GROUPS: Group[] = [
         description: 'Pull impressions, clicks, CTR, and positions for every query + page. Feeds the `gsc-content-brief` skill (REWRITE / PUSH / GAP analysis).',
         oauth: false,
         brandColor: '#4285F4',
+      },
+    ],
+  },
+  {
+    label: 'Analytics',
+    providers: [
+      {
+        provider: 'google_analytics',
+        name: 'Google Analytics',
+        description: 'Pull sessions, users, page views, engagement, and realtime active users from GA4 via the Data API. Feeds the `ga-traffic-brief` skill (SURGE / DROP / CONVERT analysis) and pairs with GSC for a full funnel view.',
+        oauth: false,
+        brandColor: '#F9AB00',
       },
     ],
   },
@@ -524,13 +540,15 @@ function IntegrationCard({
           <textarea
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            rows={def.provider === 'amazon_ses' || def.provider === 'gsc' ? 8 : 3}
+            rows={def.provider === 'amazon_ses' || def.provider === 'gsc' || def.provider === 'google_analytics' ? 8 : 3}
             placeholder={
               def.provider === 'amazon_ses'
                 ? '{\n  "access_key_id": "AKIA…",\n  "secret_access_key": "…",\n  "region": "us-east-1",\n  "from": "Lynn <lynn@inc.apidog.com>"\n}'
                 : def.provider === 'gsc'
                   ? '{\n  "service_account_json": "<paste the whole JSON key file>",\n  "site_url": "sc-domain:example.com"\n}'
-                  : def.provider === 'ghost'
+                  : def.provider === 'google_analytics'
+                    ? '{\n  "service_account_json": "<paste the whole JSON key file>",\n  "property_id": "123456789"\n}'
+                    : def.provider === 'ghost'
                     ? 'GHOST_ADMIN_API_KEY format: <id>:<secret>'
                     : def.provider === 'wordpress'
                       ? 'wpuser:xxxx xxxx xxxx xxxx xxxx xxxx'

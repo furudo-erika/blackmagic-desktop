@@ -79,6 +79,7 @@ const INTEGRATION_LABELS: Record<string, string> = {
   calcom: 'Cal.com',
   unipile: 'Unipile',
   gsc: 'Google Search Console',
+  google_analytics: 'Google Analytics',
   ghost: 'Ghost',
   wordpress: 'WordPress',
   rb2b: 'RB2B',

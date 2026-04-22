@@ -21,6 +21,7 @@ export type IntegrationProvider =
   | 'apify'
   | 'amazon_ses'
   | 'gsc'
+  | 'google_analytics'
   | 'ghost'
   | 'wordpress'
   | 'rb2b';

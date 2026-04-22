@@ -2,6 +2,35 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.67 — 2026-04-22
+
+### Added
+- **Google Analytics (GA4) integration.** Connect a GA4 property by
+  pasting a service-account JSON + numeric Property ID under
+  Integrations → Analytics → Google Analytics. Service-account-based
+  auth uses the same JWT-for-access-token dance as GSC (scope
+  `analytics.readonly`) and caches the token in-memory for ~55 min
+  per credential fingerprint.
+- **Three new agent tools:** `ga_run_report` (generic GA4 Data API
+  report: dimensions/metrics/date-range/limit/orderBy),
+  `ga_top_pages` (shortcut for "which pages drove sessions" with
+  sessions, activeUsers, screenPageViews, engagementRate — ordered
+  DESC by sessions), and `ga_realtime` (last-30-min active users
+  broken down by country / device / screen). All three route
+  through a shared `gaAccessToken()` helper and accept either
+  `"properties/123"` or bare `"123"` for the property ID.
+- **`ga-traffic-brief` skill.** Weekly analytics digest that
+  classifies pages into SURGE (sessions up ≥50% WoW, ≥200 sessions
+  current window), DROP (down ≥30% WoW, ≥200 sessions prior
+  window), and CONVERT (engagementRate above property average AND
+  conversions > 0). Writes
+  `signals/analytics/<date>-brief.md`, fires `notify()` with the
+  top items, and self-schedules on request. Pairs with
+  `gsc-content-brief` so you see the *query → session → outcome*
+  funnel in one place. The seeded researcher agent picks up
+  `ga_run_report`, `ga_top_pages`, `ga_realtime` automatically on
+  upgrade via the tools-migration path.
+
 ## 0.4.66 — 2026-04-22
 
 ### Fixed

@@ -27,6 +27,7 @@ export type IntegrationProvider =
   | 'apify'
   | 'amazon_ses'
   | 'gsc'
+  | 'google_analytics'
   | 'ghost'
   | 'wordpress'
   | 'rb2b';
@@ -36,7 +37,7 @@ export const PROVIDERS: IntegrationProvider[] = [
   'feishu', 'metabase', 'supabase',
   'calcom', 'discord', 'telegram', 'notion', 'linear', 'github', 'stripe',
   'apify', 'amazon_ses',
-  'gsc', 'ghost', 'wordpress', 'rb2b',
+  'gsc', 'google_analytics', 'ghost', 'wordpress', 'rb2b',
 ];
 
 export interface IntegrationRecord {
@@ -93,6 +94,14 @@ const ENV_MAPPING: Record<IntegrationProvider, Record<string, string>> = {
   // `service_account_json` (the whole blob) plus the `site_url` they
   // own in GSC (e.g. "sc-domain:example.com" or "https://example.com/").
   gsc:          { service_account_json: 'GSC_SERVICE_ACCOUNT_JSON', site_url: 'GSC_SITE_URL' },
+  // Google Analytics 4 — service-account JSON + the numeric GA4
+  // Property ID (not the "G-XXXX" measurement ID). The service account
+  // needs Viewer access on the property; grant it in Admin → Property
+  // Access Management.
+  google_analytics: {
+    service_account_json: 'GA_SERVICE_ACCOUNT_JSON',
+    property_id:          'GA_PROPERTY_ID',
+  },
   // Ghost — Admin API key (format "<id>:<secret>") + Admin API URL.
   ghost:        { token: 'GHOST_ADMIN_API_KEY', endpoint: 'GHOST_ADMIN_API_URL' },
   // WordPress — application-password auth (user:app_password) + site URL.

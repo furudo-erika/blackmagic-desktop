@@ -455,6 +455,223 @@ const gsc_query: ToolDef = {
   },
 };
 
+// Google Analytics 4 — same service-account JWT dance as GSC, just
+// scoped to analytics.readonly. Token cache is keyed by credential
+// fingerprint so repeated tool calls inside a single agent run don't
+// re-exchange. Property ID is the numeric GA4 property (Admin →
+// Property Settings → "PROPERTY ID"), NOT the G-XXXX measurement ID
+// — the Data API rejects measurement IDs.
+const gaTokenCache = new Map<string, { token: string; exp: number }>();
+
+async function gaAccessToken(): Promise<string> {
+  const creds = await readIntegrationCreds('google_analytics');
+  if (!creds?.service_account_json) {
+    throw new Error('No Google Analytics service account connected. Paste the JSON in sidebar → Integrations → Google Analytics.');
+  }
+  const sa = JSON.parse(creds.service_account_json) as {
+    client_email: string; private_key: string;
+  };
+  const fp = `${sa.client_email}:${(sa.private_key || '').slice(-32)}`;
+  const cached = gaTokenCache.get(fp);
+  if (cached && cached.exp > Date.now()) return cached.token;
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const claim = {
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/analytics.readonly',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now,
+  };
+  const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const unsigned = `${b64(header)}.${b64(claim)}`;
+  const { createSign } = await import('node:crypto');
+  const signer = createSign('RSA-SHA256');
+  signer.update(unsigned);
+  const sig = signer.sign(sa.private_key).toString('base64url');
+  const assertion = `${unsigned}.${sig}`;
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${encodeURIComponent(assertion)}`,
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`GA token exchange failed: ${res.status} ${text.slice(0, 200)}`);
+  const body = JSON.parse(text) as { access_token: string; expires_in: number };
+  gaTokenCache.set(fp, {
+    token: body.access_token,
+    exp: Date.now() + Math.max(0, (body.expires_in - 300)) * 1000,
+  });
+  return body.access_token;
+}
+
+async function gaPropertyId(): Promise<string | null> {
+  const creds = await readIntegrationCreds('google_analytics');
+  const raw = String(creds?.property_id ?? '').trim();
+  if (!raw) return null;
+  // Accept "properties/123" or just "123". Data API requires the
+  // `properties/123` form on the URL.
+  return raw.startsWith('properties/') ? raw : `properties/${raw.replace(/^properties\//, '')}`;
+}
+
+const ga_run_report: ToolDef = {
+  name: 'ga_run_report',
+  description:
+    'Run a GA4 Data API report on the connected property. Returns rows with the requested dimensions + metrics (e.g. sessions, activeUsers, screenPageViews by date/country/pagePath). Default window = last 28 days. Requires Google Analytics connected in Integrations.',
+  parameters: {
+    type: 'object',
+    properties: {
+      startDate: { type: 'string', description: 'YYYY-MM-DD or GA4 relative like "28daysAgo". Default "28daysAgo".' },
+      endDate:   { type: 'string', description: 'YYYY-MM-DD or "today"/"yesterday". Default "today".' },
+      dimensions: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'GA4 dimension names, e.g. ["date"], ["country"], ["pagePath"], ["sessionDefaultChannelGroup"]. Default ["date"].',
+      },
+      metrics: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'GA4 metric names, e.g. ["sessions","activeUsers","screenPageViews","engagementRate","conversions"]. Default ["sessions","activeUsers","screenPageViews"].',
+      },
+      limit: { type: 'number', description: 'Max rows. Default 500, cap 100000.' },
+      orderByMetric: { type: 'string', description: 'Metric name to sort by DESC (e.g. "sessions"). Optional.' },
+    },
+  },
+  handler: async (args) => {
+    const propId = await gaPropertyId();
+    if (!propId) return { error: 'No property_id configured in the google_analytics integration.' };
+    let token: string;
+    try { token = await gaAccessToken(); } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+    const dims = Array.isArray(args.dimensions) && args.dimensions.length > 0
+      ? args.dimensions.map((d: string) => ({ name: String(d) }))
+      : [{ name: 'date' }];
+    const mets = Array.isArray(args.metrics) && args.metrics.length > 0
+      ? args.metrics.map((m: string) => ({ name: String(m) }))
+      : [{ name: 'sessions' }, { name: 'activeUsers' }, { name: 'screenPageViews' }];
+    const body: Record<string, unknown> = {
+      dateRanges: [{
+        startDate: String(args.startDate || '28daysAgo'),
+        endDate:   String(args.endDate   || 'today'),
+      }],
+      dimensions: dims,
+      metrics: mets,
+      limit: String(Math.min(typeof args.limit === 'number' ? args.limit : 500, 100000)),
+    };
+    if (typeof args.orderByMetric === 'string' && args.orderByMetric.trim()) {
+      body.orderBys = [{ metric: { metricName: String(args.orderByMetric) }, desc: true }];
+    }
+    const url = `https://analyticsdata.googleapis.com/v1beta/${propId}:runReport`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    if (!res.ok) return { error: `ga ${res.status}: ${text.slice(0, 400)}` };
+    return JSON.parse(text);
+  },
+};
+
+const ga_top_pages: ToolDef = {
+  name: 'ga_top_pages',
+  description:
+    'Shortcut: top landing pages by sessions over the window. Returns pagePath + pageTitle with sessions, activeUsers, screenPageViews, engagementRate. Use this instead of ga_run_report when the question is "what pages are driving traffic".',
+  parameters: {
+    type: 'object',
+    properties: {
+      startDate: { type: 'string', description: 'Default "28daysAgo".' },
+      endDate:   { type: 'string', description: 'Default "today".' },
+      limit:     { type: 'number', description: 'Default 25, cap 1000.' },
+    },
+  },
+  handler: async (args) => {
+    const propId = await gaPropertyId();
+    if (!propId) return { error: 'No property_id configured in the google_analytics integration.' };
+    let token: string;
+    try { token = await gaAccessToken(); } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+    const body = {
+      dateRanges: [{
+        startDate: String(args.startDate || '28daysAgo'),
+        endDate:   String(args.endDate   || 'today'),
+      }],
+      dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
+      metrics: [
+        { name: 'sessions' },
+        { name: 'activeUsers' },
+        { name: 'screenPageViews' },
+        { name: 'engagementRate' },
+      ],
+      orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+      limit: String(Math.min(typeof args.limit === 'number' ? args.limit : 25, 1000)),
+    };
+    const url = `https://analyticsdata.googleapis.com/v1beta/${propId}:runReport`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    if (!res.ok) return { error: `ga ${res.status}: ${text.slice(0, 400)}` };
+    return JSON.parse(text);
+  },
+};
+
+const ga_realtime: ToolDef = {
+  name: 'ga_realtime',
+  description:
+    'GA4 realtime report (last 30 minutes). Returns active users broken down by the requested dimension (country, deviceCategory, unifiedScreenName, etc.). Use for "who is on the site right now".',
+  parameters: {
+    type: 'object',
+    properties: {
+      dimensions: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Default ["country"]. Common: ["country"], ["deviceCategory"], ["unifiedScreenName"].',
+      },
+      metrics: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Default ["activeUsers"].',
+      },
+      limit: { type: 'number', description: 'Default 50, cap 1000.' },
+    },
+  },
+  handler: async (args) => {
+    const propId = await gaPropertyId();
+    if (!propId) return { error: 'No property_id configured in the google_analytics integration.' };
+    let token: string;
+    try { token = await gaAccessToken(); } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+    const body = {
+      dimensions: (Array.isArray(args.dimensions) && args.dimensions.length > 0
+        ? args.dimensions
+        : ['country']
+      ).map((d: string) => ({ name: String(d) })),
+      metrics: (Array.isArray(args.metrics) && args.metrics.length > 0
+        ? args.metrics
+        : ['activeUsers']
+      ).map((m: string) => ({ name: String(m) })),
+      limit: String(Math.min(typeof args.limit === 'number' ? args.limit : 50, 1000)),
+    };
+    const url = `https://analyticsdata.googleapis.com/v1beta/${propId}:runRealtimeReport`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    if (!res.ok) return { error: `ga ${res.status}: ${text.slice(0, 400)}` };
+    return JSON.parse(text);
+  },
+};
+
 // Ghost Admin API — JWT-signed with the admin key. Ghost's format is
 // "<id>:<secret>" hex-encoded; we split, base64url-decode the secret,
 // sign a short-lived JWT (5 min), and use it as Bearer auth.
@@ -2431,6 +2648,9 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   notify,
   trigger_create,
   gsc_query,
+  ga_run_report,
+  ga_top_pages,
+  ga_realtime,
   cms_list_posts,
   cms_create_draft,
   read_file,
