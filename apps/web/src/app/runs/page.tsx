@@ -1,16 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Markdown } from '../../components/markdown';
-import { Bot, History, Wrench } from 'lucide-react';
+import { Bot, History, Wrench, Square } from 'lucide-react';
 import {
   PageHeader,
   EntityList,
   EntityRow,
   EmptyState,
   DetailDrawer,
+  Button,
 } from '../../components/ui/primitives';
 
 function timeAgo(iso: string | undefined): string {
@@ -28,6 +29,7 @@ const STATUS_STYLES: Record<string, string> = {
   completed: 'bg-[#7E8C67]/15 text-[#5D6E4D] dark:text-[#A3B38A]',
   failed: 'bg-flame/15 text-flame',
   blocked: 'bg-[#F5C24D]/20 text-[#8A6A1A] dark:text-[#E8C063]',
+  canceled: 'bg-muted/20 text-muted dark:text-[#8C837C]',
 };
 
 function StatusBadge({ status, done }: { status?: string; done?: boolean }) {
@@ -139,9 +141,14 @@ function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () => void
 }
 
 export default function RunsPage() {
+  const qc = useQueryClient();
   const runs = useQuery({ queryKey: ['runs'], queryFn: () => api.listRuns(), refetchInterval: 5_000 });
   const [selected, setSelected] = useState<string | null>(null);
   const list = runs.data?.runs ?? [];
+  const stopMut = useMutation({
+    mutationFn: (runId: string) => api.stopRun(runId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['runs'] }),
+  });
 
   return (
     <div className="h-full flex bg-cream dark:bg-[#0F0D0A]">
@@ -191,11 +198,28 @@ export default function RunsPage() {
                       </span>
                     }
                     trailing={
-                      <div className="hidden sm:flex items-center gap-4 font-mono">
-                        {r.toolCalls != null && <span>{r.toolCalls} tools</span>}
-                        {r.tokensIn != null && <span>{r.tokensIn}/{r.tokensOut}</span>}
-                        {r.costCents != null && <span>{(r.costCents / 100).toFixed(2)} USD</span>}
-                        <span>{timeAgo(started)}</span>
+                      <div className="flex items-center gap-3">
+                        {(r.status === 'running' || (!r.status && !r.done)) && (
+                          <span
+                            onClick={(e) => e.stopPropagation()}
+                            title="Mark this run as canceled. Writes a sentinel final.md so it stops showing as running."
+                          >
+                            <Button
+                              variant="ghost"
+                              onClick={() => stopMut.mutate(r.runId)}
+                              disabled={stopMut.isPending && stopMut.variables === r.runId}
+                            >
+                              <Square className="w-3 h-3" />
+                              {stopMut.isPending && stopMut.variables === r.runId ? 'Stopping…' : 'Stop'}
+                            </Button>
+                          </span>
+                        )}
+                        <div className="hidden sm:flex items-center gap-4 font-mono">
+                          {r.toolCalls != null && <span>{r.toolCalls} tools</span>}
+                          {r.tokensIn != null && <span>{r.tokensIn}/{r.tokensOut}</span>}
+                          {r.costCents != null && <span>{(r.costCents / 100).toFixed(2)} USD</span>}
+                          <span>{timeAgo(started)}</span>
+                        </div>
                       </div>
                     }
                   />

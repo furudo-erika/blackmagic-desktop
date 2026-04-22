@@ -2,6 +2,24 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.36 — 2026-04-22
+
+### Added
+- **Stop button on the Runs page for stuck "running" entries.** A run
+  shows as `running` whenever `final.md` is missing — which happens
+  both for genuinely live invocations and for runs whose daemon/codex
+  subprocess died without flushing output (daemon crash, app
+  force-quit, OS reboot). There was no way to clear those from the
+  UI, so they sat at the top of `/runs` forever. Every running row
+  now has a Stop button that hits a new `POST /api/agent/runs/:id/stop`
+  endpoint: the daemon writes a sentinel `final.md` ("Run canceled…")
+  and flips `meta.canceled = true` + `exitCode = 130`. The row
+  re-derives as a new `canceled` status on the next 5-second refetch,
+  with a neutral grey badge so canceled runs stay visible but
+  visually distinct from real completions/failures. Best-effort
+  SIGTERM is sent if `meta.pid` is recorded; absent PID tracking the
+  marker alone is enough to unstick the list.
+
 ## 0.4.35 — 2026-04-22
 
 ### Removed
