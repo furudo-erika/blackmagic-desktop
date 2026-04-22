@@ -78,11 +78,11 @@ const SETUP_STEPS: Step[] = [
   },
   {
     n: 5,
-    title: 'Try a starter playbook',
-    hint: "Run sales-account-research on a real domain — it builds a one-pager with trigger events, buyer titles, and a cold opener in 30 seconds.",
-    href: '/playbooks',
+    title: 'Try a starter skill',
+    hint: "Invoke sales-account-research on a real domain — its agent builds a one-pager with trigger events, buyer titles, and a cold opener in 30 seconds.",
+    href: '/skills',
     icon: BookOpen,
-    cta: 'Browse plays',
+    cta: 'Browse skills',
   },
 ];
 
@@ -99,9 +99,9 @@ const CAMPAIGN_STEPS: Step[] = [
     n: 2,
     title: 'Run sales-account-research',
     hint: "Produces companies/<slug>-research.md with news, tech-stack, buyer titles, and a cold opener. Seeds contacts/ with likely champions.",
-    href: '/playbooks',
+    href: '/skills',
     icon: Play,
-    cta: 'Run play',
+    cta: 'Open skill',
   },
   {
     n: 3,

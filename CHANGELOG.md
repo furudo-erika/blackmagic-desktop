@@ -2,6 +2,36 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.33 — 2026-04-22
+
+### Changed
+- **Playbooks → Skills (visible rename + concept fix).** The product
+  surface now uses "Skills" everywhere it used "Playbooks": the route
+  moved from `/playbooks` to `/skills`, the sidebar row label is
+  "Skills", the command-palette entry, the Automations hub card, and
+  the getting-started copy all align. The old `/playbooks` URL is a
+  permanent redirect to `/skills` so bookmarks and in-app deep links
+  still resolve. Vault filesystem stays at `playbooks/*.md` for now —
+  no migration is needed and existing user vaults keep working.
+- **Agent cockpit Skills section is no longer a list of mini-runners.**
+  The previous design rendered each skill as a `PlaybookCard` with its
+  own input form and Run button, which mis-modeled what a skill is — a
+  capability the agent pulls in mid-conversation when the task fits,
+  not a standalone script the user kicks off from an agent's profile.
+  The cockpit now shows passive `SkillTile` cards (icon + name + 1-line
+  summary + input chips) under the heading "Skills <agent> can use".
+  Clicking a tile jumps to `/skills?skill=<slug>` to inspect the
+  skill's definition. To actually use a skill, you talk to the agent
+  in chat and it invokes the right one — same way Claude Skills works.
+- **Skills detail "Run skill" button rephrased as "Invoke via
+  <agent>".** Same code path (`POST /api/agent/run` with the rendered
+  skill prompt), but the label and supporting microcopy now make it
+  clear that invoking a skill always happens *through* its agent — the
+  Skills page just lets you trigger one isolated invocation for
+  testing. Header subtitle rewritten to say "Capabilities your agents
+  invoke during a conversation" instead of the misleading "one-shot
+  tasks your agents know how to run".
+
 ## 0.4.32 — 2026-04-22
 
 ### Added

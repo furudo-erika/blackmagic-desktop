@@ -27,8 +27,8 @@ export default function AutomationsPage() {
     {
       icon: BookOpen,
       title: 'Skills',
-      subtitle: 'Reusable recipes your agents can run — playbook markdown files stored in the vault.',
-      href: '/playbooks',
+      subtitle: 'Capabilities your agents pull in during conversations — skill markdown files stored in the vault.',
+      href: '/skills',
     },
     {
       icon: Zap,

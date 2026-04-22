@@ -250,7 +250,7 @@ export function Sidebar() {
         )}
 
         <SectionLabel>Work</SectionLabel>
-        <NavRow icon={BookOpen} label="Playbooks" href="/playbooks" pathname={pathname} />
+        <NavRow icon={BookOpen} label="Skills" href="/skills" pathname={pathname} />
         <NavRow icon={Zap}      label="Triggers"  href="/triggers"  pathname={pathname} />
         <NavRow icon={History}  label="Runs"      href="/runs"      pathname={pathname} live={liveRunCount} />
 
@@ -418,7 +418,7 @@ function CommandPalette({
       { label: 'Contacts', href: '/contacts', hint: 'Vault — contacts' },
       { label: 'Deals', href: '/deals', hint: 'Vault — deals' },
       { label: 'Files', href: '/vault', hint: 'Vault — raw files' },
-      { label: 'Skills', href: '/playbooks', hint: 'automations — skills' },
+      { label: 'Skills', href: '/skills', hint: 'automations — skills' },
       { label: 'Triggers', href: '/triggers', hint: 'automations — scheduled' },
       { label: 'GEO', href: '/geo', hint: 'automations — GEO dashboard' },
       { label: 'Integrations', href: '/integrations', hint: 'connect third-party tools' },
