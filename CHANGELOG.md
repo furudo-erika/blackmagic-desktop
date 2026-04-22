@@ -2,6 +2,33 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.64 — 2026-04-22
+
+### Added
+- **Outbound Agent** — new default agent that orchestrates the full
+  new-business loop end-to-end: **discover → enrich → ICP-score →
+  draft → send → notify**. Pinned first in the agents directory.
+  Wires up 16 tools (Apify discovery, company/contact enrichment,
+  ICP scoring, draft creation, SES send, LinkedIn DM via Unipile,
+  notify, trigger_create) so it can complete an outbound round
+  without the user bouncing between agents. Preflight gates it on
+  Apify + Amazon SES + `us/market/icp.md` + `us/brand/voice.md`
+  (which matches what the pipeline actually reads). Autonomous
+  doctrine baked in: "never halt on missing signals, pick the
+  strongest inferable angle and proceed"; hard caps at 10 companies
+  / 5 sent emails per run to keep Apify + SES spend bounded. One of
+  the starter prompts — "Run a full outbound round" — is
+  one-click from the agent detail page.
+- **Native macOS notifications in the `notify` tool.** Instead of
+  requiring a messaging webhook to get a visible ping, `notify`
+  now fires an `osascript display notification` on darwin **in
+  addition to** any connected messaging integrations. Sound = Ping
+  for normal/high urgency, silent for low. Title = subject (80 chars
+  max), body = flattened to one line (280 chars max). Users get a
+  real Notification Center alert even with zero webhooks connected;
+  those with Slack / Feishu / Discord / Telegram connected get
+  both.
+
 ## 0.4.63 — 2026-04-22
 
 ### Fixed

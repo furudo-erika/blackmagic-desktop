@@ -2237,7 +2237,7 @@ const enroll_contact_in_sequence: ToolDef = {
 const notify: ToolDef = {
   name: 'notify',
   description:
-    "Send a notification to every messaging channel the user has connected (Slack / Discord / Telegram / Feishu / Email). Use this from skills instead of calling a specific channel — the user's BlackMagic Integrations decide where it lands.",
+    "Send a notification. On macOS always fires a native desktop notification via Notification Center. Also fans out to every messaging channel the user has connected (Slack / Discord / Telegram / Feishu). Use this from skills instead of calling a specific channel — the user's Integrations decide where else it lands.",
   parameters: {
     type: 'object',
     properties: {
@@ -2279,6 +2279,30 @@ const notify: ToolDef = {
         sends.push({ channel, ok: res.ok, detail: res.ok ? undefined : `${res.status}` });
       } catch (err) {
         sends.push({ channel, ok: false, detail: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    // macOS native notification — always fires on darwin regardless of
+    // which messaging integrations are connected. User still gets a
+    // visible ping on their own machine even with zero webhooks set up.
+    // Uses osascript's `display notification` so no extra deps; sound
+    // defaults to "Ping" for normal/high urgency, silent for low.
+    if (process.platform === 'darwin') {
+      try {
+        const { spawn } = await import('node:child_process');
+        const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        const soundClause = urgency === 'low'
+          ? ''
+          : ' sound name "Ping"';
+        // body can span multiple lines — osascript expects one line for
+        // the inner string, so collapse newlines to a bullet.
+        const oneLine = body.replace(/\n+/g, ' · ').slice(0, 280);
+        const script = `display notification "${esc(oneLine)}" with title "${esc(subject.slice(0, 80))}"${soundClause}`;
+        const proc = spawn('osascript', ['-e', script], { stdio: 'ignore' });
+        proc.on('error', () => {});
+        sends.push({ channel: 'macos', ok: true });
+      } catch (err) {
+        sends.push({ channel: 'macos', ok: false, detail: err instanceof Error ? err.message : String(err) });
       }
     }
 
