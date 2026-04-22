@@ -2,6 +2,26 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.69 — 2026-04-23
+
+### Fixed
+- **Brand monitor returned unrelated Reddit posts as "mentions".**
+  The `brand-monitor-apify` and `reddit-pulse` skills called
+  `trudax/reddit-scraper-lite` with `sort: "new"`, which ignores the
+  search term when fresh hits are sparse and just returns recent posts
+  from Reddit's firehose. Example bug report: searching for `apidog`
+  surfaced an AutoModerator welcome post in r/Morocco that mentioned
+  neither Apidog nor Apifox anywhere. The skills also had no
+  post-scrape verification — whatever Apify returned became a
+  "mention", then got misclassified as a `question`.
+
+  Two fixes in `daemon/src/vault.ts`:
+  - Switched both skills to `sort: "relevance"`.
+  - Added an explicit verify-keyword-presence step: drop any scraped
+    item where the keyword does not appear case-insensitively in
+    `title + body + url + author`. This kills the false positives
+    that the scraper leaks even on relevance sort.
+
 ## 0.4.68 — 2026-04-23
 
 ### Fixed

@@ -2052,11 +2052,19 @@ Heavy brand-monitor scan via Apify (Reddit + Twitter/X).
 
 1. For each keyword (cap at 4, dedupe synonyms), call
    \`scrape_apify_actor({ actorId: "trudax/reddit-scraper-lite",
-   input: { searches: [<keyword>], maxItems: 50, sort: "new" } })\`.
+   input: { searches: [<keyword>], maxItems: 50, sort: "relevance" } })\`.
    Same for Twitter via \`apidojo/tweet-scraper\` with \`{ searchTerms:
    [<keyword>], maxTweets: 100 }\`. Run both in parallel where the
    model supports it.
-2. Dedupe by URL across runs. Filter out:
+   **Note:** \`trudax/reddit-scraper-lite\` with \`sort: "new"\` is known
+   to ignore the search term and return random recent posts. Always use
+   \`sort: "relevance"\` and then verify in step 2.
+2. **Verify keyword presence (critical).** For every scraped item,
+   check that the keyword appears case-insensitively in
+   \`title + body/selftext + url + author handle\`. Drop anything where
+   it does not appear — the scrapers return false positives (unrelated
+   posts from Reddit's firehose). Then dedupe by URL across runs and
+   filter out:
      - the user's own social handles (\`us/company.md\` should list
        owned channels under \`socials:\`)
      - paid promo / ad copy
@@ -2248,9 +2256,12 @@ Daily Reddit narrative pulse around the user's brand + category.
    category phrases. Cap at 6 queries.
 2. For each query, \`scrape_apify_actor({ actorId:
    "trudax/reddit-scraper-lite", input: { searches: [<q>], maxItems:
-   30, sort: "new" } })\`. If subreddits.md is set, also scrape
+   30, sort: "relevance" } })\`. If subreddits.md is set, also scrape
    \`{ startUrls: [{ url: "https://reddit.com/r/<sub>/new" }],
    maxItems: 20 }\` per listed subreddit.
+   **Verify keyword presence:** the scraper returns false positives —
+   drop any post where the query string does not appear
+   case-insensitively in \`title + selftext + url\`.
 3. Classify each post: \`brand-mention\`, \`category-discussion\`,
    \`competitor-mention\`, \`question\` (someone asking for tool
    recommendations in our space), or \`noise\` (drop).
