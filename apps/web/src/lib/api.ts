@@ -200,8 +200,13 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ agent, task }) },
     ),
   listRuns: () =>
-    request<{ runs: Array<{ runId: string; agent: string; model: string; preview?: string; tokensIn: number; tokensOut: number; costCents: number; toolCalls: number; turns: number; done?: boolean; status?: 'running' | 'completed' | 'failed' | 'blocked' }> }>(
+    request<{ runs: Array<{ runId: string; agent: string; model: string; preview?: string; tokensIn: number; tokensOut: number; costCents: number; toolCalls: number; turns: number; done?: boolean; status?: 'running' | 'completed' | 'failed' | 'blocked' | 'canceled' }> }>(
       '/api/agent/runs',
+    ),
+  stopRun: (id: string) =>
+    request<{ ok: true; alreadyDone?: boolean }>(
+      `/api/agent/runs/${encodeURIComponent(id)}/stop`,
+      { method: 'POST' },
     ),
   getRun: (id: string) =>
     request<{

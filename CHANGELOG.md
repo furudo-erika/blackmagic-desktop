@@ -2,6 +2,16 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.35 — 2026-04-22
+
+### Removed
+- **Skills middle "Files" column dropped — back to a clean 2-pane.**
+  Every skill is a single `SKILL.md` and the placeholder `config/` /
+  `templates/` rows just sat there labelled `(empty)`. The Skills
+  browser is now `[ skills list (280px) | skill content ]` — the
+  frontmatter table, Inputs form, Run button, and SKILL.md body all
+  get the full right pane to themselves.
+
 ## 0.4.34 — 2026-04-22
 
 ### Removed

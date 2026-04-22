@@ -176,9 +176,10 @@ function deriveRunStatus(args: {
   meta: any;
   finalMd: string;
   stderr: string;
-}): 'running' | 'failed' | 'blocked' | 'completed' {
+}): 'running' | 'failed' | 'blocked' | 'completed' | 'canceled' {
   const { done, meta, finalMd } = args;
   if (!done) return 'running';
+  if (meta?.canceled === true) return 'canceled';
   const exit = typeof meta?.exitCode === 'number' ? meta.exitCode : 0;
   if (exit !== 0) return 'failed';
   const lower = (finalMd ?? '').toLowerCase().slice(0, 2000);
@@ -936,6 +937,56 @@ async function main() {
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 404);
     }
+  });
+
+  // Stop a run that's stuck in `running` state. Runs show as running
+  // whenever `final.md` is missing — which happens both for genuinely
+  // live invocations and for runs whose daemon/codex process died
+  // without writing final.md (daemon crash, app force-quit, OS reboot).
+  // This endpoint is the user-facing escape hatch for the second case:
+  // it writes a sentinel final.md + flips meta.canceled so the run
+  // derives a `canceled` status on the next list refresh. If a live
+  // PID is recorded on meta.pid we also send SIGTERM best-effort;
+  // absent PID tracking (most runs today), the marker alone is enough
+  // to clear the running badge.
+  app.post('/api/agent/runs/:id/stop', async (c) => {
+    const id = c.req.param('id');
+    const runDir = path.join(getVaultRoot(), 'runs', id);
+    try {
+      await fs.access(runDir);
+    } catch {
+      return c.json({ error: 'run not found' }, 404);
+    }
+    const finalPath = path.join(runDir, 'final.md');
+    const metaPath = path.join(runDir, 'meta.json');
+    let meta: any = null;
+    try { meta = JSON.parse(await fs.readFile(metaPath, 'utf-8')); } catch {}
+    const alreadyFinal = await fs
+      .readFile(finalPath, 'utf-8')
+      .then((s) => s.trim().length > 0)
+      .catch(() => false);
+    if (alreadyFinal) {
+      return c.json({ ok: true, alreadyDone: true });
+    }
+    const now = new Date().toISOString();
+    const nextMeta = {
+      ...(meta && typeof meta === 'object' ? meta : { runId: id }),
+      runId: (meta && meta.runId) ?? id,
+      canceled: true,
+      canceledAt: now,
+      exitCode: 130,
+    };
+    // Best-effort SIGTERM if we have a live pid recorded.
+    if (typeof nextMeta.pid === 'number' && nextMeta.pid > 0) {
+      try { process.kill(nextMeta.pid, 'SIGTERM'); } catch {}
+    }
+    await fs.writeFile(
+      finalPath,
+      `# Run canceled\n\nStopped by user at ${now}. The run had no final.md written — either the process was still live or it died without flushing output.\n`,
+      'utf-8',
+    );
+    await fs.writeFile(metaPath, JSON.stringify(nextMeta, null, 2), 'utf-8');
+    return c.json({ ok: true });
   });
 
   // Probe once on startup so /api/health can advertise which engine is live.

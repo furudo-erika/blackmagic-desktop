@@ -22,8 +22,6 @@ import {
   BookOpen,
   ChevronRight,
   FileText,
-  Folder,
-  FolderOpen,
   Play,
   Search,
   Sparkles,
@@ -146,7 +144,7 @@ export default function SkillsPage() {
         </div>
       </header>
 
-      <div className="flex-1 min-h-0 grid grid-cols-[260px_220px_1fr]">
+      <div className="flex-1 min-h-0 grid grid-cols-[280px_1fr]">
         {/* Left: skills list */}
         <aside className="min-h-0 overflow-y-auto border-r border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F]">
           {playbooks.isLoading && (
@@ -177,11 +175,6 @@ export default function SkillsPage() {
                 selectedSlug={selected ? skillSlug(selected) : ''}
               />
             ))}
-        </aside>
-
-        {/* Middle: file tree */}
-        <aside className="min-h-0 overflow-y-auto border-r border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15]">
-          {selected && <FileTree pb={selected} />}
         </aside>
 
         {/* Right: skill content */}
@@ -242,45 +235,6 @@ function SkillGroup({
           );
         })}
       </ul>
-    </div>
-  );
-}
-
-function FileTree({ pb }: { pb: Playbook }) {
-  const name = skillName(pb);
-  const slug = skillSlug(pb);
-  return (
-    <div className="py-2">
-      <div className="px-4 pt-2 pb-2 flex items-center gap-2">
-        <Sparkles className="w-3.5 h-3.5 text-flame" />
-        <div className="min-w-0 flex-1">
-          <div className="text-[12px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{name}</div>
-          <div className="text-[11px] text-muted dark:text-[#8C837C] truncate">{slug}</div>
-        </div>
-      </div>
-      <div className="px-2">
-        <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] px-2 py-1">
-          Files
-        </div>
-        <ul className="text-[12px]">
-          <li className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-cream-light dark:bg-[#17140F] text-ink dark:text-[#E6E0D8]">
-            <FileText className="w-3.5 h-3.5 text-muted dark:text-[#8C837C]" />
-            <span className="font-mono">SKILL.md</span>
-          </li>
-          {/* Placeholder for sibling files (config/, templates/) — */}
-          {/* will be populated when skills gain multi-file support.  */}
-          <li className="flex items-center gap-2 px-2 py-1.5 text-muted/50 dark:text-[#6B625C]">
-            <Folder className="w-3.5 h-3.5" />
-            <span className="font-mono italic">config</span>
-            <span className="ml-auto text-[10px]">(empty)</span>
-          </li>
-          <li className="flex items-center gap-2 px-2 py-1.5 text-muted/50 dark:text-[#6B625C]">
-            <Folder className="w-3.5 h-3.5" />
-            <span className="font-mono italic">templates</span>
-            <span className="ml-auto text-[10px]">(empty)</span>
-          </li>
-        </ul>
-      </div>
     </div>
   );
 }
@@ -448,5 +402,3 @@ function SkillDetail({ pb }: { pb: Playbook }) {
   );
 }
 
-// Quieting unused-import noise when FolderOpen isn't used.
-void FolderOpen;
