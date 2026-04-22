@@ -15,7 +15,6 @@
  */
 
 import { useMemo } from 'react';
-import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -23,7 +22,6 @@ import {
   Bot,
   Briefcase,
   CalendarClock,
-  ChevronRight,
   Copy,
   Globe,
   History,
@@ -278,87 +276,11 @@ export default function AgentCockpit() {
           </section>
         )}
 
-        {/* Skills the agent can use — passive list of capabilities the
-            agent will pull in automatically during a conversation when
-            the task fits. Skills aren't standalone scripts; the user
-            doesn't "run" them from this page. To invoke one, talk to
-            the agent in chat (or use the dedicated /skills browser to
-            inspect/test a single skill in isolation). */}
-        <section className="mt-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C]">
-              Skills {agent.name} can use
-            </span>
-            <span className="text-[11px] text-muted dark:text-[#8C837C]">· {playbooks.length}</span>
-            <Link href="/skills" className="ml-auto text-[11px] text-muted dark:text-[#8C837C] hover:text-flame inline-flex items-center gap-0.5">
-              all skills <ChevronRight className="w-3 h-3" />
-            </Link>
-          </div>
-          {playbooksQ.isLoading && (
-            <div className="text-[12px] text-muted dark:text-[#8C837C]">loading…</div>
-          )}
-          {!playbooksQ.isLoading && playbooks.length === 0 && (
-            <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4 text-[12px] text-muted dark:text-[#8C837C] leading-relaxed">
-              No skills wired up for this agent yet. Add a{' '}
-              <code className="font-mono text-[11px]">playbooks/*.md</code>{' '}
-              with <code className="font-mono text-[11px]">agent: {slug}</code> in
-              its frontmatter and the agent will pull it in automatically.
-            </div>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {playbooks.map((pb) => (
-              <SkillTile key={pb.path} pb={pb} />
-            ))}
-          </div>
-        </section>
+        {/* Skills section intentionally removed — they're invoked by the
+            agent inside chat, listing them here was just visual noise.
+            Use /skills if you want to browse the catalog. */}
       </EntityDetail>
     </div>
-  );
-}
-
-function SkillTile({ pb }: { pb: Playbook }) {
-  const fm = pb.frontmatter;
-  const slug = pb.path.replace(/^playbooks\//, '').replace(/\.md$/, '');
-  const name = String(fm.name ?? slug);
-  const summary = (() => {
-    const para = pb.body.trim().split(/\n\s*\n/)[0] ?? '';
-    return para.replace(/[#`*_]/g, '').slice(0, 120);
-  })();
-  const inputs = Array.isArray(fm.inputs) ? (fm.inputs as Array<{ name: string; required?: boolean }>) : [];
-  return (
-    <Link
-      href={`/skills?skill=${encodeURIComponent(slug)}`}
-      className="group flex items-start gap-2 rounded-lg border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] px-3 py-2.5 hover:border-flame/40 transition-colors"
-    >
-      <span className="w-6 h-6 rounded-md bg-flame/10 flex items-center justify-center shrink-0 mt-0.5">
-        <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-flame" fill="currentColor" aria-hidden>
-          <path d="M11.999.001L8.71 8.71.001 11.999l8.709 3.29L11.999 24l3.29-8.711L24 11.999l-8.711-3.29z" />
-        </svg>
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-semibold text-ink dark:text-[#E6E0D8] truncate group-hover:text-flame transition-colors">
-          {name}
-        </div>
-        <div className="text-[11px] text-muted dark:text-[#8C837C] line-clamp-2 leading-tight">
-          {summary || '—'}
-        </div>
-        {inputs.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {inputs.slice(0, 3).map((i) => (
-              <span
-                key={i.name}
-                className="text-[10px] font-mono px-1 py-0 rounded bg-cream-light dark:bg-[#17140F] text-muted dark:text-[#8C837C]"
-              >
-                {i.name}{i.required ? '*' : ''}
-              </span>
-            ))}
-            {inputs.length > 3 && (
-              <span className="text-[10px] text-muted dark:text-[#8C837C]">+{inputs.length - 3}</span>
-            )}
-          </div>
-        )}
-      </div>
-    </Link>
   );
 }
 

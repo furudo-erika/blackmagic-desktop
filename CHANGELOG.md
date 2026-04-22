@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.34 — 2026-04-22
+
+### Removed
+- **Skills section dropped from the agent cockpit.** Listing the
+  capabilities an agent uses on its own profile page was redundant —
+  skills are invoked automatically inside chat when the agent picks
+  them, so re-surfacing them as tiles on the agent page added visual
+  noise without behavior change. The Properties rail still shows the
+  skills *count* for at-a-glance audit, and the dedicated `/skills`
+  browser remains the place to inspect or test individual skills.
+
 ## 0.4.33 — 2026-04-22
 
 ### Changed
