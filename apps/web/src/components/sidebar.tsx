@@ -189,7 +189,7 @@ export function Sidebar() {
   function startNewThread() {
     const id = newThreadId();
     localStorage.setItem('bm-last-thread', id);
-    router.push('/');
+    router.push('/chat');
   }
 
   // Recent chat threads — populates the collapsible Chat section under
@@ -212,7 +212,7 @@ export function Sidebar() {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('bm-last-thread', threadId);
     }
-    router.push('/');
+    router.push('/chat');
   }
 
   return (
@@ -248,19 +248,20 @@ export function Sidebar() {
           not buttons — they group the rows underneath visually without
           introducing an extra click. */}
       <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-3 pt-1">
+        <NavRow icon={LayoutDashboard} label="Home" href="/" pathname={pathname} exact />
         <ActionRow icon={Search} label="Search" kbd="⌘K" onClick={() => setPaletteOpen(true)} />
 
         <div className="h-px bg-line dark:bg-[#2A241D] my-2 mx-2" />
 
         {/* Chat: collapsible row that reveals recent threads. Header
-            click navigates to /, chevron toggles the thread list. */}
+            click navigates to /chat, chevron toggles the thread list. */}
         <div>
           <div className={
             'flex items-center rounded-md ' +
-            (pathname === '/' ? 'bg-white dark:bg-[#1F1B15]' : 'hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
+            (pathname === '/chat' ? 'bg-white dark:bg-[#1F1B15]' : 'hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
           }>
             <Link
-              href="/"
+              href="/chat"
               className="flex-1 flex items-center gap-2 px-2 py-1.5 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
             >
               <MessageSquare className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
@@ -317,12 +318,10 @@ export function Sidebar() {
           liveSlugs={liveAgentSlugs}
         />
         <NavRow icon={Inbox}           label="Desk"      href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
-        <NavRow icon={LayoutDashboard} label="Dashboard" href="/dashboard" pathname={pathname} />
         <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} />
         <NavRow icon={Building2}       label="Companies" href="/companies" pathname={pathname} />
         <NavRow icon={Users}           label="Contacts"  href="/contacts"  pathname={pathname} />
         <NavRow icon={Briefcase}       label="Deals"     href="/deals"     pathname={pathname} />
-        <NavRow icon={Activity}        label="Activity"  href="/runs"      pathname={pathname} live={liveRunCount} />
         <NavRow icon={Send}            label="Outreach"  href="/sequences" pathname={pathname} />
 
         <SectionLabel>Intelligence</SectionLabel>

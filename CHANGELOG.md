@@ -2,6 +2,31 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.52 — 2026-04-22
+
+### Changed
+- **Homepage redesigned Stark-style — control center, not a chat
+  staring contest.** The root route used to dump you straight into
+  ChatSurface; that surface still exists at `/chat` but `/` is now
+  a clean landing page with a centered serif "Hello. *What should
+  &lt;org&gt; do?*" headline, a primary composer, and three status
+  cards underneath: **Pending approvals** (drafts awaiting review,
+  pulled from `listDrafts`), **Running jobs** (live runs, pulled
+  from `listRuns`, count badge goes flame when > 0), **Recent
+  threads** (last 4 chat threads, click to load). Composer hands
+  off to `/chat` via a `bm-pending-prompt` localStorage handoff so
+  the chat surface auto-prefills the textarea (user can still edit
+  + pick an agent before firing). ⌘↵ shortcut to send.
+- **Sidebar slimmed: drop Dashboard and Activity rows.** Both lived
+  in places now surfaced on the home dashboard (Dashboard's runtime
+  stats are still reachable via ⌘K and the GEO tab; Activity ↔
+  Running jobs surfaces on Home). Added a `Home` row at the very
+  top of the nav so the new dashboard is one click from anywhere.
+  Chat row continues to be collapsible with thread history.
+- **Chat surface now reads `bm-pending-prompt` on mount** and
+  pre-fills the textarea, so the home composer hand-off is
+  seamless. Empty-state and command popovers all preserved.
+
 ## 0.4.51 — 2026-04-22
 
 ### Fixed

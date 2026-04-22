@@ -210,6 +210,19 @@ export function ChatSurface({
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+
+  // Home page composer hands off via `bm-pending-prompt` localStorage.
+  // Pull it on mount, prefill the input, clear the slot. Doesn't auto-
+  // send so the user can edit + pick an agent before firing.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const pending = window.localStorage.getItem('bm-pending-prompt');
+    if (pending) {
+      window.localStorage.removeItem('bm-pending-prompt');
+      setInput(pending);
+    }
+  }, []);
+
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   // Agent picker — lets the user swap the routing agent inside Chat
   // instead of having to open /team?slug=X first. When the parent
