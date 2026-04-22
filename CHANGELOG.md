@@ -2,6 +2,44 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.47 — 2026-04-22
+
+### Changed
+- **Agent page is no longer a chat staring contest — it's a
+  step-by-step run viewer.** Picking an agent in the sidebar now
+  drops you into a 3-panel dashboard: **Input** (the prompt the
+  agent received), **Processing** (live tool-call timeline with
+  per-step status — done ✓ / running ◐ / error ⚠), **Output**
+  (every file the run wrote, deduplicated, each linking into the
+  Vault editor). Top-of-panel meta strip shows live status badge
+  with elapsed time, plus a Stop button while the run is going.
+  Empty state surfaces the agent's `starter_prompts` from
+  `agents/<slug>.md` as one-click kick-off chips.
+- **Composer at the bottom kicks off new runs OR adds context to
+  the in-flight one.** Send button reads "Run" when idle, "Add"
+  when a run is live. Polling refreshes the timeline every 2s while
+  live, every 5s otherwise (run list).
+- **Picking an agent in Chat now navigates to that agent's page
+  directly.** The dropdown in the chat header and the agent gallery
+  cards on the empty-state both `router.push('/agents?slug=…')`
+  instead of just toggling local picker state. No more two-step
+  "pick agent → see options → click → chat" — one click takes you
+  to the dashboard for that agent. The Run-now onboarding banner
+  for Company Profiler keeps its inline-execute behavior (it still
+  needs to dispatch its prompt against the picked agent without
+  navigating away mid-flow).
+
+### Notes
+- Output detection scans tool calls for `write_file`, `edit_file`,
+  `create_file`, `apply_patch`, `append_file` and pulls the `path`
+  / `file` / `file_path` arg. Add new write-tool names to the
+  `WRITE_TOOLS` set in `apps/web/src/app/agents/page.tsx` if you
+  introduce a custom one.
+- "Pending steps" preview not implemented yet — that requires
+  adding a `steps:` array to skill frontmatter so the timeline can
+  render `▢ queued` rows ahead of the cursor. Tracking for a
+  follow-up.
+
 ## 0.4.46 — 2026-04-22
 
 ### Changed

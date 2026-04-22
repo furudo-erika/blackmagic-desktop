@@ -16,6 +16,11 @@ const SKELETON_DIRS = [
   'triggers',
   'drafts',
   'runs',
+  // Copy-me-as-starting-point markdown files for the recurring ops
+  // rhythms (daily ops, weekly ops, KOL notes, etc). Users duplicate
+  // into signals/ops/<date>.md each morning.
+  'templates',
+  'kol',
   // Signals surfaced by cron-driven scans — brand mentions, competitor
   // product/pricing/hiring diffs, and industry news. One note per scan run.
   'signals',
@@ -2084,6 +2089,285 @@ Daily Reddit narrative pulse around the user's brand + category.
    urgent one to answer.
 `,
 
+  // === API testing (no integration dependency) =============================
+  'api-endpoint-test.md': `---
+kind: skill
+name: api-endpoint-test
+group: engineering
+agent: researcher
+inputs:
+  - { name: base_url, required: true }
+  - { name: auth_hint, required: false }
+  - { name: routes_hint, required: false }
+---
+
+Generate and run a comprehensive API test suite against \`{{base_url}}\`
+using \`apidog-cli\` — a free, open-source CLI (\`npm install -g
+apidog-cli\`). No account, no platform account needed. Works against any
+REST/GraphQL backend.
+
+## Pre-flight
+
+- Confirm with the user: base URL, auth scheme (Bearer / Basic / API
+  key / cookie), and where the routes live (codebase path or OpenAPI
+  spec). If \`{{auth_hint}}\` / \`{{routes_hint}}\` are set, use them.
+- Detect if \`apidog-cli\` is installed; if not, tell the user to run
+  \`npm install -g apidog-cli\` and stop.
+
+## Steps
+
+1. **Discover endpoints.** If a codebase path was given, \`grep\` for
+   route definitions in order of likelihood:
+     - Next.js App Router: \`app/**/route.{ts,js}\`
+     - Next.js Pages: \`pages/api/**/*.{ts,js}\`
+     - Express / Fastify: \`src/routes/\`, \`routes/\`
+     - FastAPI / Flask: \`@app.get|post|put|delete\` decorators
+   If an OpenAPI spec exists (\`openapi.yaml\`, \`swagger.json\`), read
+   it directly. Build a table: method + path + required params + auth.
+2. **Design test cases.** For each endpoint produce 4-6 scenarios
+   covering: auth failures (missing / invalid / valid), validation
+   (missing required / invalid values), wrong method (405), not-found
+   (404), happy path (200-2xx). Favor table-driven coverage over
+   depth.
+3. **Emit scenarios.** Write JSON test files to
+   \`tests/api/<endpoint-slug>.json\` matching the apidog-cli schema.
+   One file per endpoint keeps diffs small. Include \`variables\` for
+   the base URL + auth so the same files work in dev/staging/prod.
+4. **Run.** Emit a shell command the user can execute:
+   \`\`\`
+   apidog-cli run tests/api/*.json --env dev --report html
+   \`\`\`
+   Capture the exit code + report path in your reply.
+5. **Summarize.** Table of: endpoint / scenarios run / passed / failed
+   / notes. If any scenario failed, name the specific expectation that
+   missed.
+
+## When to use
+Anytime the user says: "test my API", "generate API tests", "validate
+auth flows", "write a test suite", "check my endpoints", or has just
+finished a backend change. Don't limit to Apidog users — apidog-cli
+works against any HTTP API.
+`,
+
+  // === KOL discovery pipeline =============================================
+  // Creator-marketing loop generalized from the apidog-team kol-pipeline
+  // scripts. Three-step loop users can run end-to-end or piece by piece.
+  'kol-discover.md': `---
+kind: skill
+name: kol-discover
+group: creator-marketing
+agent: researcher
+inputs:
+  - { name: segment, required: false, description: "Keyword(s) describing the creators we want (e.g. 'backend developer', 'product designer'). Defaults to us/market/positioning.md category terms." }
+  - { name: region, required: false, description: "Geo filter — ISO country code or a region name. Default: worldwide." }
+  - { name: limit, required: false, description: "Max KOLs. Default 50, cap 200." }
+---
+
+Discover LinkedIn KOLs in our category via Apify, score them
+shallow-to-deep, save to \`kol/discovered-<YYYY-MM-DD>.csv\`.
+
+## Pre-flight
+- \`APIFY_API_TOKEN\` must be set (Integrations → Apify).
+- If \`{{segment}}\` is empty, read category keywords from
+  \`us/market/positioning.md\` frontmatter \`category:\` field.
+- If all category inputs are still seed templates, stop with a
+  "describe your category in us/market/positioning.md first" message.
+
+## Steps
+
+1. Build 1-3 LinkedIn search queries from \`{{segment}}\` + \`{{region}}\`.
+   Keep keywords short (1-2 words each) — multi-word with geo filter
+   kills recall on the Apify actor.
+2. Call \`scrape_apify_actor({ actorId:
+   "apimaestro/linkedin-profile-search-scraper", input: { searchKeyword:
+   <q>, countries: [<region>], limit: <per-query quota> } })\` for each
+   query. Union results, dedupe by profile URL.
+3. For every profile, keep: name, title, company, profile_url,
+   headline, location, follower_count (if present). Drop obvious
+   non-technical profiles (pharma QA, food QA, auditor roles, etc.)
+   via a quick keyword filter — don't call tools for this, read the
+   headline.
+4. Write \`kol/discovered-<YYYY-MM-DD>.csv\` with columns: profile_url,
+   name, title, company, headline, location, follower_count, discovered_at,
+   segment, status=new.
+5. Reply with the count + top 5 by follower_count.
+`,
+
+  'kol-score.md': `---
+kind: skill
+name: kol-score
+group: creator-marketing
+agent: researcher
+inputs:
+  - { name: csv_path, required: true, description: "Path to a KOL CSV (e.g. kol/discovered-<date>.csv)." }
+---
+
+Score each KOL in \`{{csv_path}}\` against our ICP and historical
+success patterns. Update the CSV with a \`score\` + \`score_reasons\`
+column.
+
+## Steps
+
+1. Read \`{{csv_path}}\`. Also read \`us/market/icp.md\` for ICP
+   definition and, if present, \`kol/won-profiles.md\` describing
+   creators who previously converted.
+2. For each row, score 0-100 based on:
+     - headline / title alignment with our category (40 points)
+     - follower_count bucket (20 points — 1k-10k: 5, 10k-50k: 15,
+       50k-200k: 20, 200k+: 15 again, since massive accounts
+       rarely reply)
+     - geo / language match if the user set a target market (15)
+     - seniority fit — independent creator / founder > employee at
+       big co (15)
+     - content recency — if we can glean it from the headline (10)
+   Write a 1-sentence \`score_reasons\` per row ("tech QA content in
+   MENA, 12k followers, posts weekly").
+3. Sort descending, keep top 100, rewrite the CSV in place with
+   \`score\`, \`score_reasons\`, \`scored_at\` columns added.
+4. Reply with: median score, count ≥ 70, and the top 3 names.
+`,
+
+  'kol-outreach-draft.md': `---
+kind: skill
+name: kol-outreach-draft
+group: creator-marketing
+agent: sdr
+inputs:
+  - { name: csv_path, required: true }
+  - { name: max_drafts, required: false, description: "Default 20." }
+---
+
+Draft personalized LinkedIn DMs (or emails if we have their email) for
+the top-scoring KOLs in \`{{csv_path}}\`. **Approve-gated — nothing
+sends automatically.**
+
+## Steps
+
+1. Read \`{{csv_path}}\`; keep rows with \`score >= 70\` and
+   \`status == "new"\`. Cap at \`{{max_drafts}}\` (default 20).
+2. Read \`us/brand/voice.md\` for tone and
+   \`us/brand/messaging.md\` for core value-prop bullets.
+3. If the CSV has \`linkedin_url\` but no \`email\`, try
+   \`enrich_contact({ name, company, linkedin: <url> })\` to find an
+   email — skip silently if no hit, we'll stay on LinkedIn.
+4. For each KOL, draft a ≤ 90-word DM (LinkedIn) or ≤ 120-word email
+   (if we got one). Must reference one concrete detail from their
+   profile/headline (not a made-up compliment). No forbidden words
+   from \`CLAUDE.md\`.
+5. Call \`draft_create({ channel: <"linkedin_dm" | "email">, to:
+   <profile_url or email>, subject: <for email only>, body, tool:
+   <"manual" for linkedin_dm | "send_email" for email> })\` per
+   recipient. Drafts land in \`drafts/\` for approval.
+6. Update the CSV row \`status\` to "drafted" and \`drafted_at\` to now.
+7. Call \`notify({ subject: "<n> KOL outreach drafts pending review",
+   body: <list of names + draft paths>, urgency: "normal" })\`.
+8. Reply with the count of drafts + the one with the highest predicted
+   reply rate (your judgment) for the user to review first.
+`,
+
+  // === GSC content-feedback loop ==========================================
+  'gsc-content-brief.md': `---
+kind: skill
+name: gsc-content-brief
+group: seo
+agent: researcher
+inputs:
+  - { name: days, required: false, description: "Lookback window. Default 28." }
+---
+
+Generate next week's content brief from Google Search Console data.
+Three signal types per page/query: REWRITE (high impressions, low
+CTR — title/position problem), PUSH (position 5-20 with decent CTR —
+needs more content to break top 5), GAP (target keyword with
+zero/near-zero impressions — new content opportunity).
+
+## Pre-flight
+- GSC integration connected (service-account JSON + site_url in
+  Integrations → Google Search Console).
+- \`us/market/keywords.md\` lists target keywords (one per line).
+  If absent, work only from GSC data we observe.
+
+## Steps
+
+1. Call \`gsc_query({ dimensions: ["query"], rowLimit: 2000 })\` for
+   the default 28-day window (or \`{{days}}\` if set). Call again
+   with \`dimensions: ["page"]\`. Call a third time with
+   \`dimensions: ["query", "page"]\` for the cross-join.
+2. Classify each row:
+     - **REWRITE**: impressions > 500 AND ctr < 2% AND position < 10
+     - **PUSH**: position between 5 and 20 AND ctr ≥ 2% AND
+       impressions > 200 (room to grow)
+     - **GAP**: target keyword from \`us/market/keywords.md\` that
+       has < 100 impressions (we're not ranking at all)
+3. Write \`signals/seo/<YYYY-MM-DD>-brief.md\` with frontmatter
+   \`kind: signal.seo, date: <iso>, window_days: <n>\` and H2
+   sections: ## Rewrite (with current title + suggested fix) ·
+   ## Push (with page + content gap hypothesis) · ## Gap (with
+   target keyword + brief title idea). Max 10 items per section.
+4. Call \`notify({ subject: "Weekly SEO brief: <r> rewrites, <p>
+   pushes, <g> gaps", body: <top items>, urgency: "normal" })\`.
+5. Reply with top-3 highest-ROI items across all three buckets.
+
+## Self-schedule
+"Run this every Monday morning" → \`trigger_create({ name:
+"weekly-gsc-brief", cron: "0 9 * * 1", skill: "gsc-content-brief" })\`.
+`,
+
+  // === CMS skills =========================================================
+  'cms-blog-stats.md': `---
+kind: skill
+name: cms-blog-stats
+group: content
+agent: researcher
+inputs:
+  - { name: platform, required: false, description: "ghost | wordpress. Auto-detect if omitted." }
+---
+
+Overview of the connected CMS blog: total posts, recent activity,
+drafts pending review, content balance across tags.
+
+## Steps
+
+1. \`cms_list_posts({ status: "any", limit: 100 })\` — most recent 100.
+2. \`cms_list_posts({ status: "draft", limit: 100 })\` for the draft
+   backlog.
+3. Compute: total posts returned, posts in last 7d, posts in last 30d,
+   draft count, tag-usage distribution (top 10).
+4. Write \`signals/content/<YYYY-MM-DD>-stats.md\` with frontmatter
+   \`kind: signal.content, platform: <ghost|wordpress>, date: <iso>\`
+   and a compact markdown overview.
+5. Reply with the 4-line summary.
+`,
+
+  'cms-publish-draft.md': `---
+kind: skill
+name: cms-publish-draft
+group: content
+agent: researcher
+inputs:
+  - { name: draft_path, required: true, description: "Path under drafts/ to a markdown post." }
+  - { name: platform, required: false }
+---
+
+Push a reviewed draft from \`drafts/\` to the connected CMS as a
+DRAFT post (not published). The user publishes via the CMS UI after
+final review — this skill never auto-publishes.
+
+## Steps
+
+1. Read \`{{draft_path}}\`. Frontmatter should have \`title\` and
+   optional \`tags\`. Body is markdown.
+2. Convert the markdown body to HTML (basic: paragraph breaks, links,
+   inline formatting; the CMS renderer polishes the rest).
+3. Call \`cms_create_draft({ title: <frontmatter.title>, html: <HTML>,
+   tags: <frontmatter.tags>, platform: <"{{platform}}" or auto> })\`.
+4. Rename the original \`drafts/\` file to prefix \`[SHIPPED]-\` and
+   append the returned \`admin_url\` to its frontmatter so the local
+   file preserves the link to the CMS post.
+5. Reply with the admin_url so the user can click straight into the
+   CMS editor.
+`,
+
   // === GTM starter pack ====================================================
   // Out-of-the-box equivalents of the canonical GTM-automation flows. Each
   // plays well with zero integrations configured (falls back to web_fetch
@@ -2813,6 +3097,81 @@ export async function ensureVault(): Promise<{ created: boolean }> {
     created = true;
   }
 
+  // Seed copy-me-as-starting-point ops templates. Idempotent: only
+  // written if the path is missing, so users who edit them keep their
+  // changes.
+  const TEMPLATES: Record<string, string> = {
+    'templates/daily-ops.md': `# Daily Ops — ${'${'}DATE${'}'}
+
+> Copy to \`signals/ops/daily-<YYYY-MM-DD>.md\` each morning and fill in.
+
+### 1. Intelligence Gathering
+- [ ] brand-monitor-apify ran · mentions collected: ___
+- [ ] reddit-pulse ran · question-posts to answer: ___
+- Notes: ___
+
+### 2. Pipeline Check
+- [ ] revops-pipeline-health scanned
+- Stuck deals (no next step > 7d): ___
+- At-risk ARR flagged: ___
+- Action: ___
+
+### 3. Outreach
+- Drafts pending approval: ___
+- Sent today: ___
+- Replies to triage: ___
+
+### 4. Today's Focus (max 3)
+1. ___
+2. ___
+3. ___
+
+### 5. Blockers
+- ___
+`,
+    'templates/weekly-ops.md': `# Weekly Ops — Week of ${'${'}DATE${'}'}
+
+> Copy to \`signals/ops/weekly-<YYYY-MM-DD>.md\` every Monday.
+
+### 1. Intel Review
+- [ ] competitor-radar ran · watch items: ___
+- [ ] gsc-content-brief ran · rewrites/pushes/gaps: ___
+- [ ] linkedin-intel-weekly ran · replyable posts: ___
+
+### 2. KPIs This Week
+| Metric | This Week | Last Week | Change |
+|--------|-----------|-----------|--------|
+| Demos booked | | | |
+| Replies | | | |
+| Drafts sent | | | |
+| New contacts | | | |
+
+### 3. Content Calendar
+| Planned | Shipped | Channel | Notes |
+|---------|---------|---------|-------|
+| | | | |
+| | | | |
+| | | | |
+
+### 4. Big Bets (max 3 — what must ship this week?)
+1. ___
+2. ___
+3. ___
+
+### 5. Retrospective
+- What worked: ___
+- What didn't: ___
+- One thing to change: ___
+`,
+  };
+  for (const [rel, body] of Object.entries(TEMPLATES)) {
+    const p = path.join(getVaultRoot(), rel);
+    if (!fsSync.existsSync(p)) {
+      await fs.mkdir(path.dirname(p), { recursive: true });
+      await fs.writeFile(p, body, 'utf-8');
+    }
+  }
+
   // Revision-aware seeding. Seed missing files. For existing files, parse
   // the template's revision + the user's file's revision and overwrite when
   // the template is newer. This is how we retire old peec_* tool lists,
@@ -2853,7 +3212,7 @@ export async function ensureVault(): Promise<{ created: boolean }> {
       const fm = parsed.data as any;
       const tools: string[] = Array.isArray(fm.tools) ? fm.tools.slice() : [];
       let changed = false;
-      for (const need of ['draft_create', 'enroll_contact_in_sequence', 'enrich_contact', 'enrich_contact_linkedin', 'trigger_create', 'scrape_apify_actor', 'notify']) {
+      for (const need of ['draft_create', 'enroll_contact_in_sequence', 'enrich_contact', 'enrich_contact_linkedin', 'trigger_create', 'scrape_apify_actor', 'notify', 'gsc_query', 'cms_list_posts', 'cms_create_draft']) {
         if (!tools.includes(need)) { tools.push(need); changed = true; }
       }
       if (changed) {

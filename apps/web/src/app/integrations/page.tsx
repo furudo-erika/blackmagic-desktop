@@ -72,6 +72,17 @@ const BRAND_PATHS: Record<IntegrationProvider, string> = {
   // email-sending service.
   amazon_ses:
     'M3 5h18a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1zm.8 2l8.2 5.3L20.2 7H3.8zM3 8.35V17h18V8.35l-8.45 5.5a1 1 0 01-1.1 0L3 8.35z',
+  // GSC — magnifier + small "G" corner mark. Generic search-analytics
+  // glyph (no Google trademark).
+  gsc:
+    'M10.5 3a7.5 7.5 0 015.92 12.08l4.75 4.75-1.34 1.34-4.75-4.75A7.5 7.5 0 1110.5 3zm0 2a5.5 5.5 0 100 11 5.5 5.5 0 000-11zm.5 2.5v2h2v1.5h-2v2H9.5v-2h-2V9.5h2v-2H11z',
+  // Ghost — simple ghost silhouette. Matches Ghost's brand mark shape
+  // without using their registered logo.
+  ghost:
+    'M12 2a8 8 0 018 8v11l-2.5-1.8L15 21l-3-2-3 2-2.5-1.8L4 21V10a8 8 0 018-8zm-3.2 7.3a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4zm6.4 0a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z',
+  // WordPress — concentric circle W. Clean geometric; no trademark.
+  wordpress:
+    'M12 2a10 10 0 100 20 10 10 0 000-20zm0 2a8 8 0 016.93 4H5.07A8 8 0 0112 4zM4 12a8 8 0 01.64-3.14L9.3 19.5A8 8 0 014 12zm9.1 7.86L6.2 7.5h5.5l1.4 2.8L11 19.5a8 8 0 002.1.36zm6.14-3L14.8 7.5h2.24A8 8 0 0119.24 16.86z',
 };
 
 function BrandLogo({ provider, color }: { provider: IntegrationProvider; color: string }) {
@@ -260,6 +271,39 @@ const GROUPS: Group[] = [
         oauth: false,
         endpointField: true,
         brandColor: '#FF9900',
+      },
+    ],
+  },
+  {
+    label: 'SEO',
+    providers: [
+      {
+        provider: 'gsc',
+        name: 'Google Search Console',
+        description: 'Pull impressions, clicks, CTR, and positions for every query + page. Feeds the `gsc-content-brief` skill (REWRITE / PUSH / GAP analysis).',
+        oauth: false,
+        brandColor: '#4285F4',
+      },
+    ],
+  },
+  {
+    label: 'Content / CMS',
+    providers: [
+      {
+        provider: 'ghost',
+        name: 'Ghost',
+        description: 'Read blog posts and create drafts via Ghost Admin API. Approve-gated — nothing publishes until you confirm.',
+        oauth: false,
+        endpointField: true,
+        brandColor: '#15171A',
+      },
+      {
+        provider: 'wordpress',
+        name: 'WordPress',
+        description: 'Read posts and create drafts via WordPress REST API + application passwords. Approve-gated.',
+        oauth: false,
+        endpointField: true,
+        brandColor: '#21759B',
       },
     ],
   },
@@ -465,13 +509,19 @@ function IntegrationCard({
           <textarea
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            rows={def.provider === 'amazon_ses' ? 6 : 3}
+            rows={def.provider === 'amazon_ses' || def.provider === 'gsc' ? 8 : 3}
             placeholder={
               def.provider === 'amazon_ses'
                 ? '{\n  "access_key_id": "AKIA…",\n  "secret_access_key": "…",\n  "region": "us-east-1",\n  "from": "Lynn <lynn@inc.apidog.com>"\n}'
-                : def.provider === 'apify'
-                  ? 'apify_api_…'
-                  : 'Paste API token'
+                : def.provider === 'gsc'
+                  ? '{\n  "service_account_json": "<paste the whole JSON key file>",\n  "site_url": "sc-domain:example.com"\n}'
+                  : def.provider === 'ghost'
+                    ? 'GHOST_ADMIN_API_KEY format: <id>:<secret>'
+                    : def.provider === 'wordpress'
+                      ? 'wpuser:xxxx xxxx xxxx xxxx xxxx xxxx'
+                      : def.provider === 'apify'
+                        ? 'apify_api_…'
+                        : 'Paste API token'
             }
             className="resize-none bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-3 py-2 text-xs font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
           />

@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Send, Bot, Check, Loader2, AlertCircle, Copy as CopyIcon, ExternalLink, Sparkles,
@@ -202,6 +203,7 @@ export function ChatSurface({
   headerRight?: React.ReactNode;
   bordered?: boolean;
 }) {
+  const router = useRouter();
   const qc = useQueryClient();
   const [threadId, setThreadId] = useState<string>('');
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -625,7 +627,11 @@ export function ChatSurface({
             <span className="hidden sm:inline">Agent:</span>
             <select
               value={effectiveAgent ?? ''}
-              onChange={(e) => setPickedAgent(e.target.value || undefined)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v) router.push(`/agents?slug=${encodeURIComponent(v)}`);
+                else setPickedAgent(undefined);
+              }}
               className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md px-2 py-1 text-[12px] text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame cursor-pointer"
             >
               <option value="">Default (Research Agent)</option>
@@ -673,7 +679,7 @@ export function ChatSurface({
                       <button
                         key={a.slug}
                         type="button"
-                        onClick={() => setPickedAgent(a.slug)}
+                        onClick={() => router.push(`/agents?slug=${encodeURIComponent(a.slug)}`)}
                         className={
                           'text-left p-4 bg-white dark:bg-[#1F1B15] border rounded-xl transition-all flex flex-col gap-2 h-full group ' +
                           (picked

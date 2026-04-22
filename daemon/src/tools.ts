@@ -307,6 +307,284 @@ const scrape_apify_actor: ToolDef = {
 };
 
 // ---------------------------------------------------------------------------
+// Helpers shared by the new integration-backed tools below. Read per-user
+// credentials straight from the active project's integrations.json rather
+// than ctx.config, so the tools stay in sync with whatever the user
+// pasted in the UI (config.toml isn't updated on UI saves for the newer
+// providers).
+// ---------------------------------------------------------------------------
+async function readIntegrationCreds(provider: string): Promise<Record<string, string> | null> {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const { getVaultRoot } = await import('./paths.js');
+  try {
+    const raw = await fs.readFile(path.join(getVaultRoot(), '.bm', 'integrations.json'), 'utf-8');
+    const data = JSON.parse(raw);
+    const rec = data?.[provider];
+    if (!rec || rec.status !== 'connected') return null;
+    return (rec.credentials ?? null) as Record<string, string> | null;
+  } catch { return null; }
+}
+
+// Google Search Console — sign a JWT from a pasted service-account JSON,
+// exchange for an access token, then call Search Analytics / URL
+// Inspection. Tokens get cached in-memory for 55 minutes per credential
+// fingerprint so a run of 10 queries doesn't hit the OAuth endpoint
+// 10 times.
+const gscTokenCache = new Map<string, { token: string; exp: number }>();
+
+async function gscAccessToken(): Promise<string> {
+  const creds = await readIntegrationCreds('gsc');
+  if (!creds?.service_account_json) {
+    throw new Error('No Google Search Console service account connected. Paste the JSON in Integrations → Google Search Console.');
+  }
+  const sa = JSON.parse(creds.service_account_json) as {
+    client_email: string; private_key: string;
+  };
+  const fp = `${sa.client_email}:${(sa.private_key || '').slice(-32)}`;
+  const cached = gscTokenCache.get(fp);
+  if (cached && cached.exp > Date.now()) return cached.token;
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const claim = {
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/webmasters.readonly',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now,
+  };
+  const b64 = (o: object) =>
+    Buffer.from(JSON.stringify(o)).toString('base64url');
+  const unsigned = `${b64(header)}.${b64(claim)}`;
+  const { createSign } = await import('node:crypto');
+  const signer = createSign('RSA-SHA256');
+  signer.update(unsigned);
+  const sig = signer.sign(sa.private_key).toString('base64url');
+  const assertion = `${unsigned}.${sig}`;
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${encodeURIComponent(assertion)}`,
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`GSC token exchange failed: ${res.status} ${text.slice(0, 200)}`);
+  const body = JSON.parse(text) as { access_token: string; expires_in: number };
+  gscTokenCache.set(fp, {
+    token: body.access_token,
+    // Refresh 5 min before expiry to keep repeated calls fresh.
+    exp: Date.now() + Math.max(0, (body.expires_in - 300)) * 1000,
+  });
+  return body.access_token;
+}
+
+const gsc_query: ToolDef = {
+  name: 'gsc_query',
+  description:
+    'Query the Google Search Console Search Analytics API for the connected site. Returns impressions, clicks, CTR, and average position grouped by dimensions (query, page, country, device, date). Requires a GSC service account connected in Integrations.',
+  parameters: {
+    type: 'object',
+    properties: {
+      startDate: { type: 'string', description: 'YYYY-MM-DD. Default: 28 days ago.' },
+      endDate: { type: 'string', description: 'YYYY-MM-DD. Default: today.' },
+      dimensions: {
+        type: 'array',
+        items: { type: 'string', enum: ['query', 'page', 'country', 'device', 'date', 'searchAppearance'] },
+        description: 'Default ["query"].',
+      },
+      rowLimit: { type: 'number', description: 'Max rows. Default 500, cap 25000.' },
+      searchType: { type: 'string', enum: ['web', 'image', 'video', 'news', 'discover', 'googleNews'], description: 'Default "web".' },
+    },
+  },
+  handler: async (args) => {
+    const creds = await readIntegrationCreds('gsc');
+    if (!creds?.site_url) return { error: 'No site_url configured in the gsc integration.' };
+    let token: string;
+    try { token = await gscAccessToken(); } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+    const today = new Date();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const end = args.endDate || iso(today);
+    const start = args.startDate || iso(new Date(today.getTime() - 28 * 864e5));
+    const body = {
+      startDate: start,
+      endDate: end,
+      dimensions: Array.isArray(args.dimensions) && args.dimensions.length > 0 ? args.dimensions : ['query'],
+      rowLimit: Math.min(typeof args.rowLimit === 'number' ? args.rowLimit : 500, 25000),
+      searchType: typeof args.searchType === 'string' ? args.searchType : 'web',
+    };
+    const url = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(creds.site_url)}/searchAnalytics/query`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    if (!res.ok) return { error: `gsc ${res.status}: ${text.slice(0, 300)}` };
+    return JSON.parse(text);
+  },
+};
+
+// Ghost Admin API — JWT-signed with the admin key. Ghost's format is
+// "<id>:<secret>" hex-encoded; we split, base64url-decode the secret,
+// sign a short-lived JWT (5 min), and use it as Bearer auth.
+async function ghostAuthHeader(key: string): Promise<string> {
+  const [kid, secret] = key.split(':');
+  if (!kid || !secret) throw new Error('GHOST_ADMIN_API_KEY must be "<id>:<secret>" format');
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'HS256', typ: 'JWT', kid };
+  const claim = { iat: now, exp: now + 5 * 60, aud: '/admin/' };
+  const b64 = (o: object) =>
+    Buffer.from(JSON.stringify(o)).toString('base64url');
+  const unsigned = `${b64(header)}.${b64(claim)}`;
+  const { createHmac } = await import('node:crypto');
+  const sig = createHmac('sha256', Buffer.from(secret, 'hex')).update(unsigned).digest('base64url');
+  return `Ghost ${unsigned}.${sig}`;
+}
+
+// CMS tools — route to whichever platform (Ghost / WordPress) the user
+// has connected. If both are connected, default to Ghost unless the
+// caller passes `platform: "wordpress"`. Rationale: users typically have
+// one primary CMS; we don't want to double-publish without an explicit
+// choice.
+async function resolveCmsPlatform(hint?: string): Promise<'ghost' | 'wordpress' | null> {
+  if (hint === 'ghost' || hint === 'wordpress') return hint;
+  const ghost = await readIntegrationCreds('ghost');
+  if (ghost?.token && ghost.endpoint) return 'ghost';
+  const wp = await readIntegrationCreds('wordpress');
+  if (wp?.token && wp.endpoint) return 'wordpress';
+  return null;
+}
+
+const cms_list_posts: ToolDef = {
+  name: 'cms_list_posts',
+  description:
+    'List recent posts from the connected CMS (Ghost or WordPress). Returns id, title, status, url, updated_at for each. Use status="draft" to review pending drafts before they ship.',
+  parameters: {
+    type: 'object',
+    properties: {
+      platform: { type: 'string', enum: ['ghost', 'wordpress'], description: 'Force a platform; auto-detected if omitted.' },
+      status: { type: 'string', enum: ['published', 'draft', 'scheduled', 'any'], description: 'Default "any".' },
+      limit: { type: 'number', description: 'Default 20, cap 100.' },
+    },
+  },
+  handler: async (args) => {
+    const platform = await resolveCmsPlatform(args.platform);
+    if (!platform) return { error: 'No CMS connected. Paste credentials in Integrations → Ghost or WordPress.' };
+    const limit = Math.min(typeof args.limit === 'number' ? args.limit : 20, 100);
+    const status = typeof args.status === 'string' ? args.status : 'any';
+    if (platform === 'ghost') {
+      const creds = (await readIntegrationCreds('ghost'))!;
+      if (!creds.token || !creds.endpoint) return { error: 'Ghost integration missing token or endpoint.' };
+      const auth = await ghostAuthHeader(creds.token);
+      const base = creds.endpoint.replace(/\/+$/, '');
+      const filter = status === 'any' ? '' : `&filter=status:${status}`;
+      const url = `${base}/ghost/api/admin/posts/?limit=${limit}${filter}&order=updated_at%20desc`;
+      const res = await fetch(url, { headers: { Authorization: auth } });
+      const text = await res.text();
+      if (!res.ok) return { error: `ghost ${res.status}: ${text.slice(0, 300)}` };
+      const data = JSON.parse(text) as { posts: any[] };
+      return {
+        platform,
+        posts: (data.posts || []).map((p) => ({
+          id: p.id, title: p.title, status: p.status, url: p.url, updated_at: p.updated_at,
+        })),
+      };
+    }
+    // wordpress
+    const creds = (await readIntegrationCreds('wordpress'))!;
+    if (!creds.token || !creds.endpoint) return { error: 'WordPress integration missing token or endpoint.' };
+    const base = creds.endpoint.replace(/\/+$/, '');
+    const wpStatus = status === 'any' ? 'publish,draft,future,pending,private' : status === 'scheduled' ? 'future' : status;
+    const url = `${base}/wp-json/wp/v2/posts?per_page=${limit}&status=${wpStatus}&orderby=modified&order=desc`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Basic ${Buffer.from(creds.token).toString('base64')}` },
+    });
+    const text = await res.text();
+    if (!res.ok) return { error: `wordpress ${res.status}: ${text.slice(0, 300)}` };
+    const data = JSON.parse(text) as any[];
+    return {
+      platform,
+      posts: (data || []).map((p) => ({
+        id: p.id, title: p.title?.rendered, status: p.status, url: p.link, updated_at: p.modified,
+      })),
+    };
+  },
+};
+
+const cms_create_draft: ToolDef = {
+  name: 'cms_create_draft',
+  description:
+    'Create a DRAFT blog post in the connected CMS (Ghost or WordPress). Always creates as draft — never publishes. The user reviews + publishes via their CMS UI.',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      html: { type: 'string', description: 'Post body as HTML. Prefer this for formatting fidelity.' },
+      markdown: { type: 'string', description: 'Post body as markdown. Used if html is missing.' },
+      tags: { type: 'array', items: { type: 'string' } },
+      platform: { type: 'string', enum: ['ghost', 'wordpress'] },
+    },
+    required: ['title'],
+  },
+  handler: async (args) => {
+    const platform = await resolveCmsPlatform(args.platform);
+    if (!platform) return { error: 'No CMS connected.' };
+    const html = typeof args.html === 'string'
+      ? args.html
+      : typeof args.markdown === 'string'
+        ? args.markdown.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')
+        : '';
+    if (platform === 'ghost') {
+      const creds = (await readIntegrationCreds('ghost'))!;
+      if (!creds.token || !creds.endpoint) return { error: 'Ghost integration missing token or endpoint.' };
+      const auth = await ghostAuthHeader(creds.token);
+      const base = creds.endpoint.replace(/\/+$/, '');
+      const res = await fetch(`${base}/ghost/api/admin/posts/?source=html`, {
+        method: 'POST',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          posts: [{
+            title: args.title,
+            html,
+            status: 'draft',
+            tags: Array.isArray(args.tags) ? args.tags.map((t: string) => ({ name: t })) : undefined,
+          }],
+        }),
+      });
+      const text = await res.text();
+      if (!res.ok) return { error: `ghost ${res.status}: ${text.slice(0, 300)}` };
+      const data = JSON.parse(text) as { posts: any[] };
+      const p = data.posts?.[0];
+      return { platform, id: p?.id, title: p?.title, status: p?.status, admin_url: `${base}/ghost/#/editor/post/${p?.id}` };
+    }
+    // wordpress
+    const creds = (await readIntegrationCreds('wordpress'))!;
+    if (!creds.token || !creds.endpoint) return { error: 'WordPress integration missing token or endpoint.' };
+    const base = creds.endpoint.replace(/\/+$/, '');
+    const res = await fetch(`${base}/wp-json/wp/v2/posts`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${Buffer.from(creds.token).toString('base64')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: args.title,
+        content: html,
+        status: 'draft',
+        tags_input: Array.isArray(args.tags) ? args.tags : undefined,
+      }),
+    });
+    const text = await res.text();
+    if (!res.ok) return { error: `wordpress ${res.status}: ${text.slice(0, 300)}` };
+    const data = JSON.parse(text) as any;
+    return { platform, id: data.id, title: data.title?.rendered, status: data.status, admin_url: `${base}/wp-admin/post.php?post=${data.id}&action=edit` };
+  },
+};
+
+// ---------------------------------------------------------------------------
 // GEO (Generative Engine Optimization). Native replacement for Peec AI — runs
 // the seed prompt pool daily across ChatGPT / Perplexity / Google AI Overview
 // and stores raw results + extracted citations in signals/geo/. Handlers are
@@ -2044,6 +2322,9 @@ const trigger_create: ToolDef = {
 export const BUILTIN_TOOLS: ToolDef[] = [
   notify,
   trigger_create,
+  gsc_query,
+  cms_list_posts,
+  cms_create_draft,
   read_file,
   write_file,
   edit_file,

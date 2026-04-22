@@ -19,7 +19,10 @@ export type IntegrationProvider =
   | 'github'
   | 'stripe'
   | 'apify'
-  | 'amazon_ses';
+  | 'amazon_ses'
+  | 'gsc'
+  | 'ghost'
+  | 'wordpress';
 
 export type Integration = {
   provider: IntegrationProvider;
