@@ -2,6 +2,22 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.58 — 2026-04-22
+
+### Fixed
+- **Agent Output — final answer renders as chat-formatted markdown.**
+  The agent's final response used to hide inside a `<details>` as
+  "Show final answer" and then render the text inside a monospace
+  `<pre>` that echoed literal `##`, `**`, and `-` syntax. Replaced
+  with a prominent "Final answer" block (label + card) that pipes the
+  text through the shared `<Markdown>` component, so headings, bold,
+  lists, links, and code blocks render the way they do in chat.
+- **Entity page body renders as markdown.** Company / contact / deal
+  note bodies were displayed as raw text via `whitespace-pre-wrap`,
+  so any markdown the agent wrote into the note (e.g. a Company
+  Profile with sections and bullets) appeared as literal syntax.
+  Now routed through `<Markdown>` for proper GFM rendering.
+
 ## 0.4.57 — 2026-04-22
 
 ### Fixed

@@ -437,14 +437,14 @@ function AgentsInner() {
               </ul>
             )}
             {latestRun && !isLive && runDetail.data?.final && (
-              <details className="mt-3">
-                <summary className="text-[11px] text-muted dark:text-[#8C837C] cursor-pointer hover:text-ink dark:hover:text-[#F5F1EA]">
-                  Show final answer
-                </summary>
-                <pre className="mt-2 bg-cream-light dark:bg-[#17140F] border border-line dark:border-[#2A241D] rounded-md p-3 text-[11px] text-ink dark:text-[#E6E0D8] whitespace-pre-wrap leading-relaxed font-mono max-h-72 overflow-auto">
-                  {runDetail.data.final}
-                </pre>
-              </details>
+              <div className="mt-3 border-t border-line dark:border-[#2A241D] pt-3">
+                <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-2">
+                  Final answer
+                </div>
+                <div className="bg-cream-light dark:bg-[#17140F] border border-line dark:border-[#2A241D] rounded-md p-4 max-h-[420px] overflow-auto">
+                  <Markdown source={runDetail.data.final} />
+                </div>
+              </div>
             )}
             {latestRun && (
               <Link

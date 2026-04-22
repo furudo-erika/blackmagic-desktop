@@ -12,6 +12,7 @@ import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { EntityDetail } from '../../components/entity-detail';
+import { Markdown } from '../../components/markdown';
 import { PageShell, PageHeader, PageBody } from '../../components/ui/primitives';
 import { Building2, Users as UsersIcon, Briefcase } from 'lucide-react';
 
@@ -105,9 +106,7 @@ function EntityPageInner() {
       >
         {file.data.body && (
           <section className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-5 mb-5">
-            <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink dark:text-[#E6E0D8]">
-              {file.data.body}
-            </div>
+            <Markdown source={file.data.body} />
           </section>
         )}
       </EntityDetail>
