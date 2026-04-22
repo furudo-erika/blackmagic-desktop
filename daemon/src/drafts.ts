@@ -4,6 +4,7 @@ import matter from 'gray-matter';
 import { getVaultRoot } from './paths.js';
 import { writeVaultFile } from './vault.js';
 import { McpRegistry } from './mcp.js';
+import { sendEmailViaBestProvider } from './email-sender.js';
 
 export interface Draft {
   id: string;
@@ -95,38 +96,74 @@ function extractMessageId(result: any): string | undefined {
 
 export async function approveDraft(
   id: string,
-): Promise<{ ok: boolean; note?: string; messageId?: string; error?: string }> {
+  resendConfig?: { resendKey?: string; resendFrom?: string },
+): Promise<{ ok: boolean; note?: string; messageId?: string; error?: string; provider?: string }> {
   const d = await readDraft(id);
   if (!d) throw new Error('draft not found');
 
-  // If the draft's tool isn't an MCP tool we have, just mark approved.
-  if (!d.tool || !d.tool.includes('.') || !McpRegistry.hasTool(d.tool)) {
-    await setDraftStatus(id, 'approved');
+  // Route by channel. Email drafts prefer the built-in BYOK path
+  // (Amazon SES → Resend) over an MCP tool. LinkedIn + other channels
+  // still go through MCP if the tool is configured; otherwise fall
+  // back to "marked approved, send manually".
+  const isEmail = d.channel === 'email' || /^(send_email|gmail\.|ses\.)/.test(d.tool);
+
+  if (isEmail) {
+    const result = await sendEmailViaBestProvider(
+      {
+        to: d.to,
+        subject: d.subject ?? '(no subject)',
+        body_markdown: d.body,
+      },
+      resendConfig,
+    );
+    if (result.ok) {
+      const sentAt = new Date().toISOString();
+      await setDraftFrontmatter(id, {
+        status: 'sent',
+        sent_at: sentAt,
+        provider: result.provider,
+        ...(result.messageId ? { message_id: result.messageId } : {}),
+      });
+      return { ok: true, messageId: result.messageId, provider: result.provider };
+    }
+    // Email provider failed — keep draft as `approved` so the user can
+    // retry after fixing creds, but surface the real error instead of
+    // the misleading "MCP tool not wired" note.
+    await setDraftFrontmatter(id, { status: 'approved', last_error: result.error });
     return {
-      ok: true,
-      note: `Marked approved. MCP tool "${d.tool}" not wired; configure in ~/BlackMagic/.bm/mcp.json to auto-send.`,
+      ok: false,
+      error: result.error,
+      note: result.error,
     };
   }
 
-  // Build args from the draft frontmatter. For gmail.send_email-style tools,
-  // {to, subject, body} is the canonical shape — pass extras through too.
-  const args: Record<string, unknown> = {
-    to: d.to,
-    subject: d.subject ?? '',
-    body: d.body,
-  };
-
-  try {
-    const result = await McpRegistry.callPrefixed(d.tool, args);
-    const messageId = extractMessageId(result);
-    const sentAt = new Date().toISOString();
-    await setDraftFrontmatter(id, { status: 'sent', sent_at: sentAt, ...(messageId ? { message_id: messageId } : {}) });
-    return { ok: true, messageId };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    await setDraftFrontmatter(id, { status: 'approved', last_error: msg });
-    return { ok: false, error: msg, note: `MCP call failed: ${msg}` };
+  // Non-email channels: try an MCP tool if the draft names one.
+  if (d.tool && d.tool.includes('.') && McpRegistry.hasTool(d.tool)) {
+    const args: Record<string, unknown> = {
+      to: d.to,
+      subject: d.subject ?? '',
+      body: d.body,
+    };
+    try {
+      const result = await McpRegistry.callPrefixed(d.tool, args);
+      const messageId = extractMessageId(result);
+      const sentAt = new Date().toISOString();
+      await setDraftFrontmatter(id, { status: 'sent', sent_at: sentAt, ...(messageId ? { message_id: messageId } : {}) });
+      return { ok: true, messageId };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await setDraftFrontmatter(id, { status: 'approved', last_error: msg });
+      return { ok: false, error: msg, note: `MCP call failed: ${msg}` };
+    }
   }
+
+  // No MCP tool wired and not an email channel — LinkedIn DM etc.
+  // Mark approved; user will send manually or via an MCP wiring later.
+  await setDraftStatus(id, 'approved');
+  return {
+    ok: true,
+    note: `Marked approved. Channel "${d.channel}" has no auto-send provider wired — send manually or configure an MCP tool for "${d.tool}".`,
+  };
 }
 
 export async function rejectDraft(id: string) {

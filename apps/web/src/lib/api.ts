@@ -240,12 +240,19 @@ export const api = {
       '/api/drafts',
     ),
   approveDraft: (id: string) =>
-    request<{ ok: boolean; messageId?: string; note?: string; error?: string }>(
+    request<{ ok: boolean; messageId?: string; provider?: string; note?: string; error?: string }>(
       `/api/drafts/${encodeURIComponent(id)}/approve`,
       { method: 'POST' },
     ),
   rejectDraft: (id: string) =>
     request<{ ok: boolean }>(`/api/drafts/${encodeURIComponent(id)}/reject`, { method: 'POST' }),
+  getDraftsSettings: () =>
+    request<{ auto_send: boolean }>('/api/drafts/settings'),
+  setDraftsSettings: (body: { auto_send: boolean }) =>
+    request<{ auto_send: boolean }>('/api/drafts/settings', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
 
   // Triggers
   listTriggers: () =>

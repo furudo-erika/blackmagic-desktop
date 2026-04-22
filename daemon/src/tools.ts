@@ -211,19 +211,21 @@ const enrich_contact: ToolDef = {
 
 const draft_create: ToolDef = {
   name: 'draft_create',
-  description: 'Write a draft to drafts/. Approve-gated: nothing is sent until the human approves in the UI.',
+  description:
+    'Write a draft to drafts/. Default behavior: approval-gated (status: pending). If the skill passes auto:true OR the user has turned on the global auto-send toggle in /outreach, the draft is created and immediately sent via the best-available provider (Amazon SES → Resend → MCP tool).',
   parameters: {
     type: 'object',
     properties: {
-      channel: { type: 'string', enum: ['email', 'linkedin_dm', 'linkedin_connect'] },
+      channel: { type: 'string', enum: ['email', 'linkedin_dm', 'linkedin_connect', 'reddit', 'manual'] },
       to: { type: 'string' },
       subject: { type: 'string' },
       body: { type: 'string' },
-      tool: { type: 'string', description: 'Which approve-gated tool should send it (e.g. gmail.send)' },
+      tool: { type: 'string', description: 'Which tool should send it. email: "send_email" / "ses" / "gmail.send_email". LinkedIn: MCP tool slug. "manual" for drafts the user will send themselves.' },
+      auto: { type: 'boolean', description: 'Skip the pending gate and fire the send provider immediately. Default false — match the global /outreach setting when unset.' },
     },
     required: ['channel', 'to', 'body', 'tool'],
   },
-  handler: async (args) => {
+  handler: async (args, ctx) => {
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     const slug = (args.to || 'unknown').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     const relPath = `drafts/${ts}-${slug}.md`;
@@ -240,7 +242,33 @@ created_at: ${new Date().toISOString()}
 ${args.body}
 `;
     await writeVaultFile(relPath, content);
-    return { ok: true, path: relPath };
+
+    // Resolve auto-send: explicit args.auto > global setting > pending.
+    let auto = args.auto === true;
+    if (args.auto !== true && args.auto !== false) {
+      try {
+        const fs = await import('node:fs/promises');
+        const pathMod = await import('node:path');
+        const { getVaultRoot } = await import('./paths.js');
+        const raw = await fs.readFile(
+          pathMod.join(getVaultRoot(), '.bm', 'drafts-settings.json'),
+          'utf-8',
+        );
+        const cfg = JSON.parse(raw);
+        if (cfg?.auto_send === true) auto = true;
+      } catch { /* default false */ }
+    }
+
+    if (!auto) return { ok: true, path: relPath, status: 'pending' };
+
+    // Fire the approve path now. Reuse ctx.config for Resend fallback.
+    const { approveDraft } = await import('./drafts.js');
+    const id = relPath.replace(/^drafts\//, '').replace(/\.md$/, '');
+    const r = await approveDraft(id, {
+      resendKey: ctx.config.resend_api_key,
+      resendFrom: ctx.config.from_email,
+    });
+    return { ok: r.ok, path: relPath, status: r.ok ? 'sent' : 'approved', provider: r.provider, messageId: r.messageId, error: r.error };
   },
 };
 
@@ -1974,7 +2002,7 @@ function naiveMarkdownToHtml(md: string): string {
 const send_email: ToolDef = {
   name: 'send_email',
   description:
-    'Send a transactional email via Resend. body_markdown is required; body_html is optional (overrides the auto-converted markdown). from defaults to the configured from_email.',
+    'Send a transactional email using whichever provider the user has connected: Amazon SES (preferred, BYOK) → Resend (legacy fallback). body_markdown is required; body_html overrides the auto-converted markdown. from defaults to the provider\'s configured sender.',
   parameters: {
     type: 'object',
     properties: {
@@ -1983,41 +2011,25 @@ const send_email: ToolDef = {
       body_markdown: { type: 'string' },
       body_html: { type: 'string' },
       from: { type: 'string' },
+      reply_to: { type: 'string' },
     },
     required: ['to', 'subject', 'body_markdown'],
   },
   handler: async (args, ctx) => {
-    const key = ctx.config.resend_api_key;
-    if (!key) return { ok: false, error: 'set RESEND_API_KEY in Settings → Integration keys' };
-    const from = args.from || ctx.config.from_email;
-    if (!from) return { ok: false, error: 'set from_email (or pass `from`) in Settings → Integration keys' };
-    try {
-      const html = args.body_html || naiveMarkdownToHtml(String(args.body_markdown));
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from,
-          to: args.to,
-          subject: args.subject,
-          html,
-          text: args.body_markdown,
-        }),
-      });
-      const text = await res.text();
-      let data: any = null;
-      if (text) { try { data = JSON.parse(text); } catch { data = text; } }
-      if (!res.ok) {
-        const msg =
-          (data && typeof data === 'object' && 'message' in data && String(data.message)) ||
-          String(text).slice(0, 200) ||
-          `resend ${res.status}`;
-        return { ok: false, status: res.status, error: msg };
-      }
-      return { ok: true, data: { id: data?.id, from, to: args.to } };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
-    }
+    const { sendEmailViaBestProvider } = await import('./email-sender.js');
+    const result = await sendEmailViaBestProvider(
+      {
+        to: args.to,
+        subject: args.subject,
+        body_markdown: args.body_markdown,
+        body_html: args.body_html,
+        from: args.from,
+        reply_to: args.reply_to,
+      },
+      { resendKey: ctx.config.resend_api_key, resendFrom: ctx.config.from_email },
+    );
+    if (!result.ok) return { ok: false, error: result.error, tried: result.triedProviders };
+    return { ok: true, data: { id: result.messageId, from: result.from, to: args.to, provider: result.provider } };
   },
 };
 

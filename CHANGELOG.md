@@ -2,6 +2,35 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.59 — 2026-04-22
+
+### Fixed
+- **Draft approval now sends through the connected email provider
+  instead of erroring on "MCP tool gmail.send_email not wired".** The
+  old path only knew how to call MCP-registered tools, so users who
+  pasted Amazon SES credentials in Integrations → Amazon SES got a
+  misleading "configure ~/BlackMagic/.bm/mcp.json" note every time
+  they approved. New `email-sender.ts` module owns the decision: if
+  Amazon SES is connected, it signs a SESv2 `SendEmail` with AWS
+  SigV4 and fires that; if Resend is configured (legacy), it falls
+  back to Resend; otherwise it surfaces the actual SES/Resend error
+  (e.g. `SES 403: security token invalid`) rather than the generic
+  "nothing connected". The built-in `send_email` tool and the
+  draft-approval path both share this logic now.
+
+### Added
+- **Auto-send drafts toggle** on the Outreach page. When on, every
+  draft the agent creates is approved + sent immediately via the
+  best-available provider — no manual click required. Setting
+  persists at `.bm/drafts-settings.json` so it survives restarts.
+  Skills can override per-call with `draft_create({..., auto: true})`
+  (explicit `true` wins) or `auto: false` to force the gate even when
+  the global toggle is on. Default is off — existing vaults keep
+  approval-gated behavior until you flip it.
+- **SESv2 SigV4 request signing in the daemon**, no external AWS SDK.
+  Uses Node's built-in `crypto` for HMAC-SHA256; ~50 lines.
+  Least-privilege `ses:SendEmail` IAM action is enough.
+
 ## 0.4.58 — 2026-04-22
 
 ### Fixed

@@ -39,6 +39,14 @@ export default function OutreachPage() {
     queryFn: async () => (await api.listDrafts()).drafts as DraftRow[],
     refetchInterval: 10_000,
   });
+  const settings = useQuery({
+    queryKey: ['drafts-settings'],
+    queryFn: api.getDraftsSettings,
+  });
+  const setAutoSend = useMutation({
+    mutationFn: (auto_send: boolean) => api.setDraftsSettings({ auto_send }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['drafts-settings'] }),
+  });
 
   const [editing, setEditing] = useState<string | null>(null);
   const [editBody, setEditBody] = useState('');
@@ -97,6 +105,33 @@ export default function OutreachPage() {
         icon={Send}
       />
       <PageBody maxWidth="2xl">
+        {/* Auto-send toggle — when on, draft_create writes the file and
+            immediately fires approveDraft(). Skill frontmatter can still
+            override per-skill via `auto: true/false`. */}
+        <Panel className="mb-4 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-ink dark:text-[#F5F1EA]">Auto-send drafts</div>
+            <div className="text-[11px] text-muted dark:text-[#8C837C] mt-0.5">
+              Skip the approval gate. New drafts fire immediately through
+              your configured email provider (Amazon SES preferred).
+              Skills that set <code className="font-mono text-[10px]">auto: true</code>
+              {' '}already bypass the gate regardless.
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
+            <input
+              type="checkbox"
+              checked={settings.data?.auto_send === true}
+              disabled={settings.isLoading || setAutoSend.isPending}
+              onChange={(e) => setAutoSend.mutate(e.target.checked)}
+              className="accent-flame w-4 h-4"
+            />
+            <span className="text-sm text-ink dark:text-[#E6E0D8]">
+              {settings.data?.auto_send ? 'On' : 'Off'}
+            </span>
+          </label>
+        </Panel>
+
         {drafts.isLoading && <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>}
         {drafts.error && <div className="text-sm text-flame">{(drafts.error as Error).message}</div>}
 

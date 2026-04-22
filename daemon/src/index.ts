@@ -802,12 +802,38 @@ async function main() {
   });
   app.post('/api/drafts/:id/approve', async (c) => {
     try {
-      const r = await approveDraft(c.req.param('id'));
+      const r = await approveDraft(c.req.param('id'), {
+        resendKey: config.resend_api_key,
+        resendFrom: config.from_email,
+      });
       pushDrafts(config).catch(() => {});
       return c.json(r);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
     }
+  });
+
+  // Auto-send drafts toggle — read from .bm/drafts-settings.json. When
+  // true, draft_create immediately calls approveDraft instead of leaving
+  // the draft `pending`. UI exposes this as a single switch on /outreach.
+  app.get('/api/drafts/settings', async (c) => {
+    try {
+      const raw = await fs.readFile(path.join(getVaultRoot(), '.bm', 'drafts-settings.json'), 'utf-8');
+      return c.json(JSON.parse(raw));
+    } catch {
+      return c.json({ auto_send: false });
+    }
+  });
+  app.put('/api/drafts/settings', async (c) => {
+    const body = await c.req.json<{ auto_send?: boolean }>();
+    const next = { auto_send: body.auto_send === true };
+    await fs.mkdir(path.join(getVaultRoot(), '.bm'), { recursive: true });
+    await fs.writeFile(
+      path.join(getVaultRoot(), '.bm', 'drafts-settings.json'),
+      JSON.stringify(next, null, 2) + '\n',
+      'utf-8',
+    );
+    return c.json(next);
   });
   app.post('/api/drafts/:id/reject', async (c) => {
     try {
