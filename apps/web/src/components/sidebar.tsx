@@ -46,6 +46,9 @@ import {
   Activity,
   Radar,
   Send,
+  Brain,
+  Wrench,
+  ChevronRight,
   Search as SearchIcon,
   type LucideIcon,
 } from 'lucide-react';
@@ -307,26 +310,27 @@ export function Sidebar() {
           )}
         </div>
 
-        <NavRow icon={Inbox}           label="Inbox"     href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
-        <NavRow icon={LayoutDashboard} label="Dashboard" href="/dashboard" pathname={pathname} />
-        <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} />
-
-        <NavRow icon={Bot} label="Agents" href="/agents" pathname={pathname} live={liveAgentSlugs.size} />
+        <NavRow icon={Bot}             label="Agents"    href="/agents"    pathname={pathname} live={liveAgentSlugs.size} />
+        <NavRow icon={Inbox}           label="Desk"      href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
+        <NavRow icon={Building2}       label="Companies" href="/companies" pathname={pathname} />
+        <NavRow icon={Users}           label="Contacts"  href="/contacts"  pathname={pathname} />
+        <NavRow icon={Briefcase}       label="Deals"     href="/deals"     pathname={pathname} />
+        <NavRow icon={Activity}        label="Activity"  href="/runs"      pathname={pathname} live={liveRunCount} />
+        <NavRow icon={Send}            label="Outreach"  href="/sequences" pathname={pathname} />
 
         <SectionLabel>Intelligence</SectionLabel>
-        <NavRow icon={Zap}      label="Triggers"  href="/triggers"  pathname={pathname} />
-        <NavRow icon={History}  label="Runs"      href="/runs"      pathname={pathname} live={liveRunCount} />
-        <NavRow icon={Sparkles} label="Ontology"  href="/ontology"  pathname={pathname} />
+        <KnowledgeSidebarRow pathname={pathname} />
+        <NavRow icon={Brain}           label="Memory"    href="/memory"    pathname={pathname} />
+        <NavRow icon={BookOpen}        label="Skills"    href="/skills"    pathname={pathname} />
+        <NavRow icon={Zap}             label="Triggers"  href="/triggers"  pathname={pathname} />
+        <NavRow icon={Wrench}          label="Tools"     href="/integrations" pathname={pathname} />
+        <NavRow icon={LayoutDashboard} label="Dashboard" href="/dashboard" pathname={pathname} />
+        <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} />
+        <NavRow icon={Sparkles}        label="Ontology"  href="/ontology"  pathname={pathname} />
+        <NavRow icon={FileText}        label="Files"     href="/vault"     pathname={pathname} />
 
-        <SectionLabel>Vault</SectionLabel>
-        <NavRow icon={Building2} label="Companies" href="/companies" pathname={pathname} />
-        <NavRow icon={Users}     label="Contacts"  href="/contacts"  pathname={pathname} />
-        <NavRow icon={Briefcase} label="Deals"     href="/deals"     pathname={pathname} />
-        <NavRow icon={FileText}  label="Files"     href="/vault"     pathname={pathname} />
-
-        <SectionLabel>System</SectionLabel>
-        <NavRow icon={Plug}         label="Integrations" href="/integrations" pathname={pathname} />
-        <NavRow icon={SettingsIcon} label="Settings"     href="/settings"     pathname={pathname} />
+        <SectionLabel>Other</SectionLabel>
+        <NavRow icon={SettingsIcon} label="Account" href="/settings" pathname={pathname} />
       </nav>
 
       {/* Footer */}
@@ -360,6 +364,69 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-3 pt-4 pb-1 text-[10px] uppercase tracking-widest font-mono text-muted/70 dark:text-[#6B625C]/80 select-none">
       {children}
+    </div>
+  );
+}
+
+// Expandable Knowledge row — header navigates to /knowledge, chevron
+// reveals the four sub-tabs (General / ICPs / Funnel / Tags). Auto-
+// expands when you're already inside any /knowledge route.
+function KnowledgeSidebarRow({ pathname }: { pathname: string }) {
+  const inside = pathname.startsWith('/knowledge');
+  const [open, setOpen] = useState<boolean>(inside);
+  useEffect(() => { if (inside) setOpen(true); }, [inside]);
+  const subs = [
+    { href: '/knowledge', label: 'General' },
+    { href: '/knowledge/icps', label: 'ICPs' },
+    { href: '/knowledge/funnel', label: 'Funnel' },
+    { href: '/knowledge/tags', label: 'Tags' },
+  ];
+  return (
+    <div>
+      <div
+        className={
+          'flex items-center rounded-md ' +
+          (inside ? 'bg-white dark:bg-[#1F1B15]' : 'hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
+        }
+      >
+        <Link
+          href="/knowledge"
+          className="flex-1 flex items-center gap-2 px-2 py-1.5 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
+        >
+          <BookOpen className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
+          <span className="truncate">Knowledge</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-label={open ? 'Collapse Knowledge' : 'Expand Knowledge'}
+          className="px-1.5 py-1.5 text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]"
+        >
+          <ChevronRight className={'w-3 h-3 transition-transform ' + (open ? 'rotate-90' : '')} />
+        </button>
+      </div>
+      {open && (
+        <ul className="ml-5 pl-2 border-l border-line dark:border-[#2A241D] mt-0.5 mb-1 space-y-0.5">
+          {subs.map((s) => {
+            const active = pathname === s.href;
+            return (
+              <li key={s.href}>
+                <Link
+                  href={s.href}
+                  className={
+                    'block px-2 py-1 rounded-md text-[11.5px] truncate ' +
+                    (active
+                      ? 'text-flame font-semibold'
+                      : 'text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
+                  }
+                >
+                  {s.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

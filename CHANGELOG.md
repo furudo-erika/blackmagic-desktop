@@ -2,6 +2,38 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.44 — 2026-04-22
+
+### Changed
+- **Sidebar restructured Swan-style — flat data rows on top, an
+  Intelligence section in the middle, Other at the bottom.** Multi-
+  agent stays (still 11 agents under `Agents` row), but the chrome
+  around them now follows the canonical "data → intelligence →
+  account" grouping. Top group: `Chat` (collapsible), `Agents`,
+  `Desk` (was Inbox), `Companies`, `Contacts`, `Deals`, `Activity`
+  (was Runs), `Outreach`. Intelligence: `Knowledge` (expandable —
+  General / ICPs / Funnel / Tags), `Memory`, `Skills` (re-surfaced),
+  `Triggers`, `Tools` (was Integrations), `Dashboard`, `GEO`,
+  `Ontology`, `Files`. Other: `Account` (was Settings).
+
+### Added
+- **`/memory` page.** Single-textarea editor backed by `MEMORY.md` at
+  the vault root. Whatever you type lives in the project's memory and
+  is read by every agent at the start of every run — the per-project
+  sticky note. Dirty-state indicator + Save button; persists via the
+  existing readFile/writeFile daemon endpoints, no new API surface.
+- **`/knowledge` tabbed hub** (General / ICPs / Funnel / Tags). Each
+  tab is its own route so deep-links work. General lists the canonical
+  `us/` files (company profile, brand voice, product); ICPs links into
+  `us/market/icp.md` + personas; Funnel renders the eight default
+  stages with descriptions; Tags scans every company/contact/deal
+  frontmatter and rolls up `tags:` usage counts. Editing happens in
+  the Vault editor — these pages are navigation hubs, not mini-CMSes.
+- **Knowledge sidebar entry is expandable** with a chevron — click
+  the row to land on `/knowledge`, click the chevron to reveal the
+  four sub-tabs. Auto-expands when you're inside any `/knowledge/*`
+  route.
+
 ## 0.4.43 — 2026-04-22
 
 ### Changed
