@@ -16,7 +16,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   BookOpen,
@@ -310,8 +310,14 @@ export function Sidebar() {
           )}
         </div>
 
-        <NavRow icon={Bot}             label="Agents"    href="/agents"    pathname={pathname} live={liveAgentSlugs.size} />
+        <AgentsSidebarRow
+          pathname={pathname}
+          agents={teamAgents.data ?? []}
+          liveSlugs={liveAgentSlugs}
+        />
         <NavRow icon={Inbox}           label="Desk"      href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
+        <NavRow icon={LayoutDashboard} label="Dashboard" href="/dashboard" pathname={pathname} />
+        <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} />
         <NavRow icon={Building2}       label="Companies" href="/companies" pathname={pathname} />
         <NavRow icon={Users}           label="Contacts"  href="/contacts"  pathname={pathname} />
         <NavRow icon={Briefcase}       label="Deals"     href="/deals"     pathname={pathname} />
@@ -324,8 +330,6 @@ export function Sidebar() {
         <NavRow icon={BookOpen}        label="Skills"    href="/skills"    pathname={pathname} />
         <NavRow icon={Zap}             label="Triggers"  href="/triggers"  pathname={pathname} />
         <NavRow icon={Wrench}          label="Tools"     href="/integrations" pathname={pathname} />
-        <NavRow icon={LayoutDashboard} label="Dashboard" href="/dashboard" pathname={pathname} />
-        <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} />
         <NavRow icon={Sparkles}        label="Ontology"  href="/ontology"  pathname={pathname} />
         <NavRow icon={FileText}        label="Files"     href="/vault"     pathname={pathname} />
 
@@ -364,6 +368,94 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-3 pt-4 pb-1 text-[10px] uppercase tracking-widest font-mono text-muted/70 dark:text-[#6B625C]/80 select-none">
       {children}
+    </div>
+  );
+}
+
+// Expandable Agents row — header routes to /agents (which redirects
+// to your last-picked agent), chevron reveals every agent in the
+// vault. Click any sub-row to open a full-screen chat with that
+// agent. Auto-expands when you're inside /agents/*.
+function AgentsSidebarRow({
+  pathname,
+  agents,
+  liveSlugs,
+}: {
+  pathname: string;
+  agents: Array<{ slug: string; name: string; icon: string }>;
+  liveSlugs: Set<string>;
+}) {
+  const inside = pathname.startsWith('/agents');
+  const search = useSearchParams();
+  const activeSlug = search.get('slug') ?? '';
+  const [open, setOpen] = useState<boolean>(inside);
+  useEffect(() => { if (inside) setOpen(true); }, [inside]);
+  return (
+    <div>
+      <div
+        className={
+          'flex items-center rounded-md ' +
+          (inside ? 'bg-white dark:bg-[#1F1B15]' : 'hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
+        }
+      >
+        <Link
+          href="/agents"
+          className="flex-1 flex items-center gap-2 px-2 py-1.5 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
+        >
+          <Bot className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
+          <span className="truncate">Agents</span>
+          {liveSlugs.size > 0 && (
+            <span className="ml-auto text-[10px] font-mono text-flame">{liveSlugs.size}</span>
+          )}
+        </Link>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-label={open ? 'Collapse Agents' : 'Expand Agents'}
+          className="px-1.5 py-1.5 text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]"
+        >
+          <ChevronRight className={'w-3 h-3 transition-transform ' + (open ? 'rotate-90' : '')} />
+        </button>
+      </div>
+      {open && (
+        <ul className="ml-5 pl-2 border-l border-line dark:border-[#2A241D] mt-0.5 mb-1 space-y-0.5">
+          {agents.length === 0 && (
+            <li className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">no agents</li>
+          )}
+          {agents.map((a) => {
+            const Icon = AGENT_ICON_MAP[a.icon] ?? Bot;
+            const active = inside && activeSlug === a.slug;
+            const isLive = liveSlugs.has(a.slug.toLowerCase());
+            return (
+              <li key={a.slug}>
+                <Link
+                  href={`/agents?slug=${encodeURIComponent(a.slug)}`}
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem('bm-last-agent', a.slug);
+                    }
+                  }}
+                  className={
+                    'flex items-center gap-1.5 px-2 py-1 rounded-md text-[11.5px] truncate ' +
+                    (active
+                      ? 'bg-white dark:bg-[#1F1B15] text-ink dark:text-[#F5F1EA] font-semibold'
+                      : 'text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
+                  }
+                >
+                  <Icon className={'w-3 h-3 shrink-0 ' + (active ? 'text-flame' : 'text-muted dark:text-[#8C837C]')} />
+                  <span className="truncate flex-1">{a.name}</span>
+                  {isLive && (
+                    <span className="relative flex h-1.5 w-1.5 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-flame" />
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

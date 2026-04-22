@@ -2,6 +2,32 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.46 — 2026-04-22
+
+### Changed
+- **Agents row in the sidebar is now expandable; `/agents` is just a
+  full-screen chat.** The 2-pane "agent list left, chat right" page
+  felt like an extra step — the sidebar is already a list. Click the
+  Agents chevron to reveal every agent in the vault (icon + name +
+  live-pulse dot when running); click any sub-row to drop straight
+  into a full-width chat with that agent at `/agents?slug=<agent>`.
+  Bare `/agents` redirects to your last-picked agent (localStorage
+  `bm-last-agent`) or the first one. Active sub-row gets a flame
+  border like the rest of the active-state chrome. Auto-expands
+  whenever you're already inside `/agents/*`.
+- **Dashboard and GEO promoted out of the Intelligence section.**
+  They were sitting under Triggers/Memory/Skills which buried two
+  of the most-checked surfaces. Both rows now sit right under
+  `Desk` at the top of the nav so "what happened today?" is one
+  click from anywhere. Dashboard ↔ GEO tab strip stays.
+
+### Notes
+- Stayed on query strings (`?slug=`) instead of `/agents/[slug]` —
+  the app builds with Next static export, which requires
+  `generateStaticParams` for every dynamic segment, and an empty
+  list means the route doesn't render at all. Query params
+  sidestep that and deep-link the same way.
+
 ## 0.4.45 — 2026-04-22
 
 ### Fixed
