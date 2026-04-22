@@ -194,12 +194,27 @@ export default function SettingsPage() {
             </p>
           </Section>
 
-          <Section icon={KeyRound} title="Integration keys">
+          <Section icon={KeyRound} title="Integration keys (legacy)">
+            <div className="rounded-lg border border-flame/40 bg-flame/5 px-3 py-2.5 mb-3">
+              <div className="flex items-start gap-2 text-[12px] text-ink dark:text-[#F5F1EA]">
+                <span className="font-semibold shrink-0">Looking for Amazon SES, GSC, Ghost, WordPress, Unipile, Discord, Telegram, Notion, Linear, GitHub, Stripe, Cal.com, RB2B?</span>
+              </div>
+              <p className="text-[11px] text-muted dark:text-[#8C837C] mt-1">
+                Those are newer BYOK integrations and live in <strong>sidebar → Tools</strong>, not here. This panel is kept only for a handful of legacy config.toml keys that haven't been migrated yet (EnrichLayer, Apollo, Slack webhook, Resend, LinkedIn cookie, From email). Pasting keys in Tools also mirrors them to <code className="text-[11px]">{vault}/.env</code>.
+              </p>
+              <div className="mt-2">
+                <a
+                  href="/integrations"
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-flame text-flame hover:bg-flame hover:text-white transition-colors"
+                >
+                  Open Tools →
+                </a>
+              </div>
+            </div>
             <p className="text-[11px] text-muted dark:text-[#8C837C]">
-              Bring-your-own keys for EnrichLayer, Apify, HubSpot CRM, Slack,
-              Resend email and LinkedIn session cookie. Stored locally in{' '}
+              Legacy keys below are stored in{' '}
               <code className="text-[11px]">{vault}/.bm/config.toml</code> and
-              read directly by the built-in tools.
+              read directly by the built-in tools. For everything else, use Tools.
             </p>
             <div className="space-y-2">
               <div className="flex items-center gap-2">

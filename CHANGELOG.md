@@ -2,6 +2,23 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.62 — 2026-04-22
+
+### Fixed
+- **Settings → Integration keys now clearly points to Tools for the
+  newer BYOK integrations.** Users opening Settings looking for
+  Amazon SES / GSC / Ghost / WordPress / Unipile / Discord /
+  Telegram / Notion / Linear / GitHub / Stripe / Cal.com / RB2B
+  were finding an old `config.toml`-backed list of ~14 legacy keys
+  and asking "where's Amazon SES?". Added a flame-tinted callout at
+  the top of the legacy panel that names the missing providers
+  explicitly and ships a one-click "Open Tools →" button. Section
+  title renamed to "Integration keys (legacy)" so the split is
+  obvious at a glance. Nothing under the hood changed — the legacy
+  `config.toml` path still works for EnrichLayer / Apollo / Slack
+  webhook / Resend / From email / LinkedIn cookie. Everything else
+  belongs in Tools.
+
 ## 0.4.61 — 2026-04-22
 
 ### Added
