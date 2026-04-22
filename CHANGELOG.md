@@ -2,6 +2,30 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.37 — 2026-04-22
+
+### Changed
+- **Sidebar nav re-shaped: collapse the Team multi-row into a single
+  Agents entry, surface Ontology, demote Skills.** The previous nav
+  rendered every agent as its own sidebar row (10+ rows for a typical
+  GTM project), which dwarfed everything else and made the rest of
+  the app harder to scan. The Team section is gone — a single
+  `Agents` row replaces it and links to the existing `/agents`
+  directory page where you pick the one you want. The Work section
+  drops the `Skills` row entirely (skills are an internal capability
+  agents pull in during chat — exposing a top-level nav for them was
+  noise) and gains an `Ontology` row so the vault graph isn't hidden
+  behind ⌘K only. Triggers and Runs stay where they were. The
+  `/skills` route still exists for power users / debugging — just
+  not advertised in the sidebar or palette anymore.
+- **GEO is now a tab inside Dashboard.** The standalone `/geo` page
+  felt orphaned — Dashboard and GEO are both "what's happening across
+  my agents" surfaces. Both routes now share a tab strip
+  (`Runtimes / GEO`) in their PageHeader, so flipping between them is
+  one click and they read as one tabbed dashboard. The two routes
+  stay separate files (each is ~500 lines, the queries don't overlap)
+  but the user-visible shell ties them together.
+
 ## 0.4.36 — 2026-04-22
 
 ### Added

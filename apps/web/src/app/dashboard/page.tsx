@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Monitor, Cloud, FolderKanban, LayoutDashboard } from 'lucide-react';
 import { api } from '../../lib/api';
 import { PageShell, PageHeader, PageBody, Panel } from '../../components/ui/primitives';
+import { DashboardTabs } from '../../components/dashboard-tabs';
 
 type RuntimeRow = {
   id: string;
@@ -76,6 +77,7 @@ export default function DashboardPage() {
         title="Dashboard"
         subtitle="Runtimes, token usage, activity, and spend. Everything your agents did, by runtime."
         icon={LayoutDashboard}
+        trailing={<DashboardTabs />}
       />
       <PageBody maxWidth="5xl">
         <div className="grid grid-cols-[240px_1fr] gap-5">

@@ -230,29 +230,12 @@ export function Sidebar() {
         <NavRow icon={Inbox}           label="Inbox"     href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
         <NavRow icon={LayoutDashboard} label="Dashboard" href="/dashboard" pathname={pathname} />
 
-        {(teamAgents.data?.length ?? 0) > 0 && (
-          <>
-            <SectionLabel>Team</SectionLabel>
-            {(teamAgents.data ?? []).map((a) => {
-              const Icon = AGENT_ICON_MAP[a.icon] ?? Bot;
-              return (
-                <NavRow
-                  key={a.slug}
-                  icon={Icon}
-                  label={a.name}
-                  href={`/team?slug=${encodeURIComponent(a.slug)}`}
-                  pathname={pathname}
-                  breathing={liveAgentSlugs.has(a.slug.toLowerCase())}
-                />
-              );
-            })}
-          </>
-        )}
+        <NavRow icon={Bot} label="Agents" href="/agents" pathname={pathname} live={liveAgentSlugs.size} />
 
         <SectionLabel>Work</SectionLabel>
-        <NavRow icon={BookOpen} label="Skills" href="/skills" pathname={pathname} />
         <NavRow icon={Zap}      label="Triggers"  href="/triggers"  pathname={pathname} />
         <NavRow icon={History}  label="Runs"      href="/runs"      pathname={pathname} live={liveRunCount} />
+        <NavRow icon={Sparkles} label="Ontology"  href="/ontology"  pathname={pathname} />
 
         <SectionLabel>Vault</SectionLabel>
         <NavRow icon={Building2} label="Companies" href="/companies" pathname={pathname} />
@@ -418,9 +401,10 @@ function CommandPalette({
       { label: 'Contacts', href: '/contacts', hint: 'Vault — contacts' },
       { label: 'Deals', href: '/deals', hint: 'Vault — deals' },
       { label: 'Files', href: '/vault', hint: 'Vault — raw files' },
-      { label: 'Skills', href: '/skills', hint: 'automations — skills' },
+      { label: 'Agents', href: '/agents', hint: 'all agents in this project' },
       { label: 'Triggers', href: '/triggers', hint: 'automations — scheduled' },
-      { label: 'GEO', href: '/geo', hint: 'automations — GEO dashboard' },
+      { label: 'Ontology', href: '/ontology', hint: 'vault graph' },
+      { label: 'GEO', href: '/geo', hint: 'dashboard — GEO tab' },
       { label: 'Integrations', href: '/integrations', hint: 'connect third-party tools' },
       { label: 'Settings', href: '/settings', hint: 'vault path, model, keys' },
     ],
