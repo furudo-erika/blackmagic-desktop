@@ -2,6 +2,24 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.38 — 2026-04-22
+
+### Added
+- **`@`-mention and `/`-slash autocomplete in the chat composer.**
+  Typing `@` (or `/`) at the start of a token now opens a popover
+  above the textarea: `@` lists every agent in the active vault
+  (filtered as you type, name + slug), `/` lists slash commands
+  (`/clear` resets the local thread, `/agent` queues a switch,
+  `/skills` jumps to the skill catalog). ↑/↓ navigate, ↵ or Tab
+  selects, Esc cancels. Selecting a mention inserts `@<slug>` into
+  your message so the receiving agent can see who you wanted looped
+  in. Triggers only fire after whitespace or at start-of-line, so
+  email addresses and URLs don't accidentally pop the menu. Composer
+  placeholder updated to advertise both affordances. Previously the
+  chat surface was a plain textarea with zero hinting — typing `@`
+  did nothing visible, even though entity-comment composers had
+  supported mentions since 0.4.24.
+
 ## 0.4.37 — 2026-04-22
 
 ### Changed
