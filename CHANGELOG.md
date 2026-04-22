@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.53 — 2026-04-22
+
+### Added
+- **Hero illustration on the homepage.** Reused the retro-pixelated
+  volcano landscape from the marketing site (`03.webp`) — same
+  aesthetic as the rest of the brand, drops in cleanly above the
+  composer. 16:7 aspect, gradient mask blending into the page bg
+  at the bottom, "BlackMagic · control center" pill in the top-left
+  with a flame pulse dot. Static asset shipped in the desktop app's
+  `public/` so it loads from disk in Electron.
+
 ## 0.4.52 — 2026-04-22
 
 ### Changed
