@@ -176,7 +176,7 @@ export async function preflight(kind: 'agent' | 'skill', slug: string): Promise<
         kind: 'integration',
         provider: p,
         label: INTEGRATION_LABELS[p] ?? p,
-        hint: `Open sidebar → Tools → ${INTEGRATION_LABELS[p] ?? p}, paste your key.`,
+        hint: `Open sidebar → Integrations → ${INTEGRATION_LABELS[p] ?? p}, paste your key.`,
       });
     }
   }
@@ -189,7 +189,7 @@ export async function preflight(kind: 'agent' | 'skill', slug: string): Promise<
         kind: 'integration',
         provider: p,
         label: INTEGRATION_LABELS[p] ?? p,
-        hint: `Optional. Connect via sidebar → Tools → ${INTEGRATION_LABELS[p] ?? p} to unlock ${slug}'s extra capabilities.`,
+        hint: `Optional. Connect via sidebar → Integrations → ${INTEGRATION_LABELS[p] ?? p} to unlock ${slug}'s extra capabilities.`,
       });
     }
   }

@@ -2,7 +2,7 @@
 
 /**
  * Pre-flight modal — rendered before an agent or skill fires. Shows:
- *   - missing integrations → link to sidebar → Tools
+ *   - missing integrations → link to sidebar → Integrations
  *   - missing us/* files → one-shot "fill now" textarea
  *   - missing CLI tools → copy-pasteable install command
  *   - required + optional inputs → form fields

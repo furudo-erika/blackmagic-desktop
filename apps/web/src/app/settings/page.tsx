@@ -200,14 +200,14 @@ export default function SettingsPage() {
                 <span className="font-semibold shrink-0">Looking for Amazon SES, GSC, Ghost, WordPress, Unipile, Discord, Telegram, Notion, Linear, GitHub, Stripe, Cal.com, RB2B?</span>
               </div>
               <p className="text-[11px] text-muted dark:text-[#8C837C] mt-1">
-                Those are newer BYOK integrations and live in <strong>sidebar → Tools</strong>, not here. This panel is kept only for a handful of legacy config.toml keys that haven't been migrated yet (EnrichLayer, Apollo, Slack webhook, Resend, LinkedIn cookie, From email). Pasting keys in Tools also mirrors them to <code className="text-[11px]">{vault}/.env</code>.
+                Those are newer BYOK integrations and live in <strong>sidebar → Integrations</strong>, not here. This panel is kept only for a handful of legacy config.toml keys that haven't been migrated yet (EnrichLayer, Apollo, Slack webhook, Resend, LinkedIn cookie, From email). Pasting keys in Integrations also mirrors them to <code className="text-[11px]">{vault}/.env</code>.
               </p>
               <div className="mt-2">
                 <a
                   href="/integrations"
                   className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-flame text-flame hover:bg-flame hover:text-white transition-colors"
                 >
-                  Open Tools →
+                  Open Integrations →
                 </a>
               </div>
             </div>
@@ -399,12 +399,12 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-start gap-2">
                 <label className="w-36 mt-1.5 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
-                  LinkedIn cookie <span className="block text-[9px] normal-case tracking-normal text-flame mt-0.5">deprecated — use Tools → Unipile</span>
+                  LinkedIn cookie <span className="block text-[9px] normal-case tracking-normal text-flame mt-0.5">deprecated — use Integrations → Unipile</span>
                 </label>
                 <textarea
                   value={linkedinCookieDraft}
                   onChange={(e) => setLinkedinCookieDraft(e.target.value)}
-                  placeholder={intKeys.data?.linkedin_cookie ? '✓ SAVED · paste new li_at=… to rotate' : 'LEGACY — paste your li_at cookie here only if you cannot use Unipile. Prefer sidebar → Tools → Unipile for LinkedIn automation (stable, non-ToS-grey).'}
+                  placeholder={intKeys.data?.linkedin_cookie ? '✓ SAVED · paste new li_at=… to rotate' : 'LEGACY — paste your li_at cookie here only if you cannot use Unipile. Prefer sidebar → Integrations → Unipile for LinkedIn automation (stable, non-ToS-grey).'}
                   rows={2}
                   className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono resize-none"
                 />

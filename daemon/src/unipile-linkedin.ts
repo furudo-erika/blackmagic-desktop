@@ -48,7 +48,7 @@ export async function unipileRequest(
   if (!creds) {
     return {
       ok: false,
-      error: 'Unipile not connected. Open sidebar → Tools → Unipile, paste your API key + instance URL (https://api…unipile.com:…). Unipile pricing: https://www.unipile.com/pricing-api/.',
+      error: 'Unipile not connected. Open sidebar → Integrations → Unipile, paste your API key + instance URL (https://api…unipile.com:…). Unipile pricing: https://www.unipile.com/pricing-api/.',
     };
   }
   const url = `${creds.endpoint}${pathAndQuery.startsWith('/') ? '' : '/'}${pathAndQuery}`;

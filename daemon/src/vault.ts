@@ -1135,7 +1135,7 @@ Enrich the contact at \`{{contact_path}}\` using EnrichLayer.
    add one to frontmatter first".
 2. Call \`enrich_contact_linkedin({ linkedinUrl: <url> })\`. If the tool
    returns an \`error\` mentioning ENRICHLAYER_API_KEY, surface that
-   verbatim — the user has to paste their key in sidebar → Tools → Integration keys
+   verbatim — the user has to paste their key in sidebar → Integrations → Integration keys
    before this playbook works.
 3. Map the returned profile into frontmatter fields and write them back with
    \`edit_file\`. Specifically set (only if present in the response):
@@ -1920,7 +1920,7 @@ Heavy brand-monitor scan via Apify (Reddit + Twitter/X).
 - Confirm \`APIFY_API_TOKEN\` is reachable. If \`scrape_apify_actor\`
   returns an "APIFY_API_TOKEN not set" error on the first call, surface
   that verbatim and stop — the user has to paste their Apify token in
-  Tools → Apify before this skill can run.
+  Integrations → Apify before this skill can run.
 
 ## Steps
 
@@ -2225,7 +2225,7 @@ Discover LinkedIn KOLs in our category via Apify, score them
 shallow-to-deep, save to \`kol/discovered-<YYYY-MM-DD>.csv\`.
 
 ## Pre-flight
-- \`APIFY_API_TOKEN\` must be set (Tools → Apify).
+- \`APIFY_API_TOKEN\` must be set (Integrations → Apify).
 - If \`{{segment}}\` is empty, read category keywords from
   \`us/market/positioning.md\` frontmatter \`category:\` field.
 - If all category inputs are still seed templates, stop with a
@@ -2351,7 +2351,7 @@ zero/near-zero impressions — new content opportunity).
 
 ## Pre-flight
 - GSC integration connected (service-account JSON + site_url in
-  Tools → Google Search Console).
+  Integrations → Google Search Console).
 - \`us/market/keywords.md\` lists target keywords (one per line).
   If absent, work only from GSC data we observe.
 
@@ -3079,7 +3079,7 @@ Daily 09:00 brand monitor across Reddit + Twitter via Apify. Reads
 keywords from \`us/company.md\`. Writes \`signals/mentions/<date>.md\`.
 Notifies via every messaging integration the user has connected
 (Slack / Discord / Telegram / Feishu / Email). Enable after pasting
-\`APIFY_API_TOKEN\` in sidebar → Tools → Apify.
+\`APIFY_API_TOKEN\` in sidebar → Integrations → Apify.
 `,
   'apify-competitor-radar.md': `---
 kind: trigger

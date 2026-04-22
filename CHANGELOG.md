@@ -2,6 +2,29 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.63 — 2026-04-22
+
+### Fixed
+- **"Retry Send" → `500 fetch failed` on email drafts.** The daemon
+  runs inside Electron, whose fetch() occasionally gets intercepted
+  by Chromium's network stack (proxy / VPN auto-config / PAC files)
+  with no real underlying error — just a cryptic "fetch failed".
+  Standalone Node smoke tests worked, in-app sends didn't. Swapped
+  the Amazon SES call to use Node's native `https` module
+  end-to-end, which sidesteps the Chromium layer entirely. If the
+  request still fails it now surfaces the real reason (ENOTFOUND /
+  ETIMEDOUT / etc) instead of the generic message. Smoke-verified:
+  real AWS SES messageId returns through the new path.
+
+### Changed
+- **"Tools" sidebar row renamed back to "Integrations".** Was a
+  naming churn that left every error message and deep link
+  mismatched ("Tools → Amazon SES" vs a sidebar that said "Tools").
+  All 14 error strings across daemon + UI now say "Integrations".
+  Sidebar label, Integrations page title, Settings legacy-panel
+  callout, preflight modal copy — all match the actual page title
+  again.
+
 ## 0.4.62 — 2026-04-22
 
 ### Fixed

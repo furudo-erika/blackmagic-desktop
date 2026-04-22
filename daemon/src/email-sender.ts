@@ -14,8 +14,36 @@
 
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
+import https from 'node:https';
 import pathMod from 'node:path';
 import { getVaultRoot } from './paths.js';
+
+// Lightweight HTTPS POST via Node's native `https` — used instead of
+// fetch() for the AWS SES call because Electron's Chromium network
+// stack occasionally intercepts fetch with a "fetch failed" that has
+// no actual network error (proxy auto-config, corporate VPN shenanigans).
+// Using https directly keeps the request in pure Node space where it
+// behaves like the CLI smoke-test environment.
+function httpsPost(opts: { hostname: string; path: string; headers: Record<string, string>; body: string }): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: opts.hostname,
+        path: opts.path,
+        method: 'POST',
+        headers: { ...opts.headers, 'Content-Length': Buffer.byteLength(opts.body).toString() },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf-8') }));
+      },
+    );
+    req.on('error', (err) => reject(err));
+    req.write(opts.body);
+    req.end();
+  });
+}
 
 type SendResult =
   | { ok: true; provider: 'ses' | 'resend'; messageId?: string; from?: string }
@@ -154,20 +182,30 @@ async function sendViaSes(creds: any, args: EmailArgs): Promise<SendResult> {
     nowUtc: now,
   });
 
-  const res = await fetch(`https://${host}/v2/email/outbound-emails`, {
-    method: 'POST',
-    headers: { ...headers, Authorization: authHeader },
-    body,
-  });
-  const rtext = await res.text();
-  if (!res.ok) {
-    return { ok: false, error: `SES ${res.status}: ${rtext.slice(0, 300)}`, triedProviders: ['ses'] };
-  }
   try {
-    const data = JSON.parse(rtext) as { MessageId?: string };
-    return { ok: true, provider: 'ses', messageId: data.MessageId, from };
-  } catch {
-    return { ok: true, provider: 'ses', from };
+    const res = await httpsPost({
+      hostname: host,
+      path: '/v2/email/outbound-emails',
+      headers: { ...headers, Authorization: authHeader },
+      body,
+    });
+    if (res.status < 200 || res.status >= 300) {
+      return { ok: false, error: `SES ${res.status}: ${res.body.slice(0, 300)}`, triedProviders: ['ses'] };
+    }
+    try {
+      const data = JSON.parse(res.body) as { MessageId?: string };
+      return { ok: true, provider: 'ses', messageId: data.MessageId, from };
+    } catch {
+      return { ok: true, provider: 'ses', from };
+    }
+  } catch (err) {
+    const e = err as any;
+    const detail = e?.code || e?.errno || '';
+    return {
+      ok: false,
+      error: `SES network error: ${e?.message ?? 'request failed'}${detail ? ` (${detail})` : ''}. Check DNS / VPN — email.${region}.amazonaws.com must be reachable from this machine.`,
+      triedProviders: ['ses'],
+    };
   }
 }
 
@@ -223,7 +261,7 @@ export async function sendEmailViaBestProvider(
   if (tried.length === 0) {
     return {
       ok: false,
-      error: 'No email provider connected. Open the sidebar → Tools → Amazon SES and paste your credentials (access_key_id + secret_access_key + region + from). Also: bottom-left gear icon works to get there.',
+      error: 'No email provider connected. Open the sidebar → Integrations → Amazon SES and paste your credentials (access_key_id + secret_access_key + region + from). Also: bottom-left gear icon works to get there.',
       triedProviders: ['none-connected'],
     };
   }

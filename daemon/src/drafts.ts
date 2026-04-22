@@ -166,7 +166,7 @@ export async function approveDraft(
         accountId = items[0]?.id ?? items[0]?.account_id;
       }
       if (!accountId) {
-        const msg = 'No LinkedIn account connected in Unipile. Open sidebar → Tools → Unipile to link your LinkedIn account first.';
+        const msg = 'No LinkedIn account connected in Unipile. Open sidebar → Integrations → Unipile to link your LinkedIn account first.';
         await setDraftFrontmatter(id, { status: 'approved', last_error: msg });
         return { ok: false, error: msg, note: msg };
       }

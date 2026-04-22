@@ -329,7 +329,7 @@ export function Sidebar() {
         <NavRow icon={Brain}           label="Memory"    href="/memory"    pathname={pathname} />
         <NavRow icon={BookOpen}        label="Skills"    href="/skills"    pathname={pathname} />
         <NavRow icon={Zap}             label="Triggers"  href="/triggers"  pathname={pathname} />
-        <NavRow icon={Wrench}          label="Tools"     href="/integrations" pathname={pathname} />
+        <NavRow icon={Wrench}          label="Integrations" href="/integrations" pathname={pathname} />
         <NavRow icon={Sparkles}        label="Ontology"  href="/ontology"  pathname={pathname} />
         <NavRow icon={FileText}        label="Files"     href="/vault"     pathname={pathname} />
 
