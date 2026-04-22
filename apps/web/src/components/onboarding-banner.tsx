@@ -87,8 +87,21 @@ export function OnboardingBanner() {
 
   const agent = pinnedAgent.data;
   return (
-    <div className="shrink-0 border-b border-flame/20 bg-gradient-to-r from-flame/5 via-flame/10 to-flame/5 px-4 py-2">
-      <div className="max-w-6xl mx-auto flex items-center gap-3">
+    <div
+      className="shrink-0 border-b border-flame/20 bg-gradient-to-r from-flame/5 via-flame/10 to-flame/5 py-2 pr-4"
+      // macOS draggable region (so dragging the banner moves the
+      // window) + 80px left padding to clear the traffic-light
+      // controls on darwin. -webkit-app-region applies in Electron;
+      // the browser ignores it harmlessly.
+      style={{
+        WebkitAppRegion: 'drag',
+        paddingLeft: 'max(env(safe-area-inset-left), 88px)',
+      } as React.CSSProperties}
+    >
+      <div
+        className="max-w-6xl mx-auto flex items-center gap-3"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
         <AgentIcon slug={agent.slug} name={agent.name} size="sm" />
         <div className="flex-1 min-w-0 flex items-center gap-2 text-[12px]">
           <span className="font-semibold text-ink dark:text-[#F5F1EA]">Welcome —</span>

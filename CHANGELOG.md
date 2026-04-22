@@ -2,6 +2,21 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.51 — 2026-04-22
+
+### Fixed
+- **Onboarding announcement bar collided with the macOS traffic-light
+  buttons.** The banner from 0.4.49 rendered at the very top of the
+  `flex flex-col h-screen` shell with no left clearance, which on
+  darwin meant its agent icon and "Welcome —" text sat directly under
+  the red/yellow/green window controls — visually broken and you
+  couldn't click the controls without overshooting the banner. Banner
+  content now starts at `padding-left: max(env(safe-area-inset-left),
+  88px)` so the traffic lights have an unobstructed gutter, and the
+  banner's empty-region is marked `-webkit-app-region: drag` so the
+  cleared strip is a real macOS drag handle (interactive children
+  opt back out via `no-drag`).
+
 ## 0.4.50 — 2026-04-22
 
 ### Changed
