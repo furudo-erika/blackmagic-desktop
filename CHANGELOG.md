@@ -2,6 +2,29 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.39 — 2026-04-22
+
+### Changed
+- **/agents redesigned: clean directory cards, no internal leakage.**
+  The previous page dumped every implementation detail onto the
+  surface — model name (`gpt-5.3-codex`), temperature (`temp 0.3`),
+  the full tool list as chips (`read_file`, `write_file`, `edit_file`,
+  `list_dir`, `grep`, `web_fetch`, `web_search`, `enrich_company`,
+  `deep_research`, `geo_list_prompts`, `geo_add_prompt`, `+10`…),
+  raw "You are the AE (Deal Manager) agent. You manage `deals/`."
+  system-prompt prose, "edit .md" links, and a "last run —" footer.
+  All of that is removed. The page is now a 3-column responsive grid
+  of clean cards: a flame-tinted icon tile, the agent's name, a
+  one-sentence tagline (with the boilerplate `You are the X agent.`
+  prefix programmatically stripped before render), and a live-pulse
+  dot if a run is in flight. The whole card is the click target →
+  opens chat with that agent (`/?agent=<slug>`). Pinned agents
+  (frontmatter `pin: first`) float to the top, then alpha-sorted.
+  Power users who want the raw .md can still open it through
+  `/vault?path=agents/<slug>.md`. Subtitle on the page header
+  rewritten to user-facing language too — no more references to
+  "Role definitions under agents/".
+
 ## 0.4.38 — 2026-04-22
 
 ### Added

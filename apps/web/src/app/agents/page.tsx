@@ -1,36 +1,53 @@
 'use client';
 
 /**
- * /agents — one card per role .md under agents/.
+ * /agents — clean directory of agents in this project.
  *
- * Shows role description (frontmatter description or first line of body),
- * the tools chip list, and last-run time pulled from /api/agent/runs.
- * The "+ New agent" button scaffolds a starter .md and routes to the
- * vault editor; no separate dialog to maintain.
+ * Just enough to pick which agent to talk to. The card is the entire
+ * click target → opens chat with that agent. We deliberately don't
+ * render tool lists, model names, temperature, raw "You are the X…"
+ * system-prompt text, or .md edit links — that's all internal plumbing
+ * the user doesn't need to see (and shouldn't see) when picking an
+ * agent. Power users who want the raw .md can still open it from
+ * /vault?path=agents/<slug>.md.
  */
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Bot, Plus, Wrench, ExternalLink } from 'lucide-react';
-import { api } from '../../lib/api';
 import {
-  PageShell,
-  PageHeader,
-  Panel,
-  EmptyState,
-  Button,
-} from '../../components/ui/primitives';
+  Bot,
+  Plus,
+  Sparkles,
+  Search,
+  Briefcase,
+  Globe,
+  Linkedin,
+  CalendarClock,
+  Copy as CopyIcon,
+  RotateCcw,
+  Activity,
+  Radar,
+  Send,
+  type LucideIcon,
+} from 'lucide-react';
+import { api } from '../../lib/api';
+import { PageShell, PageHeader, EmptyState, Button } from '../../components/ui/primitives';
+
+// Same icon map the sidebar uses — agents declare `icon:` in frontmatter.
+const AGENT_ICON_MAP: Record<string, LucideIcon> = {
+  Bot, Globe, Linkedin, CalendarClock, Copy: CopyIcon, RotateCcw,
+  Activity, Radar, Search, Briefcase, Send, Sparkles,
+};
 
 type Agent = {
   path: string;
   name: string;
   slug: string;
-  description: string;
-  tools: string[];
-  temperature?: string;
-  model?: string;
+  icon: string;
+  tagline: string;
+  pinned: boolean;
 };
 
 function runStartedMs(runId: string): number | null {
@@ -43,13 +60,28 @@ function runStartedMs(runId: string): number | null {
   const t = Date.parse(`${m[1]}:${m[2]}:${m[3]}.${m[4]}Z`);
   return Number.isFinite(t) ? t : null;
 }
-function timeAgo(ms: number | null): string {
-  if (!ms) return '—';
-  const d = (Date.now() - ms) / 1000;
-  if (d < 60) return `${Math.floor(d)}s ago`;
-  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
-  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
-  return `${Math.floor(d / 86400)}d ago`;
+
+// Strip the boilerplate "You are the X agent." prefix and grab the first
+// natural-feeling sentence to show as a tagline. We never want raw
+// system-prompt phrasing on a user-facing card.
+function deriveTagline(fm: Record<string, unknown>, body: string, fallbackName: string): string {
+  const explicit =
+    (typeof fm.tagline === 'string' && fm.tagline) ||
+    (typeof fm.description === 'string' && fm.description) ||
+    '';
+  const candidate = explicit || body;
+  let text = candidate.trim();
+  // Drop any leading markdown header line.
+  text = text.replace(/^#+\s.*$/m, '').trim();
+  // Drop "You are the X agent." / "You are X." style leads.
+  text = text.replace(/^You\s+(are|own)\s+(the\s+)?[^.]*\.\s*/i, '');
+  // Drop "Your job is to …" style leads.
+  text = text.replace(/^Your\s+(job|role|task)\s+is\s+to\s+/i, '');
+  const firstSentence = text.split(/(?<=[.?!])\s+/)[0] ?? '';
+  const trimmed = firstSentence.replace(/[`*_#]/g, '').trim();
+  if (trimmed.length > 0 && trimmed.length < 180) return trimmed;
+  // Fallback: just say what we know without leaking prompt internals.
+  return `${fallbackName} agent`;
 }
 
 const STARTER_AGENT = `---
@@ -71,9 +103,6 @@ prompt the model will see. Reference files with wikilinks: [[us/CLAUDE.md]].
 
 export default function AgentsPage() {
   const router = useRouter();
-  // Inline "new agent" form. We used window.prompt() here but Electron
-  // disables it in packaged builds, so the button looked broken with no
-  // feedback (QA BUG-008).
   const [showNew, setShowNew] = useState(false);
   const [newSlug, setNewSlug] = useState('');
   const [newErr, setNewErr] = useState<string | null>(null);
@@ -85,46 +114,43 @@ export default function AgentsPage() {
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
       );
-      return Promise.all(
+      const rows = await Promise.all(
         files.map(async (f) => {
           const r = await api.readFile(f.path);
-          const fm = r.frontmatter;
+          const fm = (r.frontmatter ?? {}) as Record<string, unknown>;
           const slug = f.path.replace(/^agents\//, '').replace(/\.md$/, '');
-          const toolsRaw = Array.isArray(fm.tools) ? (fm.tools as unknown[]) : [];
-          const tools = toolsRaw.map((t) => String(t));
-          const description =
-            (typeof fm.description === 'string' && fm.description) ||
-            (typeof fm.role === 'string' && (fm.role as string)) ||
-            r.body.trim().split('\n').find((l) => l.trim().length > 0)?.replace(/^#+\s*/, '') ||
-            '';
+          const name = String(fm.name ?? slug);
           return {
             path: f.path,
-            name: String(fm.name ?? slug),
+            name,
             slug,
-            description,
-            tools,
-            temperature: fm.temperature !== undefined ? String(fm.temperature) : undefined,
-            model: typeof fm.model === 'string' ? (fm.model as string) : undefined,
+            icon: typeof fm.icon === 'string' ? fm.icon : 'Bot',
+            tagline: deriveTagline(fm, r.body, name),
+            pinned: String(fm.pin ?? '') === 'first',
           };
         }),
       );
+      // Pinned agents float to the top, then alpha by name.
+      rows.sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+      return rows;
     },
   });
 
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.listRuns, refetchInterval: 30_000 });
 
-  const lastRunByAgent = useMemo(() => {
-    const map = new Map<string, { runId: string; startedMs: number }>();
+  const liveSlugs = useMemo(() => {
+    const set = new Set<string>();
     for (const r of runs.data?.runs ?? []) {
-      const t = runStartedMs(r.runId) ?? 0;
-      const key = (r.agent ?? '').toLowerCase();
-      if (!key) continue;
-      const existing = map.get(key);
-      if (!existing || existing.startedMs < t) {
-        map.set(key, { runId: r.runId, startedMs: t });
-      }
+      if (r.done) continue;
+      const t = runStartedMs(r.runId);
+      if (t == null || Date.now() - t > 5 * 60_000) continue;
+      const slug = (r.agent ?? '').toLowerCase();
+      if (slug) set.add(slug);
     }
-    return map;
+    return set;
   }, [runs.data]);
 
   async function createAgent() {
@@ -152,7 +178,7 @@ export default function AgentsPage() {
     <PageShell>
       <PageHeader
         title="Agents"
-        subtitle="Role definitions under agents/. Each .md is a system prompt the LLM sees. The researcher, writer, and pipeline-analyst live here."
+        subtitle="Pick an agent to chat with. Each one knows your project and can call the right tools on its own."
         icon={Bot}
         trailing={
           <Button variant="primary" onClick={() => setShowNew(true)}>
@@ -165,7 +191,7 @@ export default function AgentsPage() {
           {showNew && (
             <form
               onSubmit={(e) => { e.preventDefault(); createAgent(); }}
-              className="mb-4 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4 flex items-center gap-2"
+              className="mb-5 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4 flex items-center gap-2"
             >
               <label className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C] shrink-0">
                 slug
@@ -182,6 +208,7 @@ export default function AgentsPage() {
               {newErr && <span className="text-[11px] text-flame">{newErr}</span>}
             </form>
           )}
+
           {agents.isLoading && <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>}
           {agents.error && <div className="text-sm text-flame">{(agents.error as Error).message}</div>}
 
@@ -199,80 +226,46 @@ export default function AgentsPage() {
           )}
 
           {list.length > 0 && (
-            <>
-              <div className="mb-4 text-[11px] font-mono text-muted dark:text-[#8C837C]">
-                {list.length} agent{list.length === 1 ? '' : 's'}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {list.map((a) => {
-                  const last = lastRunByAgent.get(a.slug.toLowerCase()) ?? lastRunByAgent.get(a.name.toLowerCase());
-                  const isLive = !!last && Date.now() - last.startedMs < 5 * 60_000;
-                  return (
-                    <Panel key={a.path}>
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={
-                                'inline-block w-1.5 h-1.5 rounded-full shrink-0 ' +
-                                (isLive ? 'bg-flame animate-pulse' : 'bg-muted/40 dark:bg-[#8C837C]/40')
-                              }
-                            />
-                            <span className="text-sm font-semibold text-ink dark:text-[#F5F1EA] truncate">
-                              {a.name}
-                            </span>
-                            {a.model && (
-                              <span className="text-[10px] font-mono text-muted dark:text-[#8C837C] truncate">
-                                {a.model}
-                              </span>
-                            )}
-                          </div>
-                          {a.description && (
-                            <p className="mt-1 text-[12px] text-muted dark:text-[#8C837C] line-clamp-2">
-                              {a.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {a.tools.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {a.tools.slice(0, 10).map((t) => (
-                            <span
-                              key={t}
-                              className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border border-line dark:border-[#2A241D] text-muted dark:text-[#8C837C]"
-                            >
-                              <Wrench className="w-2.5 h-2.5" /> {t}
-                            </span>
-                          ))}
-                          {a.tools.length > 10 && (
-                            <span className="text-[10px] font-mono text-muted dark:text-[#8C837C]">
-                              +{a.tools.length - 10}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="mt-3 pt-3 border-t border-line dark:border-[#2A241D] flex items-center justify-between text-[11px] text-muted dark:text-[#8C837C]">
-                        <span className="font-mono truncate">
-                          {a.temperature != null && `temp ${a.temperature} · `}
-                          last run {timeAgo(last?.startedMs ?? null)}
-                        </span>
-                        <Link
-                          href={`/vault?path=${encodeURIComponent(a.path)}`}
-                          className="inline-flex items-center gap-1 text-[11px] text-muted dark:text-[#8C837C] hover:text-flame"
-                        >
-                          <ExternalLink className="w-3 h-3" /> edit .md
-                        </Link>
-                      </div>
-                    </Panel>
-                  );
-                })}
-              </div>
-            </>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {list.map((a) => (
+                <AgentCard key={a.path} agent={a} live={liveSlugs.has(a.slug.toLowerCase())} />
+              ))}
+            </div>
           )}
         </div>
       </div>
     </PageShell>
+  );
+}
+
+function AgentCard({ agent, live }: { agent: Agent; live: boolean }) {
+  const Icon = AGENT_ICON_MAP[agent.icon] ?? Bot;
+  return (
+    <Link
+      href={`/?agent=${encodeURIComponent(agent.slug)}`}
+      className="group relative flex flex-col gap-3 rounded-xl border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] p-4 hover:border-flame/50 hover:shadow-sm transition-all"
+    >
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-flame/10 group-hover:bg-flame/20 transition-colors">
+          <Icon className="w-5 h-5 text-flame" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-[14px] font-semibold text-ink dark:text-[#F5F1EA] truncate group-hover:text-flame transition-colors">
+              {agent.name}
+            </h3>
+            {live && (
+              <span className="relative flex h-2 w-2 shrink-0" aria-label="live">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-flame" />
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-[12px] text-muted dark:text-[#8C837C] line-clamp-2 leading-snug">
+            {agent.tagline}
+          </p>
+        </div>
+      </div>
+    </Link>
   );
 }
