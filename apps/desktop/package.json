@@ -1,6 +1,6 @@
 {
   "name": "@bm/desktop",
-  "version": "0.4.49",
+  "version": "0.4.50",
   "private": true,
   "main": "src/main.cjs",
   "scripts": {

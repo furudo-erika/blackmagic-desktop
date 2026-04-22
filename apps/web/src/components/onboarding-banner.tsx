@@ -89,7 +89,7 @@ export function OnboardingBanner() {
   return (
     <div className="shrink-0 border-b border-flame/20 bg-gradient-to-r from-flame/5 via-flame/10 to-flame/5 px-4 py-2">
       <div className="max-w-6xl mx-auto flex items-center gap-3">
-        <AgentIcon slug={agent.slug} size="sm" />
+        <AgentIcon slug={agent.slug} name={agent.name} size="sm" />
         <div className="flex-1 min-w-0 flex items-center gap-2 text-[12px]">
           <span className="font-semibold text-ink dark:text-[#F5F1EA]">Welcome —</span>
           <span className="text-ink/80 dark:text-[#E6E0D8] truncate">

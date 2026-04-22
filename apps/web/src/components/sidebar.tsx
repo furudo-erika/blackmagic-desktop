@@ -444,7 +444,7 @@ function AgentsSidebarRow({
                   }
                 >
                   {hasAgentTheme(a.slug) ? (
-                    <AgentIcon slug={a.slug} size="sm" className="!w-4 !h-4" />
+                    <AgentIcon slug={a.slug} name={a.name} size="sm" className="!w-4 !h-4" />
                   ) : (
                     <FallbackIcon className={'w-3 h-3 shrink-0 ' + (active ? 'text-flame' : 'text-muted dark:text-[#8C837C]')} />
                   )}

@@ -2,6 +2,22 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.50 — 2026-04-22
+
+### Changed
+- **Agent icons redesigned Vercel-style.** Dropped the gradient
+  tile + hand-drawn glyph from 0.4.49 — too busy. Replaced with the
+  Vercel/Linear/Resend project-tile pattern: a neutral surface
+  (cream or `#1F1B15` per theme) with a thin subtle border, a
+  Vercel-signature 1px inset top sheen, and a bold 1–2 letter
+  monogram in a single per-agent accent color. "Company Profiler"
+  → `CP` in amber, "GEO Analyst" → `GA` in flame, "Researcher" →
+  `R` in blue, etc. No SVG paths to maintain, perfect typography
+  alignment, and a row of 11 agents now reads as 11 distinct,
+  legible tiles instead of a kindergarten sticker book. Used
+  everywhere the old icon component was — sidebar Agents sub-rows,
+  chat gallery cards, /agents hero, onboarding banner.
+
 ## 0.4.49 — 2026-04-22
 
 ### Added

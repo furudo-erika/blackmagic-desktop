@@ -278,7 +278,7 @@ function AgentsInner() {
       <header className="shrink-0 border-b border-line dark:border-[#2A241D] px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-start gap-3">
           {hasAgentTheme(agent.slug) ? (
-            <AgentIcon slug={agent.slug} size="lg" />
+            <AgentIcon slug={agent.slug} name={agent.name} size="lg" />
           ) : (
             <div className="w-11 h-11 rounded-xl bg-flame/10 border border-flame/20 flex items-center justify-center shrink-0">
               <FallbackIcon className="w-5 h-5 text-flame" />

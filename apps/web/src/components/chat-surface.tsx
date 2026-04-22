@@ -681,7 +681,7 @@ export function ChatSurface({
                         }
                       >
                         <div className="flex items-start gap-2.5">
-                          <AgentIcon slug={a.slug} size="md" />
+                          <AgentIcon slug={a.slug} name={a.name} size="md" />
                           <div className="min-w-0 flex-1">
                             <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{a.name}</div>
                           </div>
