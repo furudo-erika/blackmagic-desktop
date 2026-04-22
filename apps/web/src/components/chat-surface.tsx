@@ -20,7 +20,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Send, Bot, Check, Loader2, AlertCircle, Copy as CopyIcon, ExternalLink, Sparkles,
+  Send, Bot, Check, Loader2, AlertCircle, Copy as CopyIcon, Sparkles,
   // Per-agent icons — matches the slugs seeded in daemon/src/vault.ts.
   Search, Briefcase, Globe, Linkedin, CalendarClock, Copy as CopyTwin, RotateCcw,
   Activity, Radar, type LucideIcon,
@@ -212,14 +212,18 @@ export function ChatSurface({
   const [activity, setActivity] = useState<ActivityItem[]>([]);
 
   // Home page composer hands off via `bm-pending-prompt` localStorage.
-  // Pull it on mount, prefill the input, clear the slot. Doesn't auto-
-  // send so the user can edit + pick an agent before firing.
+  // Pull it on mount and auto-send — the user already pressed Send on
+  // the home composer, so stopping at a prefilled input and making
+  // them press Send *again* felt broken (see bug report 0.4.49). The
+  // value is captured into a stable pendingAutoSend ref and consumed
+  // once the chat is fully mounted (thread hydrated, sendMut ready).
+  const pendingAutoSendRef = useRef<string | null>(null);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const pending = window.localStorage.getItem('bm-pending-prompt');
     if (pending) {
       window.localStorage.removeItem('bm-pending-prompt');
-      setInput(pending);
+      pendingAutoSendRef.current = pending;
     }
   }, []);
 
@@ -606,6 +610,22 @@ export function ChatSurface({
     sendMut.mutate(next);
   }
 
+  // Consume the pending home-page prompt once the component is fully
+  // mounted and idle. Deferred to an effect so it runs after thread
+  // hydration (which may setMessages([]) on mount) settles.
+  useEffect(() => {
+    const pending = pendingAutoSendRef.current;
+    if (!pending) return;
+    if (sendMut.isPending) return;
+    pendingAutoSendRef.current = null;
+    // One tick of defer lets loadThread's setMessages([]) commit first,
+    // otherwise the user message gets wiped and the gallery sticks
+    // around next to the Thinking... bubble (the original bug).
+    const t = setTimeout(() => send(pending), 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveThreadKey]);
+
   return (
     <div
       className={
@@ -659,7 +679,7 @@ export function ChatSurface({
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        {messages.length === 0 && (
+        {messages.length === 0 && !sendMut.isPending && (
           <div className="max-w-5xl mx-auto py-6 space-y-8">
             {/* Onboarding nudge moved to a global app-shell banner
                 (see components/onboarding-banner.tsx) so it shows up
@@ -973,14 +993,6 @@ function MessageFooter({ content }: { content: string }) {
       setTimeout(() => setCopied(false), 1200);
     } catch {}
   }
-  function onView() {
-    try {
-      const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    } catch {}
-  }
   return (
     <div className="mt-3 pt-2 border-t border-line/60 dark:border-[#2A241D]/60 flex items-center gap-3 text-[11px] text-muted dark:text-[#8C837C]">
       <button
@@ -990,14 +1002,6 @@ function MessageFooter({ content }: { content: string }) {
       >
         <CopyIcon className="w-3 h-3" />
         {copied ? 'Copied' : 'Copy'}
-      </button>
-      <button
-        type="button"
-        onClick={onView}
-        className="inline-flex items-center gap-1 hover:text-flame transition-colors"
-      >
-        <ExternalLink className="w-3 h-3" />
-        View as Markdown
       </button>
     </div>
   );

@@ -2,6 +2,29 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.57 — 2026-04-22
+
+### Fixed
+- **Home composer Send now actually runs the prompt instead of just
+  navigating to /chat.** The home page stashed the typed prompt into
+  `localStorage.bm-pending-prompt` and pushed the user to `/chat` —
+  but ChatSurface only *prefilled* the input, leaving the user to
+  press Send a second time. Chat now consumes the pending prompt via
+  a ref, defers one tick so thread-hydration's `setMessages([])`
+  commits first, then auto-fires `send()`. User clicks Send once,
+  the query actually runs.
+- **Agent gallery no longer bleeds through while a run is in flight.**
+  The empty-state gallery was gated only on `messages.length === 0`,
+  so the brief window between "user message committed" and "thread
+  hydration reset" could leave it rendering next to the Thinking…
+  bubble (visible in bug screenshot). Added `!sendMut.isPending` to
+  the gate — a live run always wins the empty-state.
+
+### Removed
+- **"View as Markdown" link on assistant replies.** Copy stays; the
+  blob-URL open-in-new-tab was noise. Dropped `ExternalLink` import
+  alongside.
+
 ## 0.4.56 — 2026-04-22
 
 ### Fixed
