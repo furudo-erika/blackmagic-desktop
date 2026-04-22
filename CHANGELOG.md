@@ -2,6 +2,22 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.40 — 2026-04-22
+
+### Changed
+- **/agents is now a split-pane workspace, not a directory dead-end.**
+  The previous design was a grid of cards where every click did nothing
+  but bounce you to `/?agent=<slug>` — a wasted page load and a wasted
+  scroll. The page now mounts as `[ agent list (240px) | ChatSurface ]`:
+  pick an agent on the left, chat with it on the right, no navigation
+  in between. Each row gets a small icon, the name, and a live-pulse
+  dot if the agent has a run in flight; the search input filters in
+  place. `?slug=<agent>` deep-links the selection. `+ New agent`
+  collapses into a tiny inline form on the left rail. The chat surface
+  on the right is the same `ChatSurface` component as `/`, so the
+  `@`-mention popover, `/`-slash commands, and per-agent thread
+  history (`bm-team-thread-<slug>`) all carry over.
+
 ## 0.4.39 — 2026-04-22
 
 ### Changed

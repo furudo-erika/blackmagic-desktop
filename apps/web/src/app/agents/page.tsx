@@ -1,41 +1,29 @@
 'use client';
 
 /**
- * /agents — clean directory of agents in this project.
+ * /agents — split-pane agents workspace.
  *
- * Just enough to pick which agent to talk to. The card is the entire
- * click target → opens chat with that agent. We deliberately don't
- * render tool lists, model names, temperature, raw "You are the X…"
- * system-prompt text, or .md edit links — that's all internal plumbing
- * the user doesn't need to see (and shouldn't see) when picking an
- * agent. Power users who want the raw .md can still open it from
- * /vault?path=agents/<slug>.md.
+ *   [ agents list (240px) | ChatSurface ]
+ *
+ * Pick an agent on the left, chat with it on the right. No navigation
+ * between picking and using — the chat surface mounts inline with the
+ * selected agent's threadKey. Replaces the old directory-of-cards page
+ * which forced a click → page-jump → chat round-trip and dumped a bunch
+ * of useless prompt prose along the way. URL state in `?slug=` so the
+ * choice deep-links.
  */
 
-import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Bot,
-  Plus,
-  Sparkles,
-  Search,
-  Briefcase,
-  Globe,
-  Linkedin,
-  CalendarClock,
-  Copy as CopyIcon,
-  RotateCcw,
-  Activity,
-  Radar,
-  Send,
+  Bot, Plus, Sparkles, Search, Briefcase, Globe, Linkedin,
+  CalendarClock, Copy as CopyIcon, RotateCcw, Activity, Radar, Send,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../../lib/api';
-import { PageShell, PageHeader, EmptyState, Button } from '../../components/ui/primitives';
+import { ChatSurface } from '../../components/chat-surface';
 
-// Same icon map the sidebar uses — agents declare `icon:` in frontmatter.
 const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   Bot, Globe, Linkedin, CalendarClock, Copy: CopyIcon, RotateCcw,
   Activity, Radar, Search, Briefcase, Send, Sparkles,
@@ -43,46 +31,11 @@ const AGENT_ICON_MAP: Record<string, LucideIcon> = {
 
 type Agent = {
   path: string;
-  name: string;
   slug: string;
+  name: string;
   icon: string;
-  tagline: string;
   pinned: boolean;
 };
-
-function runStartedMs(runId: string): number | null {
-  if (runId.startsWith('codex-')) {
-    const ms = Number(runId.slice('codex-'.length));
-    return Number.isFinite(ms) ? ms : null;
-  }
-  const m = runId.match(/^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z/);
-  if (!m) return null;
-  const t = Date.parse(`${m[1]}:${m[2]}:${m[3]}.${m[4]}Z`);
-  return Number.isFinite(t) ? t : null;
-}
-
-// Strip the boilerplate "You are the X agent." prefix and grab the first
-// natural-feeling sentence to show as a tagline. We never want raw
-// system-prompt phrasing on a user-facing card.
-function deriveTagline(fm: Record<string, unknown>, body: string, fallbackName: string): string {
-  const explicit =
-    (typeof fm.tagline === 'string' && fm.tagline) ||
-    (typeof fm.description === 'string' && fm.description) ||
-    '';
-  const candidate = explicit || body;
-  let text = candidate.trim();
-  // Drop any leading markdown header line.
-  text = text.replace(/^#+\s.*$/m, '').trim();
-  // Drop "You are the X agent." / "You are X." style leads.
-  text = text.replace(/^You\s+(are|own)\s+(the\s+)?[^.]*\.\s*/i, '');
-  // Drop "Your job is to …" style leads.
-  text = text.replace(/^Your\s+(job|role|task)\s+is\s+to\s+/i, '');
-  const firstSentence = text.split(/(?<=[.?!])\s+/)[0] ?? '';
-  const trimmed = firstSentence.replace(/[`*_#]/g, '').trim();
-  if (trimmed.length > 0 && trimmed.length < 180) return trimmed;
-  // Fallback: just say what we know without leaking prompt internals.
-  return `${fallbackName} agent`;
-}
 
 const STARTER_AGENT = `---
 name: "new-agent"
@@ -101,14 +54,28 @@ Describe the role in more detail here. This markdown body is the system
 prompt the model will see. Reference files with wikilinks: [[us/CLAUDE.md]].
 `;
 
-export default function AgentsPage() {
+function runStartedMs(runId: string): number | null {
+  if (runId.startsWith('codex-')) {
+    const ms = Number(runId.slice('codex-'.length));
+    return Number.isFinite(ms) ? ms : null;
+  }
+  const m = runId.match(/^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z/);
+  if (!m) return null;
+  const t = Date.parse(`${m[1]}:${m[2]}:${m[3]}.${m[4]}Z`);
+  return Number.isFinite(t) ? t : null;
+}
+
+function AgentsInner() {
   const router = useRouter();
+  const params = useSearchParams();
+  const selectedSlug = params.get('slug') ?? '';
+  const [filter, setFilter] = useState('');
   const [showNew, setShowNew] = useState(false);
   const [newSlug, setNewSlug] = useState('');
   const [newErr, setNewErr] = useState<string | null>(null);
 
   const agents = useQuery({
-    queryKey: ['agents'],
+    queryKey: ['agents-list-pane'],
     queryFn: async (): Promise<Agent[]> => {
       const tree = await api.vaultTree();
       const files = tree.tree.filter(
@@ -119,18 +86,15 @@ export default function AgentsPage() {
           const r = await api.readFile(f.path);
           const fm = (r.frontmatter ?? {}) as Record<string, unknown>;
           const slug = f.path.replace(/^agents\//, '').replace(/\.md$/, '');
-          const name = String(fm.name ?? slug);
           return {
             path: f.path,
-            name,
             slug,
+            name: String(fm.name ?? slug),
             icon: typeof fm.icon === 'string' ? fm.icon : 'Bot',
-            tagline: deriveTagline(fm, r.body, name),
             pinned: String(fm.pin ?? '') === 'first',
           };
         }),
       );
-      // Pinned agents float to the top, then alpha by name.
       rows.sort((a, b) => {
         if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
         return a.name.localeCompare(b.name);
@@ -140,7 +104,6 @@ export default function AgentsPage() {
   });
 
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.listRuns, refetchInterval: 30_000 });
-
   const liveSlugs = useMemo(() => {
     const set = new Set<string>();
     for (const r of runs.data?.runs ?? []) {
@@ -153,11 +116,26 @@ export default function AgentsPage() {
     return set;
   }, [runs.data]);
 
+  const list = agents.data ?? [];
+  const q = filter.trim().toLowerCase();
+  const filtered = q
+    ? list.filter((a) => a.slug.toLowerCase().includes(q) || a.name.toLowerCase().includes(q))
+    : list;
+
+  // Auto-select first agent if nothing's selected.
+  useEffect(() => {
+    if (!selectedSlug && filtered[0]) {
+      router.replace(`/agents?slug=${encodeURIComponent(filtered[0].slug)}`);
+    }
+  }, [selectedSlug, filtered, router]);
+
+  const selected = filtered.find((a) => a.slug === selectedSlug) ?? filtered[0];
+
   async function createAgent() {
     setNewErr(null);
     const slug = newSlug.trim().replace(/[^a-z0-9-]/gi, '-').toLowerCase();
     if (!slug) {
-      setNewErr('Pick a slug (letters, digits, dashes).');
+      setNewErr('letters/digits/dashes only');
       return;
     }
     const path = `agents/${slug}.md`;
@@ -168,104 +146,119 @@ export default function AgentsPage() {
       setNewSlug('');
       router.push(`/vault?path=${encodeURIComponent(path)}`);
     } catch (e) {
-      setNewErr((e as Error).message || 'failed to create agent');
+      setNewErr((e as Error).message || 'failed');
     }
   }
 
-  const list = agents.data ?? [];
-
   return (
-    <PageShell>
-      <PageHeader
-        title="Agents"
-        subtitle="Pick an agent to chat with. Each one knows your project and can call the right tools on its own."
-        icon={Bot}
-        trailing={
-          <Button variant="primary" onClick={() => setShowNew(true)}>
-            <Plus className="w-3 h-3" /> New agent
-          </Button>
-        }
-      />
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="max-w-5xl mx-auto">
+    <div className="h-full flex bg-cream dark:bg-[#0F0D0A] min-h-0">
+      {/* Left: agent list */}
+      <aside className="w-[240px] shrink-0 border-r border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] flex flex-col min-h-0">
+        <div className="px-3 py-3 border-b border-line dark:border-[#2A241D]">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Bot className="w-4 h-4 text-flame" />
+            <h1 className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] flex-1">Agents</h1>
+            <button
+              type="button"
+              onClick={() => setShowNew((v) => !v)}
+              title="New agent"
+              className="w-5 h-5 rounded hover:bg-white dark:hover:bg-[#1F1B15] flex items-center justify-center"
+            >
+              <Plus className="w-3.5 h-3.5 text-muted dark:text-[#8C837C]" />
+            </button>
+          </div>
+          <div className="relative">
+            <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted dark:text-[#8C837C]" />
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter…"
+              className="w-full bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md pl-6 pr-2 py-1 text-[11px] text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+            />
+          </div>
           {showNew && (
             <form
               onSubmit={(e) => { e.preventDefault(); createAgent(); }}
-              className="mb-5 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4 flex items-center gap-2"
+              className="mt-2 flex flex-col gap-1"
             >
-              <label className="text-[10px] uppercase tracking-widest font-mono text-muted dark:text-[#8C837C] shrink-0">
-                slug
-              </label>
               <input
                 autoFocus
                 value={newSlug}
                 onChange={(e) => setNewSlug(e.target.value)}
-                placeholder="my-agent"
-                className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-3 py-1.5 text-sm font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+                placeholder="slug"
+                className="w-full bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-flame"
               />
-              <Button variant="primary" onClick={createAgent}>Create</Button>
-              <Button variant="ghost" onClick={() => { setShowNew(false); setNewErr(null); setNewSlug(''); }}>Cancel</Button>
-              {newErr && <span className="text-[11px] text-flame">{newErr}</span>}
+              {newErr && <span className="text-[10px] text-flame">{newErr}</span>}
+              <div className="flex gap-1">
+                <button type="submit" className="flex-1 bg-flame text-white text-[11px] py-1 rounded">Create</button>
+                <button type="button" onClick={() => { setShowNew(false); setNewErr(null); setNewSlug(''); }} className="flex-1 text-[11px] py-1 rounded border border-line dark:border-[#2A241D]">Cancel</button>
+              </div>
             </form>
           )}
-
-          {agents.isLoading && <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>}
-          {agents.error && <div className="text-sm text-flame">{(agents.error as Error).message}</div>}
-
-          {!agents.isLoading && list.length === 0 && (
-            <EmptyState
-              icon={Bot}
-              title="No agents yet."
-              hint="Drop a *.md file in agents/ or click + New agent to scaffold one."
-              action={
-                <Button variant="primary" onClick={() => setShowNew(true)}>
-                  <Plus className="w-3 h-3" /> New agent
-                </Button>
-              }
-            />
-          )}
-
-          {list.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {list.map((a) => (
-                <AgentCard key={a.path} agent={a} live={liveSlugs.has(a.slug.toLowerCase())} />
-              ))}
-            </div>
-          )}
         </div>
+
+        <ul className="flex-1 overflow-y-auto py-1">
+          {agents.isLoading && (
+            <li className="px-3 py-2 text-[11px] text-muted dark:text-[#8C837C]">loading…</li>
+          )}
+          {!agents.isLoading && filtered.length === 0 && (
+            <li className="px-3 py-2 text-[11px] text-muted dark:text-[#8C837C]">
+              {q ? 'no match' : 'no agents'}
+            </li>
+          )}
+          {filtered.map((a) => {
+            const Icon = AGENT_ICON_MAP[a.icon] ?? Bot;
+            const isSel = selected?.slug === a.slug;
+            const isLive = liveSlugs.has(a.slug.toLowerCase());
+            return (
+              <li key={a.path}>
+                <a
+                  href={`/agents?slug=${encodeURIComponent(a.slug)}`}
+                  className={
+                    'flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors border-l-2 ' +
+                    (isSel
+                      ? 'bg-white dark:bg-[#1F1B15] border-flame text-ink dark:text-[#F5F1EA] font-semibold'
+                      : 'border-transparent text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
+                  }
+                >
+                  <Icon className={'w-3.5 h-3.5 shrink-0 ' + (isSel ? 'text-flame' : 'text-muted dark:text-[#8C837C]')} />
+                  <span className="truncate flex-1">{a.name}</span>
+                  {isLive && (
+                    <span className="relative flex h-1.5 w-1.5 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-flame" />
+                    </span>
+                  )}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </aside>
+
+      {/* Right: chat with selected agent */}
+      <div className="flex-1 min-w-0 min-h-0">
+        {selected ? (
+          <ChatSurface
+            key={selected.slug}
+            agent={selected.slug}
+            threadKey={`bm-team-thread-${selected.slug}`}
+            title={`Chat with ${selected.name}`}
+          />
+        ) : (
+          <div className="h-full flex items-center justify-center text-sm text-muted dark:text-[#8C837C]">
+            Pick an agent on the left to start chatting.
+          </div>
+        )}
       </div>
-    </PageShell>
+    </div>
   );
 }
 
-function AgentCard({ agent, live }: { agent: Agent; live: boolean }) {
-  const Icon = AGENT_ICON_MAP[agent.icon] ?? Bot;
+export default function AgentsPage() {
   return (
-    <Link
-      href={`/?agent=${encodeURIComponent(agent.slug)}`}
-      className="group relative flex flex-col gap-3 rounded-xl border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] p-4 hover:border-flame/50 hover:shadow-sm transition-all"
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-flame/10 group-hover:bg-flame/20 transition-colors">
-          <Icon className="w-5 h-5 text-flame" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <h3 className="text-[14px] font-semibold text-ink dark:text-[#F5F1EA] truncate group-hover:text-flame transition-colors">
-              {agent.name}
-            </h3>
-            {live && (
-              <span className="relative flex h-2 w-2 shrink-0" aria-label="live">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-flame" />
-              </span>
-            )}
-          </div>
-          <p className="mt-0.5 text-[12px] text-muted dark:text-[#8C837C] line-clamp-2 leading-snug">
-            {agent.tagline}
-          </p>
-        </div>
-      </div>
-    </Link>
+    <Suspense fallback={<div className="p-8 text-sm text-muted dark:text-[#8C837C]">loading…</div>}>
+      <AgentsInner />
+    </Suspense>
   );
 }
