@@ -29,6 +29,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, CheckCircle2, Circle } from 'lucide-react';
 import { api } from '../lib/api';
+import { Composer } from '../components/composer';
 
 function newThreadId(): string {
   const d = new Date();
@@ -59,6 +60,37 @@ function timeAgo(ms: number | null): string {
 export default function HomePage() {
   const router = useRouter();
   const [draft, setDraft] = useState('');
+  const [homeAgent, setHomeAgent] = useState<string | undefined>(undefined);
+
+  // Load the same agents roster the chat composer uses, for the
+  // picker pill + @-mention popover. Stable across tabs because both
+  // consumers query the same key.
+  const agentList = useQuery({
+    queryKey: ['chat-agent-options'],
+    queryFn: async () => {
+      const tree = await api.vaultTree();
+      const files = tree.tree.filter(
+        (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
+      );
+      const rows = await Promise.all(
+        files.map(async (f) => {
+          const r = await api.readFile(f.path);
+          const fm = (r.frontmatter ?? {}) as Record<string, unknown>;
+          const slug = f.path.replace(/^agents\//, '').replace(/\.md$/, '');
+          const name = typeof fm.name === 'string' && fm.name ? fm.name : slug;
+          const body = (r.body ?? '').trim();
+          const firstLine = body
+            .split('\n').map((l) => l.trim())
+            .find((l) => l && !l.startsWith('#') && !l.startsWith('-') && !l.startsWith('*'));
+          const tagline = firstLine ? firstLine.replace(/^[*_`]+/, '').slice(0, 120) : '';
+          return { slug, name, tagline };
+        }),
+      );
+      rows.sort((a, b) => a.name.localeCompare(b.name));
+      return rows;
+    },
+    staleTime: 60_000,
+  });
 
   const drafts = useQuery({ queryKey: ['drafts'], queryFn: api.listDrafts });
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.listRuns, refetchInterval: 5_000 });
@@ -147,18 +179,25 @@ export default function HomePage() {
 
   const orgName = projects.data?.projects.find((p) => p.id === projects.data?.active)?.name ?? 'BlackMagic';
 
-  function send() {
-    const text = draft.trim();
+  function send(textArg?: string) {
+    const text = (textArg ?? draft).trim();
     if (!text) {
       router.push('/chat');
       return;
     }
+    // If the user picked a specific agent on the home composer, route
+    // the handoff through that agent's per-agent thread bucket so the
+    // chat surface opens the right history. Otherwise land on the
+    // global default thread (`bm-last-thread`), matching the legacy
+    // home behavior.
     const id = newThreadId();
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('bm-last-thread', id);
+      const threadKey = homeAgent ? `bm-team-thread-${homeAgent}` : 'bm-last-thread';
+      window.localStorage.setItem(threadKey, id);
       window.localStorage.setItem('bm-pending-prompt', text);
     }
-    router.push('/chat');
+    setDraft('');
+    router.push(homeAgent ? `/chat?agent=${encodeURIComponent(homeAgent)}` : '/chat');
   }
 
   return (
@@ -191,36 +230,29 @@ export default function HomePage() {
           </span>
         </h1>
 
-        {/* Composer */}
-        <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl shadow-sm overflow-hidden">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            placeholder="Ask, plan, automate…"
-            rows={2}
-            className="w-full resize-none bg-transparent border-0 px-5 py-4 text-[15px] text-ink dark:text-[#E6E0D8] placeholder:text-muted/70 dark:placeholder:text-[#6B625C] focus:outline-none"
-            style={{ minHeight: 80, maxHeight: 240 }}
-          />
-          <div className="flex items-center justify-between px-3 py-2 border-t border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F]">
-            <div className="flex items-center gap-3 text-[10px] font-mono text-muted dark:text-[#8C837C]">
-              <Kbd>⌘↵</Kbd> <span>send</span>
-              <span>·</span>
-              <Kbd>⌘K</Kbd> <span>command palette</span>
-            </div>
-            <button
-              type="button"
-              onClick={send}
-              className="inline-flex items-center gap-1.5 bg-flame text-white text-[13px] font-medium px-4 py-1.5 rounded-md hover:opacity-90 transition-opacity"
-            >
-              Send <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+        {/* Composer — same component used at /chat. Keeps UX (agent
+            picker, @-mention, slash commands, auto-size) identical
+            between the two surfaces. */}
+        <Composer
+          value={draft}
+          onChange={setDraft}
+          onSubmit={(text) => send(text)}
+          agents={agentList.data ?? []}
+          agentSlug={homeAgent}
+          onAgentChange={(slug) => setHomeAgent(slug)}
+          onSlashCommand={(action) => {
+            if (action === 'clear') setDraft('');
+            else if (action === 'skills') router.push('/skills');
+          }}
+        />
+        {/* Keyboard hint strip under the composer — stays as a footer
+            callout here since Home has more real estate than /chat. */}
+        <div className="mt-2 flex items-center gap-3 px-1 text-[10px] font-mono text-muted dark:text-[#8C837C]">
+          <Kbd>⌘↵</Kbd> <span>send</span>
+          <span>·</span>
+          <Kbd>⌘K</Kbd> <span>command palette</span>
+          <span>·</span>
+          <span>@ agent · / commands</span>
         </div>
 
         {/* Today strip — live KPIs at a glance */}

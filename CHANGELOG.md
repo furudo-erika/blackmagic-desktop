@@ -2,6 +2,29 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.70 — 2026-04-23
+
+### Changed
+- **Unified chat composer across Home and /chat.** Extracted the
+  composer into `components/composer.tsx` and swapped both pages
+  onto it. Same rounded-card look (the one you liked on Home), same
+  auto-size textarea, same ⌘↵ to send, same `@`-mention popover to
+  loop in agents, same `/` slash commands (`/clear`, `/skills`,
+  `/agent`).
+- **Agent picker now lives inside the composer.** Killed the Agents
+  cards grid that used to dominate the empty state of /chat —
+  instead a pill-button on the left of the composer footer shows
+  the current routing agent (with its monogram icon) and opens an
+  inline menu of every agent in the vault, ChatGPT-style. Much
+  less visual clutter and the pick follows you into the message
+  you're already typing. Header's redundant "Agent: …" dropdown
+  removed since the pill replaces it.
+- **Home composer picker hands off correctly to /chat.** If you
+  pick a specific agent on the Home composer, Send routes to
+  `/chat?agent=<slug>` and writes to that agent's per-agent thread
+  bucket (`bm-team-thread-<slug>`) so the chat opens the right
+  history; otherwise you land on the default thread as before.
+
 ## 0.4.69 — 2026-04-23
 
 ### Fixed

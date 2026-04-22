@@ -29,6 +29,7 @@ import {
 import { api } from '../lib/api';
 import { Markdown } from './markdown';
 import { AgentIcon } from './agent-icon';
+import { Composer } from './composer';
 
 export type ChatScenario = { title: string; prompt: string };
 
@@ -239,129 +240,6 @@ export function ChatSurface({
   // that, but still let the user change it for this thread.
   const [pickedAgent, setPickedAgent] = useState<string | undefined>(agent);
 
-  // Inline command popover. Opens when the cursor lands right after a
-  // bare `@` or `/` (no preceding non-space char). Esc closes; arrow
-  // keys navigate; Enter/Tab inserts the highlighted item.
-  const [popover, setPopover] = useState<
-    | { kind: 'mention' | 'slash'; query: string; anchor: number; index: number }
-    | null
-  >(null);
-
-  // Roster of agents in this vault — used to populate the @-mention list.
-  // Same query as the sidebar/cockpit so we don't duplicate vault reads.
-  const agentsForMention = useQuery({
-    queryKey: ['chat-mention-agents'],
-    queryFn: async () => {
-      const tree = await api.vaultTree();
-      const files = tree.tree.filter(
-        (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
-      );
-      const rows = await Promise.all(
-        files.map(async (f) => {
-          const r = await api.readFile(f.path);
-          const fm = (r.frontmatter ?? {}) as Record<string, unknown>;
-          const slug = f.path.replace(/^agents\//, '').replace(/\.md$/, '');
-          const name = typeof fm.name === 'string' && fm.name ? fm.name : slug;
-          return { slug, name };
-        }),
-      );
-      rows.sort((a, b) => a.name.localeCompare(b.name));
-      return rows;
-    },
-    staleTime: 60_000,
-  });
-
-  // Slash commands. Pure UI helpers — `/clear` resets the local thread;
-  // `/agent <slug>` switches the picker; `/skills` jumps to the catalog.
-  const SLASH_COMMANDS = [
-    { name: '/clear', hint: 'reset this thread', action: 'clear' as const },
-    { name: '/agent', hint: 'switch which agent answers', action: 'agent' as const },
-    { name: '/skills', hint: 'browse the skill catalog', action: 'skills' as const },
-  ];
-
-  // Detect @ / triggers from the current input + cursor position.
-  function detectPopover(value: string, cursor: number) {
-    // Walk back from cursor to either a whitespace or one of the trigger
-    // chars. If we hit `@` or `/` first, we're inside a token.
-    let i = cursor - 1;
-    while (i >= 0) {
-      const c = value[i]!;
-      if (c === '@' || c === '/') {
-        // Trigger must be at start-of-line or preceded by whitespace.
-        if (i === 0 || /\s/.test(value[i - 1]!)) {
-          const query = value.slice(i + 1, cursor);
-          // Slash commands only match on the first character (no spaces).
-          if (/\s/.test(query)) return null;
-          return {
-            kind: c === '@' ? ('mention' as const) : ('slash' as const),
-            query,
-            anchor: i,
-          };
-        }
-        return null;
-      }
-      if (/\s/.test(c)) return null;
-      i--;
-    }
-    return null;
-  }
-
-  function handleInputChange(value: string, cursor: number) {
-    setInput(value);
-    const det = detectPopover(value, cursor);
-    if (det) setPopover({ ...det, index: 0 });
-    else setPopover(null);
-  }
-
-  // Resolve the active option list for whichever popover kind is open.
-  const popoverItems: Array<{ label: string; sublabel?: string; insert: string; meta?: any }> = (() => {
-    if (!popover) return [];
-    if (popover.kind === 'mention') {
-      const q = popover.query.toLowerCase();
-      return (agentsForMention.data ?? [])
-        .filter((a) => !q || a.slug.toLowerCase().includes(q) || a.name.toLowerCase().includes(q))
-        .slice(0, 8)
-        .map((a) => ({ label: a.name, sublabel: a.slug, insert: `@${a.slug}` }));
-    }
-    const q = popover.query.toLowerCase();
-    return SLASH_COMMANDS.filter((c) => c.name.slice(1).toLowerCase().includes(q)).map((c) => ({
-      label: c.name,
-      sublabel: c.hint,
-      insert: c.name + ' ',
-      meta: c.action,
-    }));
-  })();
-
-  function applyPopoverChoice(choice: { insert: string; meta?: any }) {
-    if (!popover) return;
-    // Slash command actions handled inline before insertion.
-    if (popover.kind === 'slash') {
-      if (choice.meta === 'clear') {
-        setMessages([]);
-        setInput('');
-        setPopover(null);
-        return;
-      }
-      if (choice.meta === 'skills') {
-        window.location.href = '/skills';
-        return;
-      }
-      // /agent → just insert; user types slug after the space.
-    }
-    const before = input.slice(0, popover.anchor);
-    const after = input.slice(popover.anchor + 1 + popover.query.length);
-    const inserted = before + choice.insert + (after.startsWith(' ') ? '' : ' ') + after;
-    setInput(inserted);
-    setPopover(null);
-    // Restore focus + caret right after the insertion.
-    requestAnimationFrame(() => {
-      const el = inputRef.current;
-      if (!el) return;
-      el.focus();
-      const pos = (before + choice.insert + ' ').length;
-      el.setSelectionRange(pos, pos);
-    });
-  }
   useEffect(() => { setPickedAgent(agent); }, [agent]);
   const effectiveAgent = pickedAgent ?? agent;
   const agentOptions = useQuery({
@@ -432,20 +310,6 @@ export function ChatSurface({
   })();
 
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // Auto-size the textarea whenever its contents change — covers typing,
-  // scenario clicks, and the post-send clear. 'auto' collapses the height
-  // first so scrollHeight reflects the real minimum needed, then we cap
-  // at 320px and flip on the scrollbar when we'd exceed that.
-  useEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    const next = Math.min(el.scrollHeight, 320);
-    el.style.height = next + 'px';
-    el.style.overflowY = el.scrollHeight > 320 ? 'auto' : 'hidden';
-  }, [input]);
 
   // When the picker changes which agent routes the conversation, also
   // switch the persisted thread. Each agent keeps its own history under
@@ -677,27 +541,6 @@ export function ChatSurface({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <label
-            className="inline-flex items-center gap-1.5 text-[11px] text-muted dark:text-[#8C837C]"
-            title="Switch agents — each one has its own thread so you can run many in parallel"
-          >
-            <Bot className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Agent:</span>
-            <select
-              value={effectiveAgent ?? ''}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v) router.push(`/agents?slug=${encodeURIComponent(v)}`);
-                else setPickedAgent(undefined);
-              }}
-              className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md px-2 py-1 text-[12px] text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame cursor-pointer"
-            >
-              <option value="">Default (Research Agent)</option>
-              {(agentOptions.data ?? []).map((a) => (
-                <option key={a.slug} value={a.slug}>{a.name}</option>
-              ))}
-            </select>
-          </label>
           {headerRight}
         </div>
       </header>
@@ -710,50 +553,9 @@ export function ChatSurface({
                 regardless of which page the user lands on, not just the
                 empty-state of /. */}
 
-            {/* Agent gallery — always visible in the empty state, not
-                tucked behind the header dropdown. Each card switches the
-                active agent for this thread; the currently-picked agent
-                gets a flame-colored ring so there's no confusion about
-                which agent will handle the next message. */}
-            {(agentOptions.data?.length ?? 0) > 0 && (
-              <div>
-                <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-3">
-                  Agents
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
-                  {(agentOptions.data ?? []).map((a) => {
-                    const picked = effectiveAgent === a.slug;
-                    const Icon = AGENT_ICONS[a.icon] ?? Bot;
-                    const accent = AGENT_ACCENTS[a.slug] ?? 'text-muted dark:text-[#8C837C]';
-                    return (
-                      <button
-                        key={a.slug}
-                        type="button"
-                        onClick={() => router.push(`/agents?slug=${encodeURIComponent(a.slug)}`)}
-                        className={
-                          'text-left p-4 bg-white dark:bg-[#1F1B15] border rounded-xl transition-all flex flex-col gap-2 h-full group ' +
-                          (picked
-                            ? 'border-flame ring-1 ring-flame/40 shadow-sm'
-                            : 'border-line dark:border-[#2A241D] hover:border-flame/60 hover:-translate-y-0.5')
-                        }
-                      >
-                        <div className="flex items-start gap-2.5">
-                          <AgentIcon slug={a.slug} name={a.name} size="md" />
-                          <div className="min-w-0 flex-1">
-                            <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{a.name}</div>
-                          </div>
-                        </div>
-                        {a.tagline && (
-                          <div className="text-[11px] text-muted dark:text-[#8C837C] line-clamp-2 leading-snug">
-                            {a.tagline}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Agents gallery removed — picker is now the pill inside
+                the composer footer. Empty state stays clean: just the
+                starter prompts for the currently-selected agent. */}
 
             {derivedScenarios.length > 0 && (
               <div>
@@ -807,102 +609,25 @@ export function ChatSurface({
         </div>
       </div>
 
-      <div className="border-t border-line dark:border-[#2A241D] px-6 py-3 bg-cream-light dark:bg-[#17140F]">
-        <div className="max-w-3xl mx-auto flex items-end gap-2 relative">
-          {popover && popoverItems.length > 0 && (
-            <div className="absolute bottom-full mb-2 left-0 w-80 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg shadow-lg overflow-hidden z-30">
-              <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] border-b border-line dark:border-[#2A241D]">
-                {popover.kind === 'mention' ? 'Loop in agent' : 'Slash commands'}
-              </div>
-              <ul className="max-h-[260px] overflow-y-auto py-1">
-                {popoverItems.map((it, i) => (
-                  <li key={it.label}>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        applyPopoverChoice(it);
-                      }}
-                      onMouseEnter={() => setPopover((p) => (p ? { ...p, index: i } : p))}
-                      className={
-                        'w-full text-left flex items-center gap-2 px-3 py-1.5 text-[12px] ' +
-                        (i === popover.index
-                          ? 'bg-flame/10 text-ink dark:text-[#F5F1EA]'
-                          : 'text-ink dark:text-[#E6E0D8] hover:bg-cream dark:hover:bg-[#0F0D0A]')
-                      }
-                    >
-                      <span className="truncate">{it.label}</span>
-                      {it.sublabel && (
-                        <span className="ml-auto truncate text-[10px] font-mono text-muted dark:text-[#8C837C]">
-                          {it.sublabel}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <div className="px-3 py-1.5 text-[10px] text-muted dark:text-[#8C837C] border-t border-line dark:border-[#2A241D] font-mono">
-                ↑↓ navigate · ↵ select · esc cancel
-              </div>
-            </div>
-          )}
-          <textarea
-            ref={inputRef}
+      <div className="border-t border-line dark:border-[#2A241D] px-6 py-4 bg-cream-light dark:bg-[#17140F]">
+        <div className="max-w-3xl mx-auto">
+          <Composer
             value={input}
-            onChange={(e) => handleInputChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
-            onKeyUp={(e) => {
-              const t = e.currentTarget;
-              const det = detectPopover(t.value, t.selectionStart ?? 0);
-              if (det) setPopover((p) => ({ ...det, index: p?.index ?? 0 }));
-              else setPopover(null);
-            }}
-            onClick={(e) => {
-              const t = e.currentTarget;
-              const det = detectPopover(t.value, t.selectionStart ?? 0);
-              if (det) setPopover((p) => ({ ...det, index: p?.index ?? 0 }));
-              else setPopover(null);
-            }}
-            onKeyDown={(e) => {
-              if (popover && popoverItems.length > 0) {
-                if (e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  setPopover((p) => (p ? { ...p, index: (p.index + 1) % popoverItems.length } : p));
-                  return;
-                }
-                if (e.key === 'ArrowUp') {
-                  e.preventDefault();
-                  setPopover((p) => (p ? { ...p, index: (p.index - 1 + popoverItems.length) % popoverItems.length } : p));
-                  return;
-                }
-                if (e.key === 'Enter' || e.key === 'Tab') {
-                  e.preventDefault();
-                  applyPopoverChoice(popoverItems[popover.index]!);
-                  return;
-                }
-                if (e.key === 'Escape') {
-                  e.preventDefault();
-                  setPopover(null);
-                  return;
-                }
-              }
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
+            onChange={setInput}
+            onSubmit={(text) => send(text)}
+            agents={(agentOptions.data ?? []).map((a) => ({ slug: a.slug, name: a.name, tagline: a.tagline }))}
+            agentSlug={effectiveAgent}
+            onAgentChange={(slug) => setPickedAgent(slug)}
+            onSlashCommand={(action) => {
+              if (action === 'clear') {
+                setMessages([]);
+                setInput('');
+              } else if (action === 'skills') {
+                router.push('/skills');
               }
             }}
-            rows={1}
-            placeholder="Ask the agent… ( @ to loop in another agent · / for commands )"
-            className="flex-1 resize-none bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg px-3 py-2 text-sm leading-5 text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
-            style={{ minHeight: 40, maxHeight: 320 }}
+            disabled={sendMut.isPending}
           />
-          <button
-            onClick={() => send()}
-            disabled={sendMut.isPending || !input.trim()}
-            className="h-10 px-4 rounded-lg bg-flame text-white text-sm font-medium hover:opacity-90 disabled:opacity-40 flex items-center gap-1.5"
-          >
-            <Send className="w-4 h-4" />
-            Send
-          </button>
         </div>
       </div>
     </div>
