@@ -53,6 +53,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { AgentIcon, hasAgentTheme } from './agent-icon';
 
 // Icon string (from agent frontmatter `icon:`) → lucide component.
 // Mirrors the names seeded in daemon/src/vault.ts DEFAULT_AGENTS. Falls
@@ -423,7 +424,7 @@ function AgentsSidebarRow({
             <li className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">no agents</li>
           )}
           {agents.map((a) => {
-            const Icon = AGENT_ICON_MAP[a.icon] ?? Bot;
+            const FallbackIcon = AGENT_ICON_MAP[a.icon] ?? Bot;
             const active = inside && activeSlug === a.slug;
             const isLive = liveSlugs.has(a.slug.toLowerCase());
             return (
@@ -442,7 +443,11 @@ function AgentsSidebarRow({
                       : 'text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
                   }
                 >
-                  <Icon className={'w-3 h-3 shrink-0 ' + (active ? 'text-flame' : 'text-muted dark:text-[#8C837C]')} />
+                  {hasAgentTheme(a.slug) ? (
+                    <AgentIcon slug={a.slug} size="sm" className="!w-4 !h-4" />
+                  ) : (
+                    <FallbackIcon className={'w-3 h-3 shrink-0 ' + (active ? 'text-flame' : 'text-muted dark:text-[#8C837C]')} />
+                  )}
                   <span className="truncate flex-1">{a.name}</span>
                   {isLive && (
                     <span className="relative flex h-1.5 w-1.5 shrink-0">

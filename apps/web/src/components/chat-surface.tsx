@@ -28,6 +28,7 @@ import {
 
 import { api } from '../lib/api';
 import { Markdown } from './markdown';
+import { AgentIcon } from './agent-icon';
 
 export type ChatScenario = { title: string; prompt: string };
 
@@ -647,18 +648,10 @@ export function ChatSurface({
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {messages.length === 0 && (
           <div className="max-w-5xl mx-auto py-6 space-y-8">
-            {/* Onboarding nudge — if a `pin: first` agent exists (Company
-                Profiler by convention), promote it above the gallery
-                with a one-click "Run now" so new users profile their
-                company on first launch. Every other agent's output is
-                generic until us/ has real data from the profiler. */}
-            <ProfilerOnboardingBanner
-              agents={agentOptions.data ?? []}
-              onRun={(slug, prompt) => {
-                setPickedAgent(slug);
-                send(prompt);
-              }}
-            />
+            {/* Onboarding nudge moved to a global app-shell banner
+                (see components/onboarding-banner.tsx) so it shows up
+                regardless of which page the user lands on, not just the
+                empty-state of /. */}
 
             {/* Agent gallery — always visible in the empty state, not
                 tucked behind the header dropdown. Each card switches the
@@ -688,14 +681,7 @@ export function ChatSurface({
                         }
                       >
                         <div className="flex items-start gap-2.5">
-                          <div className={
-                            'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ' +
-                            (picked
-                              ? 'bg-flame/10'
-                              : 'bg-cream dark:bg-[#0F0D0A] group-hover:bg-flame/5')
-                          }>
-                            <Icon className={`w-4 h-4 ${picked ? 'text-flame' : accent}`} />
-                          </div>
+                          <AgentIcon slug={a.slug} size="md" />
                           <div className="min-w-0 flex-1">
                             <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{a.name}</div>
                           </div>

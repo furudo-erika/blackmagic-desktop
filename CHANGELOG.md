@@ -2,6 +2,45 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.49 — 2026-04-22
+
+### Added
+- **Per-agent SVG icons with gradient tiles, replacing the generic
+  lucide silhouettes.** New `AgentIcon` component (`components/agent-icon.tsx`)
+  ships 11 hand-drawn glyphs paired with distinct linear-gradient
+  backgrounds — Company Profiler gets the building scanner on
+  amber→orange, Researcher gets the magnifying glass on sky→blue,
+  GEO Analyst keeps the radar on flame, LinkedIn Outreach gets the
+  proper "in" mark on LinkedIn blue, and so on. Sized presets (sm/md/
+  lg/xl). Wired up in three highest-traffic spots: chat agent
+  gallery cards, sidebar Agents sub-rows, and the /agents hero. Old
+  `Bot` lucide stays as a fallback for any agent slug that hasn't
+  been themed yet.
+- **App-wide onboarding announcement bar.** `OnboardingBanner` mounts
+  in `AppShell` between the upgrade bar and the sidebar, so the
+  Company Profiler nudge shows on every page until you've actually
+  run it (or dismissed). Reads the `pin: first` agent from the
+  vault, checks `listRuns` for any completed runs against that
+  agent, and renders a slim flame-tinted strip with the agent icon,
+  one-sentence pitch, "Run now" CTA (links to `/agents?slug=…` and
+  primes localStorage), and an X dismiss. Per-vault dismissal in
+  `localStorage` so switching projects re-triggers the prompt.
+- **RB2B integration for website visitor de-anonymization.** New
+  `rb2b` provider in Integrations (Visitor identification group),
+  `RB2B_API_KEY` mirrored into `<vault>/.env`. Plus a new
+  `rb2b-visitor-pull` skill (Website Visitor agent) that fetches
+  identified visitors from the RB2B API every N hours, ICP-scores
+  them against `us/market/icp.md`, upserts companies/ + contacts/
+  files, and appends a daily summary to `signals/visitors/<date>.md`.
+  Runs through the existing `web_fetch` tool — no new daemon-side
+  tool wiring needed.
+
+### Changed
+- **In-chat ProfilerOnboardingBanner removed in favor of the global
+  bar.** The banner used to live inside the chat empty-state, which
+  meant new users only saw it if they happened to land on `/`. Now
+  it's everywhere until the work is done.
+
 ## 0.4.48 — 2026-04-22
 
 ### Added

@@ -27,6 +27,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { AgentIcon, hasAgentTheme } from '../../components/agent-icon';
 
 const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   Bot, Globe, Linkedin, CalendarClock, Copy: CopyIcon, RotateCcw,
@@ -248,7 +249,7 @@ function AgentsInner() {
     );
   }
 
-  const Icon = AGENT_ICON_MAP[agent.icon] ?? Bot;
+  const FallbackIcon = AGENT_ICON_MAP[agent.icon] ?? Bot;
 
   // Derive the three panels' contents from the latest run.
   const startedMs = latestRun ? runStartedMs(latestRun.runId) : null;
@@ -276,9 +277,13 @@ function AgentsInner() {
       {/* Hero */}
       <header className="shrink-0 border-b border-line dark:border-[#2A241D] px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-start gap-3">
-          <div className="w-11 h-11 rounded-xl bg-flame/10 border border-flame/20 flex items-center justify-center shrink-0">
-            <Icon className="w-5 h-5 text-flame" />
-          </div>
+          {hasAgentTheme(agent.slug) ? (
+            <AgentIcon slug={agent.slug} size="lg" />
+          ) : (
+            <div className="w-11 h-11 rounded-xl bg-flame/10 border border-flame/20 flex items-center justify-center shrink-0">
+              <FallbackIcon className="w-5 h-5 text-flame" />
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h1 className="text-[18px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{agent.name}</h1>

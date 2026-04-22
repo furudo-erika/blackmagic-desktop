@@ -22,7 +22,8 @@ export type IntegrationProvider =
   | 'amazon_ses'
   | 'gsc'
   | 'ghost'
-  | 'wordpress';
+  | 'wordpress'
+  | 'rb2b';
 
 export type Integration = {
   provider: IntegrationProvider;

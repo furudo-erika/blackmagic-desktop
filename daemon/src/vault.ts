@@ -1304,6 +1304,39 @@ Resolve the company behind visitor \`{{ip}}\` / session \`{{session_id}}\`.
 Reject consumer ISPs. Output JSON: { company, domain, size, confidence, personas }.
 Save to \`companies/<slug>.md\` (create if missing).
 `,
+
+  // RB2B-powered visitor identification. Pulls the last 24h of
+  // identified visitors from the user's RB2B account, scores each one
+  // against ICP, and writes the high-fit ones to companies/ + contacts/
+  // for the website-visitor agent to act on. Requires the rb2b
+  // integration credentials (RB2B_API_KEY in vault .env).
+  'rb2b-visitor-pull.md': `---
+kind: playbook
+name: rb2b-visitor-pull
+group: high-intent-visitor
+agent: website-visitor
+inputs: [{ name: hours, required: false }]
+---
+
+Pull identified visitors from RB2B over the last \`{{hours}}\` hours
+(default 24). Use the \`web_fetch\` tool to call:
+
+  GET https://app.rb2b.com/api/v1/visitors?period={{hours}}h
+  Authorization: Bearer $RB2B_API_KEY
+
+For each identified person+company pair returned:
+1. Score against \`us/market/icp.md\`. Skip rows below ICP threshold.
+2. Upsert \`companies/<domain-slug>.md\` (create if missing) with
+   { name, domain, size, industry } from RB2B's company block.
+3. Upsert \`contacts/<email-or-linkedin-slug>.md\` with
+   { name, title, linkedin, company_path } from the person block.
+4. Append a row to \`signals/visitors/{{date}}.md\` with the visit
+   timestamp, page, referrer, and links to the upserted files.
+
+When done, summarize: how many visitors RB2B returned, how many passed
+ICP, and which accounts are worth a same-day touch (cite the signal
+file paths).
+`,
   'visitor-qualify-icp.md': `---
 kind: playbook
 name: visitor-qualify-icp

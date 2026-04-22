@@ -83,6 +83,9 @@ const BRAND_PATHS: Record<IntegrationProvider, string> = {
   // WordPress — concentric circle W. Clean geometric; no trademark.
   wordpress:
     'M12 2a10 10 0 100 20 10 10 0 000-20zm0 2a8 8 0 016.93 4H5.07A8 8 0 0112 4zM4 12a8 8 0 01.64-3.14L9.3 19.5A8 8 0 014 12zm9.1 7.86L6.2 7.5h5.5l1.4 2.8L11 19.5a8 8 0 002.1.36zm6.14-3L14.8 7.5h2.24A8 8 0 0119.24 16.86z',
+  // RB2B — abstract person-on-orbit (visitor de-anonymization).
+  rb2b:
+    'M12 2a4 4 0 100 8 4 4 0 000-8zm0 10c-3.31 0-6 2.24-6 5v3h12v-3c0-2.76-2.69-5-6-5zm9-6h-3v2h-2v2h2v2h-2v-2h-2V8h2V6h2V4h3v2zm-2 4h2v2h-2v-2z',
 };
 
 function BrandLogo({ provider, color }: { provider: IntegrationProvider; color: string }) {
@@ -304,6 +307,18 @@ const GROUPS: Group[] = [
         oauth: false,
         endpointField: true,
         brandColor: '#21759B',
+      },
+    ],
+  },
+  {
+    label: 'Visitor identification',
+    providers: [
+      {
+        provider: 'rb2b',
+        name: 'RB2B',
+        description: 'De-anonymize US-based website visitors. Paste your RB2B API key — agents pull person + company per session and write them to companies/ + contacts/ for the Website Visitor Agent to act on.',
+        oauth: false,
+        brandColor: '#FF6B35',
       },
     ],
   },
