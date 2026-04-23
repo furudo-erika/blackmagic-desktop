@@ -2,6 +2,28 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.9 — 2026-04-23
+
+### Fixed
+- **Clicking a starter prompt crashed /chat until refresh.** Home's
+  `agentList` query and chat-surface's `agentOptions` query both used
+  the react-query cache key `['chat-agent-options']`, but returned
+  different row shapes — Home returned `{slug, name, tagline}`, chat-
+  surface expected `{slug, name, tagline, icon, pin, starterPrompts}`.
+  When Home populated the cache first (the usual cold-load path),
+  chat-surface read `a.starterPrompts.length` on undefined →
+  `Cannot read properties of undefined (reading 'length')`. Refresh
+  reversed the mount order so chat-surface populated the cache and
+  the crash disappeared. Renamed Home's key to `['home-agent-options']`
+  and hardened chat-surface with a defensive `Array.isArray` guard.
+- **`/api/plan` 401 spam in devtools** when not signed in. The daemon
+  returns 401 without a `zenn_api_key`, which is fine — both the
+  sidebar credit pill and the out-of-credits banner hide themselves
+  on null data. But the thrown ApiError still wrote a red stack trace
+  on every route change. `api.plan` now swallows 401 and returns
+  null (the consumers already handle null); other statuses still
+  throw so real errors aren't hidden.
+
 ## 0.5.8 — 2026-04-23
 
 ### Fixed

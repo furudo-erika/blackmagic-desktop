@@ -75,14 +75,31 @@ export const api = {
       engine?: 'codex-cli' | 'builtin';
       localToken?: string;
     }>('/api/health'),
-  plan: () =>
-    request<{
-      plan: 'free' | 'growth' | 'scale' | 'enterprise';
-      creditsIncluded: number;
-      creditsUsed: number;
-      creditsRemaining: number;
-      resetAt: string | null;
-    }>('/api/plan'),
+  // Plan / credits balance. Returns null when the user isn't signed
+  // in (daemon 401s without a zenn_api_key) — the sidebar pill and
+  // out-of-credits banner both handle null by hiding themselves, so
+  // we don't want the 401 to surface as a thrown error that pollutes
+  // the devtools console on every route change.
+  plan: async (): Promise<{
+    plan: 'free' | 'growth' | 'scale' | 'enterprise';
+    creditsIncluded: number;
+    creditsUsed: number;
+    creditsRemaining: number;
+    resetAt: string | null;
+  } | null> => {
+    try {
+      return await request<{
+        plan: 'free' | 'growth' | 'scale' | 'enterprise';
+        creditsIncluded: number;
+        creditsUsed: number;
+        creditsRemaining: number;
+        resetAt: string | null;
+      }>('/api/plan');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) return null;
+      throw err;
+    }
+  },
   setApiKey: (key: string) =>
     request<{ ok: true }>('/api/config/api-key', { method: 'POST', body: JSON.stringify({ key }) }),
   authStart: () => request<{ browserUrl: string; state: string }>('/api/auth/start'),

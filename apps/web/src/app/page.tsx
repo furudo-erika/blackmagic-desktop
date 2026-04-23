@@ -65,8 +65,13 @@ export default function HomePage() {
   // Load the same agents roster the chat composer uses, for the
   // picker pill + @-mention popover. Stable across tabs because both
   // consumers query the same key.
+  // Distinct cache key from chat-surface's ['chat-agent-options'] —
+  // the two queries return different row shapes (Home: {slug,name,
+  // tagline}; chat-surface: {slug,name,tagline,icon,pin,starterPrompts}).
+  // Sharing the key crashes chat-surface when Home populated the cache
+  // first (reading a.starterPrompts.length on undefined).
   const agentList = useQuery({
-    queryKey: ['chat-agent-options'],
+    queryKey: ['home-agent-options'],
     queryFn: async () => {
       const tree = await api.vaultTree();
       const files = tree.tree.filter(

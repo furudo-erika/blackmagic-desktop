@@ -296,8 +296,9 @@ export function ChatSurface({
     if (!effectiveAgent) return [];
     const a = agentOptions.data?.find((x) => x.slug === effectiveAgent);
     if (!a) return [];
-    if (a.starterPrompts.length > 0) {
-      return a.starterPrompts.map((p) => ({
+    const starters = Array.isArray(a.starterPrompts) ? a.starterPrompts : [];
+    if (starters.length > 0) {
+      return starters.map((p) => ({
         title: p.length > 48 ? p.slice(0, 45) + '…' : p,
         prompt: p,
       }));
