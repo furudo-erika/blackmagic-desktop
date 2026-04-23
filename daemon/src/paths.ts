@@ -15,6 +15,16 @@ export interface Config {
   hubspot_api_key?: string;
   apollo_api_key?: string;
   attio_api_key?: string;
+  // Salesforce. OAuth2 bearer token (access_token from a Connected App)
+  // plus the instance URL returned by the token endpoint
+  // (e.g. https://acme.my.salesforce.com). API v59.0 is the baseline.
+  salesforce_access_token?: string;
+  salesforce_instance_url?: string;
+  // Pipedrive. api_token + workspace domain
+  // (https://<domain>.pipedrive.com/api/v1). Token auth via query string
+  // is still Pipedrive's canonical pattern.
+  pipedrive_api_key?: string;
+  pipedrive_domain?: string;
   // Feishu (Lark). Tenant access comes from app_id + app_secret — the daemon
   // exchanges them for a tenant_access_token on demand. A separate
   // feishu_webhook_url supports the simple "notify this group chat" path.

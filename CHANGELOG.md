@@ -2,6 +2,14 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.76 — 2026-04-23
+
+### Changed
+- **Resend logo** on the marketing integrations grid swapped to the
+  rebrand-era "R" square image from cdn.resend.com/posts — the
+  white-PNG-with-CSS-mask approach was rendering flat on the
+  colored tiles.
+
 ## 0.4.75 — 2026-04-23
 
 ### Changed
