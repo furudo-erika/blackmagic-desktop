@@ -27,6 +27,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { PreflightModal } from '../../components/preflight-modal';
+import { Button } from '../../components/ui/primitives';
 
 type PlaybookInput = { name: string; required?: boolean };
 type Playbook = {
@@ -127,7 +128,7 @@ export default function SkillsPage() {
   return (
     <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A]">
       <header className="shrink-0 border-b border-line dark:border-[#2A241D] px-5 py-3 flex items-center gap-3">
-        <BookOpen className="w-4 h-4 text-flame" />
+        <BookOpen className="w-3.5 h-3.5 text-muted dark:text-[#8C837C]" />
         <div className="flex-1 min-w-0">
           <h1 className="text-[15px] font-semibold text-ink dark:text-[#F5F1EA]">Skills</h1>
           <p className="text-[11px] text-muted dark:text-[#8C837C] truncate">
@@ -283,8 +284,8 @@ function SkillDetail({ pb }: { pb: Playbook }) {
     <div className="h-full flex flex-col">
       {/* Skill header — name + description */}
       <header className="shrink-0 border-b border-line dark:border-[#2A241D] px-6 py-4 flex items-start gap-3">
-        <div className="w-8 h-8 rounded-md bg-flame/10 border border-flame/20 flex items-center justify-center shrink-0">
-          <Sparkles className="w-4 h-4 text-flame" />
+        <div className="w-8 h-8 rounded-md bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] flex items-center justify-center shrink-0">
+          <Sparkles className="w-[15px] h-[15px] text-muted dark:text-[#8C837C]" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-[18px] font-semibold text-ink dark:text-[#F5F1EA] leading-tight">{name}</h2>
@@ -358,15 +359,15 @@ function SkillDetail({ pb }: { pb: Playbook }) {
         )}
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="md"
             onClick={() => setPreflightOpen(true)}
             disabled={run.isPending || !canRun}
-            className="inline-flex items-center gap-1.5 bg-flame text-white text-[13px] font-medium px-3.5 py-1.5 rounded-md hover:bg-flame/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Play className="w-3.5 h-3.5" />
             {run.isPending ? 'Invoking…' : `Invoke via ${agent}`}
-          </button>
+          </Button>
           {preflightOpen && (
             <PreflightModal
               kind="skill"
@@ -403,7 +404,7 @@ function SkillDetail({ pb }: { pb: Playbook }) {
             </span>
           )}
           {result && !result.ok && (
-            <span className="text-[11px] text-flame font-mono">{result.err}</span>
+            <span className="text-[11px] text-[#E8634A] font-mono">{result.err}</span>
           )}
         </div>
 

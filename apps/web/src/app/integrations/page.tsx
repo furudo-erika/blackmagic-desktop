@@ -10,6 +10,8 @@ import {
   PageBody,
   Panel,
   Button,
+  SectionHeading,
+  StatusBadge,
 } from '../../components/ui/primitives';
 
 type ProviderDef = {
@@ -412,9 +414,7 @@ export default function IntegrationsPage() {
 
         {GROUPS.map((group) => (
           <section key={group.label} className="mb-8">
-            <h2 className="text-[11px] uppercase tracking-wider text-muted dark:text-[#8C837C] font-mono mb-3">
-              {group.label}
-            </h2>
+            <SectionHeading className="mb-3">{group.label}</SectionHeading>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {group.providers.map((def) => (
                 <IntegrationCard
@@ -510,13 +510,18 @@ function IntegrationCard({
         </div>
       </div>
 
-      <div className="text-xs">
+      <div className="flex items-center gap-2 text-[13px]">
         {connected ? (
-          <span className="text-flame font-medium">
-            Connected{integration?.connectedAs ? ` as ${integration.connectedAs}` : ''}
-          </span>
+          <>
+            <StatusBadge tone="ok">Connected</StatusBadge>
+            {integration?.connectedAs && (
+              <span className="text-muted dark:text-[#8C837C] truncate">
+                as {integration.connectedAs}
+              </span>
+            )}
+          </>
         ) : (
-          <span className="text-muted dark:text-[#8C837C]">Not connected</span>
+          <StatusBadge tone="muted">Not connected</StatusBadge>
         )}
       </div>
 
@@ -584,7 +589,7 @@ function IntegrationCard({
             />
           )}
           {saveMut.error && (
-            <div className="text-xs text-flame">{(saveMut.error as Error).message}</div>
+            <div className="text-[13px] text-[#E8634A]">{(saveMut.error as Error).message}</div>
           )}
           <div className="flex items-center gap-2">
             <Button

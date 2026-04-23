@@ -221,7 +221,7 @@ export function EntityList({
   return (
     <div
       className={clsx(
-        'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl overflow-hidden',
+        'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg overflow-hidden',
         className,
       )}
     >
@@ -332,7 +332,7 @@ export function Button({
   const variantCls = {
     primary: 'bg-flame text-white hover:opacity-90',
     secondary:
-      'border border-line dark:border-[#2A241D] text-ink dark:text-[#E6E0D8] hover:border-flame bg-transparent',
+      'border border-line dark:border-[#2A241D] text-ink dark:text-[#E6E0D8] hover:border-flame/40 bg-transparent',
     ghost:
       'text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA] hover:bg-cream-light dark:hover:bg-[#17140F]',
     danger:
@@ -356,5 +356,64 @@ export function Button({
     >
       {children}
     </button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* SectionHeading — H2 inside a page                                   */
+/* ------------------------------------------------------------------ */
+
+export function SectionHeading({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <h2
+      className={clsx(
+        'text-[13px] uppercase tracking-[0.16em] font-mono text-muted dark:text-[#8C837C]',
+        className,
+      )}
+    >
+      {children}
+    </h2>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* StatusBadge — small color-coded pill for statuses                   */
+/* ------------------------------------------------------------------ */
+
+export type StatusTone = 'ok' | 'warn' | 'bad' | 'info' | 'muted';
+
+const TONE_STYLES: Record<StatusTone, string> = {
+  ok: 'text-[#3FA36B] bg-[#3FA36B]/10',
+  warn: 'text-[#D79B3C] bg-[#D79B3C]/10',
+  bad: 'text-[#E8634A] bg-[#E8634A]/10',
+  info: 'text-[#3F7EC7] bg-[#3F7EC7]/10',
+  muted: 'text-muted bg-muted/10 dark:text-[#8C837C]',
+};
+
+export function StatusBadge({
+  tone = 'muted',
+  children,
+  className,
+}: {
+  tone?: StatusTone;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center h-[18px] px-2 rounded-full text-[10px] font-mono uppercase tracking-wide',
+        TONE_STYLES[tone],
+        className,
+      )}
+    >
+      {children}
+    </span>
   );
 }
