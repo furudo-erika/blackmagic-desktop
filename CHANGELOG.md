@@ -2,6 +2,63 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.1 — 2026-04-23
+
+Big parallel push — 3 sub-agents ran in isolated worktrees (UX
+completeness backlog, company-logo wiring, Vercel-style visual polish),
+a review agent audited the merged state, then shipped.
+
+### Added
+- **Company logos everywhere.** After `enrich_company` runs on a
+  domain we now fetch a logo via Clearbit (`logo.clearbit.com/<d>`),
+  fall back to Google's favicon service on 404, and stash the URL
+  under `logo_url` in the company's frontmatter. The daemon's
+  `projects.ts` picks it up from each project's `us/company.md` on
+  a 60s-TTL cache. **Sidebar project switcher** swaps the generic
+  orange `bg-flame` square for the real logo; **Companies list**
+  rows swap the letter-in-orange-tile for the real logo. Falls
+  back to the old tiles when no logo is available. Fetch has a
+  4-second abort timeout so cold-cache Clearbit lookups can't stall
+  enrichment.
+- **Toast system.** New `components/ui/toast.tsx` (~80 lines,
+  zustand-backed) + `<ToastHost>` mounted once in `app-shell.tsx`.
+  `/outreach` approve/reject + `/companies` enrich flashes route
+  through `toast.success()` / `toast.error()` now; the stale inline
+  `flash` / `message` state in those pages is gone.
+- **Skeleton loaders.** New `components/ui/skeleton.tsx` with
+  `<SkeletonRow>` + `<SkeletonList count={n} />`. Replaces the raw
+  `"loading…"` text on `/companies`, `/contacts`, `/deals`, `/runs`.
+- **`StatusBadge` primitive** in `components/ui/primitives.tsx`
+  with `tone: ok | warn | bad | info | muted` — color-coded status
+  pills wired into `/runs` (status column), `/pipeline` (stage),
+  `/skills` (ok / needs integration), `/integrations` (connected).
+- **`SectionHeading` + `EmptyState` primitives** for consistent
+  in-page section labels and empty-state chrome.
+
+### Changed
+- **Composer replaces the bespoke textarea on three editor pages**
+  — `/vault`, `/outreach`, `/memory`. Muscle memory is now the same
+  across Home, Chat, Agents, and every vault editor (auto-size,
+  @-mention popover, slash commands, ⌘↵, pressed-state animation).
+- **Vercel-style visual polish pass** across `/integrations`,
+  `/runs`, `/deals`, `/skills`, `/pipeline`. Typography scale
+  tightened (standardised `text-[13px]` body, 28px page titles,
+  mono uppercase section labels), `rounded-xl`/`rounded-2xl`
+  purged from non-hero surfaces in these pages in favour of
+  `rounded-lg`, `text-flame` usage reduced to interactive / live
+  states only. Secondary accent palette (blue info, green ok,
+  amber warn, flame bad) applied to status pills.
+
+### Fixed
+- **Dead-end empty states now link forward**:
+  - `/sequences` enroll panel with no contacts → "No contacts yet ·
+    Enrich a company →" linking `/companies`.
+  - `/deals` empty page + empty kanban columns → "Ask chat to draft
+    one" links back to Home (the chat entry point after Chat was
+    hidden) with `bm-pending-prompt` prefilled.
+  - `/triggers` no-triggers hint → "Agents can self-schedule. Ask
+    any agent to 'run this daily'." with a jump to `/agents`.
+
 ## 0.5.0 — 2026-04-23
 
 First 0.5 release. Visual consistency + routing correctness pass after a

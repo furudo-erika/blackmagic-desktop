@@ -176,10 +176,19 @@ async function fetchLogoUrl(domain: string): Promise<string | null> {
     .replace(/^www\./, '');
   if (!d) return null;
   const clearbit = `https://logo.clearbit.com/${d}?size=128`;
+  // 4s cap so a cold-cache Clearbit lookup can't stall enrich_company
+  // (the tool that calls this) for ~90s on fetch's default timeout.
+  // On timeout / any error we still return the favicon fallback, which
+  // is CDN-cached and effectively instant.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4_000);
   try {
-    const r = await fetch(clearbit, { method: 'HEAD' });
+    const r = await fetch(clearbit, { method: 'HEAD', signal: ctrl.signal });
     if (r.ok) return clearbit;
   } catch {}
+  finally {
+    clearTimeout(timer);
+  }
   return `https://www.google.com/s2/favicons?sz=128&domain=${d}`;
 }
 
