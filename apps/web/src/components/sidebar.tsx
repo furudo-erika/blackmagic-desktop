@@ -50,7 +50,7 @@ import {
   Search as SearchIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { api } from '../lib/api';
+import { api, type Project } from '../lib/api';
 import { AgentIcon, hasAgentTheme } from './agent-icon';
 
 // Icon string (from agent frontmatter `icon:`) → lucide component.
@@ -195,15 +195,7 @@ export function Sidebar() {
           title={activeProject?.path || 'Switch project'}
           className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white dark:hover:bg-[#1F1B15] text-left group"
         >
-          {activeProject?.logo_url ? (
-            <img
-              src={activeProject.logo_url}
-              alt=""
-              className="w-5 h-5 rounded-sm shrink-0 object-contain bg-white"
-            />
-          ) : (
-            <div className="w-4 h-4 rounded-sm bg-flame shrink-0" aria-hidden />
-          )}
+          <ProjectTile project={activeProject ?? null} />
           <span className="flex-1 text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">
             {activeProject?.name ?? 'Select project'}
           </span>
@@ -707,6 +699,48 @@ function HistorySidebarRow({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+// ProjectTile — logo if `logo_url` loads, letter-initial otherwise.
+// Remote logo services (Clearbit, favicon CDNs) 404 fairly often;
+// without an onError fallback the user stares at a macOS
+// broken-image placeholder. We track the load state locally and
+// swap to a deterministic colored letter-tile on any failure or
+// missing url.
+const PROJECT_TILE_BG = [
+  '#E8634A', '#3F7EC7', '#3FA36B', '#8B6FD6',
+  '#D79B3C', '#C9547C', '#3B9DA8', '#5B6BC7',
+];
+function projectTileBg(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return PROJECT_TILE_BG[Math.abs(h) % PROJECT_TILE_BG.length]!;
+}
+
+function ProjectTile({ project }: { project: Project | null }) {
+  const [broken, setBroken] = useState(false);
+  const url = project?.logo_url;
+  const name = project?.name ?? '?';
+  const initial = name.charAt(0).toUpperCase() || '?';
+  if (url && !broken) {
+    return (
+      <img
+        src={url}
+        alt=""
+        className="w-5 h-5 rounded-sm shrink-0 object-contain bg-white"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  return (
+    <div
+      className="w-5 h-5 rounded-sm shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
+      style={{ background: projectTileBg(name) }}
+      aria-hidden
+    >
+      {initial}
     </div>
   );
 }

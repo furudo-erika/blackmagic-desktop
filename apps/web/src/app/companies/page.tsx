@@ -405,22 +405,7 @@ export default function CompaniesPage() {
                           key={c.path}
                           selected={isSelected}
                           onClick={() => setSelected(c)}
-                          leading={
-                            c.logoUrl ? (
-                              <img
-                                src={c.logoUrl}
-                                alt=""
-                                className="w-8 h-8 rounded-md shrink-0 object-contain bg-white"
-                              />
-                            ) : (
-                              <span
-                                className="w-8 h-8 rounded-md flex items-center justify-center text-[13px] font-semibold text-white bg-flame shrink-0"
-                                aria-hidden
-                              >
-                                {letterTile(c.name)}
-                              </span>
-                            )
-                          }
+                          leading={<CompanyLeading logoUrl={c.logoUrl} name={c.name} />}
                           title={
                             <span className="flex items-center gap-2 min-w-0">
                               <span className="truncate">{c.name}</span>
@@ -485,5 +470,31 @@ export default function CompaniesPage() {
         )}
       </div>
     </PageShell>
+  );
+}
+
+// CompanyLeading — logo if the URL loads, letter tile otherwise.
+// Remote logo services (Clearbit, favicon CDNs) 404 often, so we
+// can't assume `logoUrl` renders — track load state and fall back
+// cleanly instead of showing a macOS broken-image placeholder.
+function CompanyLeading({ logoUrl, name }: { logoUrl?: string; name: string }) {
+  const [broken, setBroken] = useState(false);
+  if (logoUrl && !broken) {
+    return (
+      <img
+        src={logoUrl}
+        alt=""
+        className="w-8 h-8 rounded-md shrink-0 object-contain bg-white"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  return (
+    <span
+      className="w-8 h-8 rounded-md flex items-center justify-center text-[13px] font-semibold text-white bg-flame shrink-0"
+      aria-hidden
+    >
+      {letterTile(name)}
+    </span>
   );
 }

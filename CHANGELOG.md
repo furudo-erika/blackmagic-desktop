@@ -2,6 +2,25 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.2 — 2026-04-23
+
+### Fixed
+- **Broken-image icon everywhere the logo can 404.** Clearbit's free
+  logo CDN 404s on a non-trivial % of domains (and silently returned
+  404 for `vercel.com` out of the gate), which rendered as the macOS
+  broken-image placeholder in two places:
+  - Sidebar project switcher — now uses `<ProjectTile>` which falls
+    back to a deterministic colored letter-initial tile on any
+    `onError`.
+  - Companies list rows — now uses `<CompanyLeading>` with the same
+    `onError` → letter-initial fallback (was falling back only when
+    `logoUrl` was *undefined*, not when the remote image 404'd).
+- **Login / splash / bootstrap screen logo 404.** The `/logo.svg`
+  asset was 404'ing under Electron's `file://` protocol on cold
+  launch. Inlined the mark as a `<BrandMark>` component (4 concentric
+  circles + a flame dot, `currentColor` strokes so dark mode
+  inverts automatically) so there's no bundled-asset fetch at all.
+
 ## 0.5.1 — 2026-04-23
 
 Big parallel push — 3 sub-agents ran in isolated worktrees (UX

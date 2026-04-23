@@ -134,7 +134,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
           className="w-full max-w-md bg-white rounded-2xl border border-line p-8 shadow-sm"
           style={{ width: '100%', maxWidth: 440, background: '#fff', borderRadius: 16, border: '1px solid rgba(55,50,47,0.08)', padding: 32, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
         >
-          <img src="/logo.svg" alt="" width={40} height={40} className="mb-4" style={{ marginBottom: 16 }} />
+          <BrandMark className="w-10 h-10 mb-4" style={{ marginBottom: 16 }} />
           <h1 className="text-xl font-semibold mb-1" style={{ fontSize: 20, fontWeight: 600, marginBottom: 4, color: '#1A1614' }}>Developer: connect to daemon</h1>
           <p className="text-sm text-muted mb-6" style={{ fontSize: 14, color: '#605A57', marginBottom: 24 }}>
             You're running the web UI outside Electron. Paste the port + token from
@@ -205,7 +205,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-cream-light p-6">
         <div className="w-full max-w-md bg-white rounded-2xl border border-line p-8 shadow-sm">
-          <img src="/logo.svg" alt="" width={40} height={40} className="mb-4" />
+          <BrandMark className="w-10 h-10 mb-4" />
           <h1 className="text-xl font-semibold mb-1">Sign in</h1>
           <p className="text-sm text-muted mb-6">
             Sign in with your Black Magic account to link this app. Your browser
@@ -343,7 +343,7 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-cream-light dark:bg-[#17140F] p-6">
       <form onSubmit={submit} className="w-full max-w-xl bg-white dark:bg-[#1F1B15] rounded-2xl border border-line dark:border-[#2A241D] p-8 shadow-sm">
-        <img src="/logo.svg" alt="" width={40} height={40} className="mb-4 dark:invert" />
+        <BrandMark className="w-10 h-10 mb-4" />
         <h1 className="text-xl font-semibold text-ink dark:text-[#F5F1EA] mb-1">Tell us about your company</h1>
         <p className="text-sm text-muted dark:text-[#8C837C] mb-4">
           Just your domain is enough — Black Magic AI will crawl your site and docs to fill in <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1 rounded">us/company.md</code>, <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1 rounded">product/</code>, <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1 rounded">market/</code>, <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1 rounded">brand/</code>, etc. You can edit anything by hand later.
@@ -426,3 +426,30 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   );
 }
 
+
+// BrandMark — inlined version of /public/logo.svg. Kept inline so
+// Electron's file:// protocol can't 404 it the way it did with the
+// bundled static asset; also invert-safe via currentColor so dark
+// mode works without the dark:invert hack.
+function BrandMark({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <svg
+      viewBox="6 6 52 52"
+      className={className}
+      style={style}
+      aria-hidden
+      role="img"
+    >
+      <circle cx="32" cy="32" r="24" fill="none" stroke="currentColor" strokeWidth={5} />
+      <circle cx="32" cy="32" r="16" fill="none" stroke="currentColor" strokeWidth={4.5} />
+      <circle cx="32" cy="32" r="8" fill="none" stroke="currentColor" strokeWidth={4} />
+      <circle cx="32" cy="32" r="3.5" fill="#E8523A" />
+    </svg>
+  );
+}
