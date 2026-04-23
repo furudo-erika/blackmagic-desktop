@@ -2,6 +2,21 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.85 — 2026-04-23
+
+### Changed
+- **Home Quick starts now shows Intelligence & Ops too** — the 0.4.84
+  grid only had the 8 content skills (videos, images, copy), which
+  made BlackMagic look like a one-trick content tool. Added a second
+  8-card row covering the stuff people actually ask for daily:
+  Brand monitor, Visitor sweep (RB2B), Inbox triage (Gmail), Meeting
+  digest (Calendar), GEO brand sweep, Competitor radar, GA traffic
+  brief, GSC content brief.
+- **"20+ more →" link now routes to /agents, not /skills.** Agents
+  are grouped by function with descriptions — easier to skim when
+  you're asking "what can this thing actually do" than the flat
+  /skills catalog.
+
 ## 0.4.84 — 2026-04-23
 
 ### Added

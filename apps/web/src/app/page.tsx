@@ -27,7 +27,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, CheckCircle2, Circle, Film, Video, Image as ImageIcon, LayoutGrid, Rocket, Megaphone, Mail, FileText } from 'lucide-react';
+import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, CheckCircle2, Circle, Film, Video, Image as ImageIcon, LayoutGrid, Rocket, Megaphone, Mail, FileText, Radar, UserCheck, CalendarDays, Target, Swords, BarChart3, Search } from 'lucide-react';
 import { api } from '../lib/api';
 import { Composer } from '../components/composer';
 
@@ -282,25 +282,47 @@ export default function HomePage() {
           <span>@ agent · / commands</span>
         </div>
 
-        {/* Quick starts — 8 skill shortcuts. Click a card to prefill
-            the composer with a ready-to-edit invocation template;
-            cursor jumps to the first bracket placeholder so the user
-            just fills in the blank and hits ⌘↵. Keeps skills
-            discoverable without forcing everyone onto /skills. */}
+        {/* Quick starts — skill shortcuts grouped into two buckets so
+            the grid doesn't just look like a pile of random cards.
+            Click a card to prefill the composer with a ready-to-edit
+            invocation template; cursor auto-selects the first
+            [bracket placeholder] so the user's next keypress replaces
+            it. "See all agents →" routes to /agents because the
+            agent-grouped view reads better than the raw /skills list
+            for someone who just wants to know "what can this do". */}
         <div className="mt-8">
           <div className="flex items-end justify-between mb-3">
             <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-muted dark:text-[#8C837C]">
               Quick starts
             </div>
             <Link
-              href="/skills"
+              href="/agents"
               className="text-[10px] font-mono text-muted dark:text-[#8C837C] hover:text-flame inline-flex items-center gap-1"
             >
-              20+ more <ChevronRight className="w-3 h-3" />
+              See all agents <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
+
+          <div className="text-[10px] uppercase tracking-wider font-mono text-muted/70 dark:text-[#6B625C] mb-2">
+            Content
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            {QUICK_STARTS_CONTENT.map((q) => (
+              <QuickStartCard
+                key={q.title}
+                icon={q.icon}
+                title={q.title}
+                subtitle={q.subtitle}
+                onClick={() => prefill(q.prompt)}
+              />
+            ))}
+          </div>
+
+          <div className="text-[10px] uppercase tracking-wider font-mono text-muted/70 dark:text-[#6B625C] mb-2">
+            Intelligence & ops
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {QUICK_STARTS.map((q) => (
+            {QUICK_STARTS_INTEL.map((q) => (
               <QuickStartCard
                 key={q.title}
                 icon={q.icon}
@@ -599,17 +621,20 @@ function Card({
   );
 }
 
-// Quick-start shortcuts — the 8 skills we think someone on a seed-stage
-// team reaches for most. Clicking one prefills the composer with a
-// template that has one or two [bracket placeholders]; the home page's
-// prefill() selects the first bracket so the user's next keystroke
-// replaces it. Rest of the 20+ skills live at /skills.
-const QUICK_STARTS: Array<{
+// Quick-start shortcuts — split into two groups so the grid actually
+// tells a user what the product is for. "Content" is the Hypereal /
+// drafting side; "Intelligence & ops" is the monitoring / research /
+// inbox-and-calendar side. Clicking a card prefills the composer with
+// a template that has [bracket placeholders]; prefill() on Home selects
+// the first bracket so the user's next keystroke replaces it.
+type QuickStart = {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   subtitle: string;
   prompt: string;
-}> = [
+};
+
+const QUICK_STARTS_CONTENT: QuickStart[] = [
   {
     icon: Film,
     title: 'Announcement video',
@@ -657,6 +682,57 @@ const QUICK_STARTS: Array<{
     title: 'Founder update',
     subtitle: 'Monthly investor draft',
     prompt: 'Use the founder-monthly-update skill.\nMonth: [YYYY-MM]',
+  },
+];
+
+const QUICK_STARTS_INTEL: QuickStart[] = [
+  {
+    icon: Radar,
+    title: 'Brand monitor',
+    subtitle: 'Daily mention sweep',
+    prompt: 'Use the brand-monitor-apify skill. Scan Reddit, X, and the open web for mentions of my brand from the last 24h, classify them, and write today\'s signal file.',
+  },
+  {
+    icon: UserCheck,
+    title: 'Visitor sweep',
+    subtitle: 'Yesterday\'s RB2B hits',
+    prompt: 'Use the rb2b-visitor-sweep skill. Pull yesterday\'s identified site visitors, score HOT/WARM against us/market/icp.md, and drop them into companies/ + contacts/.',
+  },
+  {
+    icon: Inbox,
+    title: 'Inbox triage',
+    subtitle: 'Who needs a reply today',
+    prompt: 'Use the inbox-triage skill. Classify my unread Gmail from the last 24h into REPLY_TODAY / FYI / SPAM and write today\'s digest.',
+  },
+  {
+    icon: CalendarDays,
+    title: 'Meeting digest',
+    subtitle: 'Tomorrow\'s prep briefs',
+    prompt: 'Use the meeting-digest skill. Pull tomorrow\'s Google Calendar meetings, enrich external attendees via CRM + Gmail, and write prep briefs.',
+  },
+  {
+    icon: Target,
+    title: 'GEO brand sweep',
+    subtitle: 'AI SOV across ChatGPT/PPX',
+    prompt: 'Run the daily GEO brand sweep — execute every prompt under signals/geo/prompts/ across ChatGPT, Perplexity, and Google AI Overviews, then report share-of-voice + gaps.',
+  },
+  {
+    icon: Swords,
+    title: 'Competitor radar',
+    subtitle: 'Weekly intel pack',
+    prompt: 'Use the competitor-radar skill. Sweep each competitor listed in us/market/competitors.md for product-page diffs, new pricing, and notable posts this week.',
+  },
+  {
+    icon: BarChart3,
+    title: 'GA traffic brief',
+    subtitle: 'SURGE / DROP / CONVERT',
+    prompt: 'Use the ga-traffic-brief skill. Pull the last 28 days from Google Analytics 4, flag SURGE / DROP / CONVERT pages, and report top action.',
+  },
+  {
+    icon: Search,
+    title: 'GSC content brief',
+    subtitle: 'REWRITE / PUSH / GAP',
+    prompt: 'Use the gsc-content-brief skill. Scan Search Console for queries worth rewriting, pushing, or chasing (GAP) and propose the top 5 actions.',
   },
 ];
 
