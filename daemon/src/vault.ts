@@ -2928,6 +2928,363 @@ threads from Gmail with the same people.
 skill: "meeting-digest" })\`.
 `,
 
+  // === Startup content skills (Hypereal + CMS + email) ====================
+  // The "meat & potatoes" a seed-stage team ships every week: launch
+  // videos, blog hero images, UGC-style testimonials, carousels for
+  // social, founder updates. Each one is one tool call away from a usable
+  // artifact so the team isn't paying a freelancer $200/asset.
+
+  'announcement-video.md': `---
+kind: skill
+name: announcement-video
+group: content
+agent: researcher
+inputs:
+  - { name: topic, required: true, description: "What are we announcing? e.g. 'Series A close', 'v2 launch'" }
+  - { name: duration_s, required: false, description: "Seconds. Default 8." }
+  - { name: aspect, required: false, description: "9:16 | 16:9 | 1:1. Default 16:9." }
+requires:
+  integrations: [hypereal]
+---
+
+Generate a short product-announcement video clip for the channel mix
+(LinkedIn, Twitter, homepage hero). Uses Hypereal → Seedance 2.0 by
+default; override with \`model\` for Veo / Kling / WAN.
+
+## Steps
+1. Read \`us/company.md\` for brand voice + product positioning.
+2. Compose a shotlist prompt from the topic — hook (0–2s), proof
+   beat (2–6s), CTA frame (6–8s). Include brand color hints if the
+   company file specifies them.
+3. \`hypereal_generate({ kind: "video", prompt: <shotlist>,
+   model: "seedance-2.0", options: { duration_s: {{duration_s|8}},
+   aspect: "{{aspect|16:9}}" } })\`.
+4. Save the returned url to \`assets/announcements/<slug>.mp4.md\`
+   with frontmatter \`kind: asset.video, topic: <x>, created: <iso>,
+   url: <signed>\` so the asset is discoverable later.
+5. Reply with the signed url + one-line "ready to post" message.
+`,
+
+  'ugc-video.md': `---
+kind: skill
+name: ugc-video
+group: content
+agent: researcher
+inputs:
+  - { name: persona, required: true, description: "Who's 'recording'? e.g. 'dev in hoodie at home desk'" }
+  - { name: talking_point, required: true, description: "What do they say about the product?" }
+requires:
+  integrations: [hypereal]
+---
+
+Faux-UGC testimonial video — handheld phone framing, natural lighting,
+one-take vibe. For paid social creative tests and short-form (Reels,
+Shorts, TikTok).
+
+## Steps
+1. Build prompt: "{{persona}}, speaking directly to phone camera,
+   casual natural tone, says: '{{talking_point}}'. Vertical framing,
+   slight handheld motion, ambient room light, no studio look."
+2. \`hypereal_generate({ kind: "video", prompt: <built>,
+   model: "seedance-2.0",
+   options: { duration_s: 12, aspect: "9:16" } })\`.
+3. Generate 3 variants (loop with slight persona tweaks + null seed)
+   so paid-ads has stock to A/B.
+4. Save each to \`assets/ugc/<slug>-v<n>.mp4.md\` with persona +
+   talking_point in frontmatter. Reply with the 3 urls + suggested
+   ad-copy hook lines.
+`,
+
+  'blog-post-hero.md': `---
+kind: skill
+name: blog-post-hero
+group: content
+agent: researcher
+inputs:
+  - { name: post_path, required: true, description: "Path to the blog .md (or CMS slug)" }
+  - { name: style, required: false, description: "editorial | minimal-geometric | photoreal. Default editorial." }
+requires:
+  integrations: [hypereal]
+  optional_integrations: [ghost, wordpress]
+---
+
+Hero image for a blog post. Reads the post's title + first paragraph,
+composes a style-tuned prompt, and either saves the image next to the
+draft or pushes it straight into the CMS.
+
+## Steps
+1. Load the post — if post_path is a vault path, read it; if it looks
+   like a slug, \`cms_list_posts\` then fetch.
+2. Extract: title, first paragraph, any bolded keywords.
+3. Build style-specific prompt:
+   - editorial: "Magazine-editorial illustration of <concept>,
+     clean isometric, muted palette, subtle grain, 16:9"
+   - minimal-geometric: "Minimal geometric composition suggesting
+     <concept>, flat color blocks, 16:9"
+   - photoreal: "Photo-realistic scene depicting <concept>,
+     soft natural light, shallow depth of field, 16:9"
+4. \`hypereal_generate({ kind: "image", prompt: <built>,
+   options: { aspect: "16:9" } })\`.
+5. If Ghost/WP connected, upload via the CMS media endpoint and set
+   as the post's feature image. Otherwise save to
+   \`assets/blog/<post-slug>-hero.png.md\` and reply with the url.
+`,
+
+  'social-carousel.md': `---
+kind: skill
+name: social-carousel
+group: content
+agent: researcher
+inputs:
+  - { name: topic, required: true, description: "What's the carousel about?" }
+  - { name: slides, required: false, description: "How many slides. Default 5." }
+  - { name: network, required: false, description: "linkedin | instagram | twitter. Default linkedin." }
+requires:
+  integrations: [hypereal]
+---
+
+Multi-slide image carousel for LinkedIn / Instagram. Slide 1 = hook,
+slides 2–(n-1) = body, slide n = CTA. Each slide is its own image,
+consistent visual language across the pack.
+
+## Steps
+1. Outline the story: one-liner hook → 3–4 evidence beats → CTA.
+   Each slide's text under 14 words.
+2. For each slide, \`hypereal_generate({ kind: "image",
+   prompt: <slide copy + consistent style anchor>,
+   options: { aspect: <"16:9" for twitter else "1:1"> } })\`.
+3. Save all urls + slide copy to
+   \`assets/social/<topic-slug>-carousel.md\` with frontmatter
+   \`kind: asset.carousel, network: <x>, slides: <n>\`.
+4. Reply with the ordered urls + slide copy so the user can paste
+   directly into LinkedIn's native carousel uploader.
+`,
+
+  'podcast-cover-art.md': `---
+kind: skill
+name: podcast-cover-art
+group: content
+agent: researcher
+inputs:
+  - { name: episode_title, required: true }
+  - { name: guest, required: false }
+  - { name: style, required: false, description: "bold-typographic | editorial-portrait | abstract. Default bold-typographic." }
+requires:
+  integrations: [hypereal]
+---
+
+Episode cover art at 3000×3000 (Apple / Spotify spec). Reuses the
+show's visual language if \`us/brand/podcast.md\` exists.
+
+## Steps
+1. If \`us/brand/podcast.md\` exists, read it for palette + type
+   direction. Otherwise fall back to style defaults.
+2. Compose prompt around episode title + guest name.
+3. \`hypereal_generate({ kind: "image", prompt: <built>,
+   options: { aspect: "1:1", size: "3000x3000" } })\`.
+4. Save to \`assets/podcast/<episode-slug>.png.md\` and reply with
+   the url + a 2-line episode description ready for show notes.
+`,
+
+  'product-hunt-kit.md': `---
+kind: skill
+name: product-hunt-kit
+group: content
+agent: researcher
+inputs:
+  - { name: launch_name, required: true, description: "What are we launching on PH?" }
+  - { name: tagline, required: true, description: "One-line pitch. ≤60 chars." }
+requires:
+  integrations: [hypereal]
+---
+
+Full Product Hunt asset bundle: thumbnail (1270×760), three gallery
+images (1270×760), launch tweet + LinkedIn post draft. Everything
+needed to hit "Schedule" on PH day-of.
+
+## Steps
+1. Read \`us/company.md\` for positioning.
+2. Thumbnail: "Clean product hero for {{launch_name}}, {{tagline}},
+   centered composition, brand-palette gradient bg, 16:9" →
+   \`hypereal_generate({ kind: "image",
+   options: { aspect: "16:9", size: "1270x760" } })\`.
+3. Three gallery images — each shows a distinct benefit
+   (before/after, core flow screenshot-style, founder portrait-style).
+   Same size as thumb.
+4. Launch tweet: hook → 3 bullets → link + "today on @ProductHunt".
+   LinkedIn post: same spine, expanded to ~80 words.
+5. Save bundle to \`assets/ph/<launch-slug>/\` with a \`README.md\`
+   listing all 4 urls + both copy drafts.
+6. Reply with the README contents inline.
+`,
+
+  'demo-voiceover.md': `---
+kind: skill
+name: demo-voiceover
+group: content
+agent: researcher
+inputs:
+  - { name: script_path, required: true, description: "Path to the script .md" }
+  - { name: voice, required: false, description: "ElevenLabs voice id. Default 'neutral-pm-m'." }
+requires:
+  integrations: [hypereal]
+---
+
+Turn a written demo script into a clean voiceover MP3 ready to drop
+onto a screen recording. Hypereal → ElevenLabs.
+
+## Steps
+1. Read \`{{script_path}}\`. Strip markdown, keep line breaks as
+   pause hints.
+2. \`hypereal_generate({ kind: "voice", prompt: <cleaned script>,
+   model: "elevenlabs-v2",
+   options: { voice_id: "{{voice|neutral-pm-m}}" } })\`.
+3. Save the MP3 url to \`assets/voiceover/<script-slug>.mp3.md\` and
+   reply with the url + estimated runtime (chars / 14).
+`,
+
+  'landing-hero-image.md': `---
+kind: skill
+name: landing-hero-image
+group: content
+agent: researcher
+inputs:
+  - { name: page, required: true, description: "What page? e.g. '/features/inbox-triage'" }
+  - { name: concept, required: true, description: "One-line visual concept." }
+requires:
+  integrations: [hypereal]
+---
+
+Landing-page hero image (2400×1600, retina-ready) for a product or
+feature page.
+
+## Steps
+1. Read \`us/brand.md\` if present for palette + style.
+2. Build prompt: "<concept>, professional SaaS landing hero, clean
+   light background, generous negative space on the left for
+   headline overlay, brand colors {{palette}}."
+3. \`hypereal_generate({ kind: "image", prompt: <built>,
+   options: { aspect: "16:9", size: "2400x1600" } })\`.
+4. Save to \`assets/landing/<page-slug>-hero.png.md\`. Reply with
+   url + suggested H1 that pairs with the image.
+`,
+
+  'changelog-teaser.md': `---
+kind: skill
+name: changelog-teaser
+group: content
+agent: researcher
+inputs:
+  - { name: version, required: false, description: "Release version. Default latest." }
+---
+
+Turn the latest CHANGELOG entry into a multi-channel teaser: tweet,
+LinkedIn post, 1-sentence blog summary, in-app release note. Text
+only — pair with \`blog-post-hero\` for an image.
+
+## Steps
+1. Read \`CHANGELOG.md\`. If version unset, take the top entry; else
+   find the matching \`## <version>\` section.
+2. Classify the change: feature / fix / perf / breaking.
+3. Draft:
+   - Tweet: hook + 1 benefit + "shipped today" — ≤270 chars.
+   - LinkedIn: hook, 3 bullets, 1 line on why it matters —
+     80–120 words.
+   - Blog summary: 1 sentence ready to prepend to a release post.
+   - In-app note: 2 sentences for the app's update modal.
+4. Save to \`content/teasers/<version>.md\` with a section per
+   channel. Reply with all four drafts inline.
+`,
+
+  'launch-tweet-thread.md': `---
+kind: skill
+name: launch-tweet-thread
+group: content
+agent: researcher
+inputs:
+  - { name: feature, required: true, description: "What are we launching?" }
+  - { name: tweets, required: false, description: "How many tweets. Default 7." }
+requires:
+  optional_integrations: [hypereal]
+---
+
+Feature-launch tweet thread (hook-style) with an optional Hypereal
+hero image anchoring tweet #1.
+
+## Steps
+1. Read \`us/company.md\` for tone (founder voice vs ops voice).
+2. Build the spine: hook (bold claim) → problem → old-way →
+   new-way (us) → 2 concrete proof points → who it's for → CTA
+   with link. Each tweet ≤270 chars. No "🧵", no emoji clusters.
+3. If Hypereal connected: \`hypereal_generate({ kind: "image",
+   prompt: "<feature> hero, editorial illustration, 16:9",
+   options: { aspect: "16:9" } })\` — attach url to tweet 1.
+4. Save to \`content/tweets/<feature-slug>-thread.md\` with each
+   tweet as a list item. Reply with the thread inline, ready to
+   paste into Typefully / native Twitter.
+`,
+
+  'cold-email-sequence.md': `---
+kind: skill
+name: cold-email-sequence
+group: outreach
+agent: researcher
+inputs:
+  - { name: icp, required: true, description: "Who are we writing to?" }
+  - { name: offer, required: true, description: "What are we offering? One line." }
+requires:
+  optional_integrations: [gmail, amazon_ses]
+---
+
+Draft a 3-touch cold email sequence with subject-line A/B variants.
+Writes drafts to \`drafts/\` — nothing sends without user approval.
+
+## Steps
+1. If \`us/market/icp.md\` exists, validate the ICP description
+   aligns with the house profile.
+2. Draft:
+   - Touch 1 (Day 0): personalised hook → 1-line relevance → soft
+     CTA. Two subject lines (curiosity vs specific-pain).
+   - Touch 2 (Day 3): bump — no apology, add one concrete proof
+     point, alternate CTA (async Loom?).
+   - Touch 3 (Day 7): break-up — short, "closing this loop, try
+     next quarter?", one subject line.
+3. Write each touch to \`drafts/cold-<icp-slug>-t<n>.md\` with
+   frontmatter \`kind: draft.email, sequence: cold-<slug>,
+   step: <n>, subjects: [a, b]\`.
+4. Reply with all 3 touches inline. Do NOT call \`send_email\` or
+   \`gmail_send\` — user reviews from Desk first.
+`,
+
+  'founder-monthly-update.md': `---
+kind: skill
+name: founder-monthly-update
+group: content
+agent: researcher
+inputs:
+  - { name: month, required: false, description: "YYYY-MM. Default last month." }
+requires:
+  optional_integrations: [ghost, wordpress, hubspot, attio, google_analytics, gsc]
+---
+
+Compile a monthly founder/investor update from whatever signal files
++ CRM data you have. Never sends — writes a draft for review.
+
+## Steps
+1. Resolve target month (YYYY-MM). Gather whatever's connected:
+   - \`signals/analytics/\` → top traffic / engagement story
+   - \`signals/content/\` → what shipped
+   - HubSpot / Attio → new logos, pipeline delta
+   - \`CHANGELOG.md\` → ship count + notable releases
+2. Draft sections (skip any with no data): TL;DR (3 bullets) · Wins
+   · Metrics · Shipped · Lowlights/blockers · Asks.
+3. Keep under 500 words. Investors skim.
+4. Save to \`content/updates/<YYYY-MM>.md\` with frontmatter
+   \`kind: content.update, month: <YYYY-MM>, status: draft\`.
+5. Reply with the draft inline + one-line summary of what data was
+   missing, so the founder knows what to hand-add before sending.
+`,
+
   // === CMS skills =========================================================
   // Note: no requires.integrations — this skill works with EITHER Ghost
   // OR WordPress, and requires.integrations is AND-ed. cms_list_posts

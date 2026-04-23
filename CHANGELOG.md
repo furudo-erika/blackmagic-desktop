@@ -2,6 +2,36 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.83 — 2026-04-23
+
+### Added
+- **12 startup content skills** seeded in the vault — the "meat &
+  potatoes" a seed-stage team ships every week, each one tool call
+  away from a usable artifact so the team isn't paying a freelancer
+  $200/asset:
+  - `announcement-video` — short product-announcement clip via
+    Hypereal Seedance (hook/proof/CTA shotlist).
+  - `ugc-video` — faux-UGC testimonial (handheld, natural light),
+    3 variants per run for paid A/B.
+  - `blog-post-hero` — hero image for a blog post; pushes straight
+    to Ghost / WP if connected.
+  - `social-carousel` — 5-slide LinkedIn / IG / Twitter carousel
+    with consistent visual language.
+  - `podcast-cover-art` — 3000×3000 episode art to Apple / Spotify
+    spec.
+  - `product-hunt-kit` — full PH launch bundle: thumbnail + 3
+    gallery images + launch tweet + LI post.
+  - `demo-voiceover` — script → clean MP3 via Hypereal ElevenLabs.
+  - `landing-hero-image` — 2400×1600 retina landing hero.
+  - `changelog-teaser` — multi-channel teaser (tweet / LI / blog
+    summary / in-app note) from a CHANGELOG entry.
+  - `launch-tweet-thread` — hook-style feature-launch thread with
+    optional hero image.
+  - `cold-email-sequence` — 3-touch sequence with subject-line A/B
+    variants, written to drafts/ (never auto-sends).
+  - `founder-monthly-update` — monthly investor/user update draft
+    composed from signals/ + CRM + CHANGELOG.
+
 ## 0.4.82 — 2026-04-23
 
 ### Changed
