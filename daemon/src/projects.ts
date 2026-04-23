@@ -9,12 +9,17 @@ import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import matter from 'gray-matter';
 import { homeVault, setVaultRoot, getVaultRoot } from './paths.js';
 
 export interface Project {
   id: string;
   name: string;
   path: string;
+  // Present once the Company Profiler has run enrich_company against
+  // the user's own domain — the sidebar project switcher uses this to
+  // render the real logo instead of the generic orange-square tile.
+  logo_url?: string;
 }
 
 export interface ProjectsRegistry {
@@ -85,6 +90,43 @@ export async function getRegistry(): Promise<ProjectsRegistry> {
   const reg = await readRegistry();
   if (reg) return reg;
   return initProjectsRegistry();
+}
+
+// Per-project cache for the logo_url parsed from <project>/us/company.md.
+// A 60s TTL keeps the list endpoint snappy — the frontmatter only changes
+// once per enrichment run and this file sits outside the active vault so
+// we can't rely on the vault watcher.
+const logoCache = new Map<string, { logo?: string; expires: number }>();
+const LOGO_TTL_MS = 60_000;
+
+async function readProjectLogo(projectPath: string): Promise<string | undefined> {
+  const now = Date.now();
+  const hit = logoCache.get(projectPath);
+  if (hit && hit.expires > now) return hit.logo;
+  let logo: string | undefined;
+  try {
+    const raw = await fs.readFile(path.join(projectPath, 'us', 'company.md'), 'utf-8');
+    const parsed = matter(raw);
+    const fm = parsed.data as Record<string, unknown> | undefined;
+    const v = fm?.logo_url;
+    if (typeof v === 'string' && v.trim()) logo = v.trim();
+  } catch {}
+  logoCache.set(projectPath, { logo, expires: now + LOGO_TTL_MS });
+  return logo;
+}
+
+// Registry variant that also resolves each project's logo_url from the
+// on-disk us/company.md frontmatter. The frontend sidebar project
+// switcher reads this to render the real logo next to the project name.
+export async function getRegistryWithLogos(): Promise<ProjectsRegistry> {
+  const reg = await getRegistry();
+  const withLogos = await Promise.all(
+    reg.projects.map(async (p) => {
+      const logo = await readProjectLogo(p.path);
+      return logo ? { ...p, logo_url: logo } : p;
+    }),
+  );
+  return { ...reg, projects: withLogos };
 }
 
 // Add a project. If `inputPath` has no `/`, it's treated as a simple slug and

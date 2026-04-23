@@ -42,6 +42,7 @@ type Company = {
   notesStatus?: string;
   missingFields: string[];
   humanEditedAt?: string;
+  logoUrl?: string;
   frontmatter: Record<string, unknown>;
 };
 
@@ -261,6 +262,7 @@ export default function CompaniesPage() {
             notesStatus: fm.notes_status != null ? String(fm.notes_status) : undefined,
             missingFields,
             humanEditedAt,
+            logoUrl: fm.logo_url != null ? String(fm.logo_url) : undefined,
             frontmatter: fm,
           };
         }),
@@ -408,12 +410,20 @@ export default function CompaniesPage() {
                           selected={isSelected}
                           onClick={() => setSelected(c)}
                           leading={
-                            <span
-                              className="w-8 h-8 rounded-md flex items-center justify-center text-[13px] font-semibold text-white bg-flame shrink-0"
-                              aria-hidden
-                            >
-                              {letterTile(c.name)}
-                            </span>
+                            c.logoUrl ? (
+                              <img
+                                src={c.logoUrl}
+                                alt=""
+                                className="w-8 h-8 rounded-md shrink-0 object-contain bg-white"
+                              />
+                            ) : (
+                              <span
+                                className="w-8 h-8 rounded-md flex items-center justify-center text-[13px] font-semibold text-white bg-flame shrink-0"
+                                aria-hidden
+                              >
+                                {letterTile(c.name)}
+                              </span>
+                            )
                           }
                           title={
                             <span className="flex items-center gap-2 min-w-0">

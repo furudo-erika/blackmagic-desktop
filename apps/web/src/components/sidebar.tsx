@@ -195,7 +195,15 @@ export function Sidebar() {
           title={activeProject?.path || 'Switch project'}
           className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white dark:hover:bg-[#1F1B15] text-left group"
         >
-          <div className="w-4 h-4 rounded-sm bg-flame shrink-0" aria-hidden />
+          {activeProject?.logo_url ? (
+            <img
+              src={activeProject.logo_url}
+              alt=""
+              className="w-5 h-5 rounded-sm shrink-0 object-contain bg-white"
+            />
+          ) : (
+            <div className="w-4 h-4 rounded-sm bg-flame shrink-0" aria-hidden />
+          )}
           <span className="flex-1 text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">
             {activeProject?.name ?? 'Select project'}
           </span>
