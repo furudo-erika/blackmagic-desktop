@@ -2,6 +2,13 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.75 — 2026-04-23
+
+### Changed
+- **RB2B logo** on the marketing integrations grid swapped to their
+  LinkedIn company-logo CDN url (the webflow-hosted SVG was loading
+  mis-cropped on some tiles).
+
 ## 0.4.74 — 2026-04-23
 
 ### Added
