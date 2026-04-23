@@ -11,6 +11,12 @@ declare global {
       appVersion?: string;
       openExternal?: (url: string) => void;
       pickFolder?: () => Promise<string | null>;
+      notify?: (payload: {
+        title?: string;
+        body: string;
+        subtitle?: string;
+        silent?: boolean;
+      }) => Promise<boolean>;
       onUpdateAvailable?: (
         cb: (payload: {
           currentVersion: string;

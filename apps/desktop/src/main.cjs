@@ -482,6 +482,11 @@ function launchBrewUpgradeAndRelaunch(brewPath) {
   try { fs.mkdirSync(logDir, { recursive: true }); } catch {}
   const logPath = path.join(logDir, `auto-upgrade-${Date.now()}.log`);
   const flagPath = path.join(logDir, `upgrade-done-${Date.now()}.flag`);
+  // Failure-pending flag read on next launch. Electron's Notification API
+  // isn't available to the shell script (app has quit by then), so we
+  // surface the failure via a native notification when the user reopens
+  // the old app.
+  const failFlag = path.join(app.getPath('userData'), '.upgrade-failed');
 
   // Pre-create the log so the progress window's tail has something to
   // read from frame zero.
@@ -563,7 +568,13 @@ sleep 1
 if [ "$status" -eq 0 ]; then
   open -a "BlackMagic AI"
 else
-  /usr/bin/osascript -e 'display notification "brew upgrade failed — see ~/Library/Logs/BlackMagic AI" with title "BlackMagic AI"'
+  # Write a marker so the app shows a native notification on next launch
+  # (Electron's Notification API attributes correctly to the app; osascript
+  # doesn't). Still try osascript as a fallback in case the user doesn't
+  # relaunch for a while.
+  mkdir -p "$(dirname "${failFlag}")"
+  printf '%s' "upgrade failed (exit=$status) — see ~/Library/Logs/BlackMagic AI" > "${failFlag}"
+  /usr/bin/osascript -e 'display notification "brew upgrade failed — see ~/Library/Logs/BlackMagic AI" with title "BlackMagic AI"' 2>/dev/null || true
 fi
 `;
   const scriptPath = path.join(os.tmpdir(), `blackmagic-auto-upgrade-${Date.now()}.sh`);
@@ -600,6 +611,22 @@ async function notifyIfNewerAvailable(win) {
 app.whenReady().then(async () => {
   buildAppMenu();
   await enforceMinVersion();
+  // Drain any "upgrade failed" marker left by a previous run's shell
+  // script. Shown via native Notification so it attributes to the app.
+  try {
+    const failFlag = path.join(app.getPath('userData'), '.upgrade-failed');
+    if (fs.existsSync(failFlag)) {
+      const body = fs.readFileSync(failFlag, 'utf-8').trim() ||
+        'Upgrade failed — see ~/Library/Logs/BlackMagic AI';
+      notify({ title: APP_NAME, subtitle: 'Upgrade failed', body });
+      fs.unlinkSync(failFlag);
+    }
+  } catch (err) {
+    console.error('[main] upgrade-fail flag drain failed:', err);
+  }
+  // Warmup: register the app in System Settings → Notifications on
+  // first launch so subsequent notifications actually show.
+  warmupNotificationsOnce();
   const win = await createWindow();
   if (win) {
     // Delay slightly so the renderer has time to mount its listener.

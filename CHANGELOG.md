@@ -2,6 +2,29 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.11 — 2026-04-23
+
+### Fixed
+- **macOS notifications now actually show.** All in-app notifications
+  were being sent via `osascript display notification`, which attributes
+  to Script Editor — on macOS 12+ those are silently dropped unless the
+  user has separately granted Script Editor notification permission
+  (which nobody does). Switched to Electron's `Notification` API so
+  everything attributes to `run.blackmagic.desktop` and shows up as
+  **BlackMagic AI** in System Settings → Notifications.
+- **First-launch permission warmup.** On first run the app fires one
+  silent notification so macOS registers the app in the notification
+  permission list, making subsequent notifications visible.
+- **Upgrade-failed messages survive the app quit.** When a brew upgrade
+  fails, the shell script (which runs after Electron has exited) now
+  writes a flag the app reads on next launch and shows a proper
+  native notification instead of relying on osascript.
+
+### Added
+- **`window.bmBridge.notify()`** — renderer-side hook to fire native
+  notifications. Useful for surfacing agent-run completion, draft
+  approvals, etc. from any page.
+
 ## 0.5.10 — 2026-04-23
 
 ### Changed
