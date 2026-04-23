@@ -25,7 +25,7 @@ import {
   Bot, Sparkles, Search, Briefcase, Globe, Linkedin,
   CalendarClock, Copy as CopyIcon, RotateCcw, Activity, Radar, Send,
   Play, ChevronRight, ChevronDown, FileOutput, FileInput, Loader2, Check, AlertCircle,
-  Target, MessageCircle, Eye,
+  Target, MessageCircle, Eye, MessageCircleReply,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../../lib/api';
@@ -36,7 +36,7 @@ import { Composer } from '../../components/composer';
 const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   Bot, Globe, Linkedin, CalendarClock, Copy: CopyIcon, RotateCcw,
   Activity, Radar, Search, Briefcase, Send, Sparkles,
-  Target, MessageCircle, Eye,
+  Target, MessageCircle, Eye, MessageCircleReply,
 };
 
 // Per-slug Lucide override so every seeded agent shows a distinct
@@ -60,6 +60,7 @@ const AGENT_SLUG_ICON: Record<string, LucideIcon> = {
   'brand-monitor':       Eye,
   'content-studio':      Sparkles,
   'x-account':           MessageCircle,
+  'reply-guy':           MessageCircleReply,
 };
 
 type AgentMeta = {

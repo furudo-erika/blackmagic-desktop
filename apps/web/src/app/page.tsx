@@ -523,6 +523,7 @@ const STARTER_TINTS: Record<string, string> = {
   'ae':                  'text-[#D97706] bg-[#D97706]/10',
   'sdr':                 'text-[#8B5CF6] bg-[#8B5CF6]/10',
   'x-account':           'text-[#0D9488] bg-[#0D9488]/10',
+  'reply-guy':           'text-[#EA580C] bg-[#EA580C]/10',
 };
 
 const AGENT_LABEL: Record<string, string> = {
@@ -541,6 +542,7 @@ const AGENT_LABEL: Record<string, string> = {
   'ae':                  'AE desk',
   'sdr':                 'SDR',
   'x-account':           'X',
+  'reply-guy':           'Reply Guy',
 };
 
 function StarterPromptRow({

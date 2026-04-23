@@ -52,6 +52,7 @@ import {
   MessageCircle,
   Eye,
   UserPlus,
+  MessageCircleReply,
   CreditCard,
   ExternalLink,
   type LucideIcon,
@@ -78,6 +79,7 @@ const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   MessageCircle,
   Eye,
   UserPlus,
+  MessageCircleReply,
 };
 
 // Per-slug override when the frontmatter `icon:` is missing or wrong.
@@ -99,6 +101,7 @@ const AGENT_SLUG_ICON: Record<string, LucideIcon> = {
   'brand-monitor':       Eye,
   'content-studio':      Sparkles,
   'x-account':           MessageCircle,
+  'reply-guy':           MessageCircleReply,
 };
 
 export function Sidebar() {

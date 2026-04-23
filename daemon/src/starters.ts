@@ -311,6 +311,16 @@ export const AGENT_STARTERS: Record<string, string[]> = {
     'Surface every public complaint about {product_a} from the last 14 days. Tag by severity.',
     'Switching signals: mentions where someone asks "should I leave {competitor_a} for {company}?" Pull and escalate.',
   ],
+  // Reply Guy — Reddit + X reply bot. Never posts without a skill-
+  // level constraint pass; first reply on Reddit never mentions us.
+  'reply-guy': [
+    'Scan Reddit + X for mentions of {company} in the last 24h, classify, draft on-brand replies for the top 3.',
+    'Find Reddit threads where someone asks "best alternative to {competitor_a}" in the last 7 days — draft replies for the top 3.',
+    'X mentions of {company} today — draft a peer-voice reply per mention, queue to drafts/.',
+    "Reply-guy loop on r/{icp_stack} and r/SaaS — hunt for {icp_pain}-shaped questions, draft 3 replies that lead with a useful answer.",
+    "Scan X for 'migrating from {competitor_a}' in the last 48h, draft warm peer replies.",
+    'Competitor-switching scan: Reddit + X where someone says "leaving {competitor_b}" — draft one helpful reply per thread, no pitch.',
+  ],
   // X Account — runs the company's X presence. Drafts tweets, flags
   // replies, watches competitors, escalates urgent incoming mentions.
   'x-account': [

@@ -3872,6 +3872,33 @@ const x_user_timeline: ToolDef = {
   },
 };
 
+// Reply-guy Reddit reply — proxied through blackmagic.engineering so
+// the Naizop API key stays server-side. Upstream service is Naizop
+// "custom-comments" (#15756, ≈ $0.30/comment). Billed at 200% of the
+// upstream retail per reply (see web/api/agent-tools/[name]/route.ts).
+// Reddit disallows raw API replies from third-party automation without
+// a legitimate app; Naizop is the pragmatic relay we already use.
+const reddit_post_reply: ToolDef = {
+  name: 'reddit_post_reply',
+  description:
+    'Post a reply comment on a Reddit thread via the blackmagic.engineering Reddit relay. Pass the full reddit.com URL of the post or comment you\'re replying to and the comment text. Charged at 200% of the relay\'s per-comment cost against the caller\'s credits. Use sparingly — the Reply Guy agent\'s daily cap is 5 replies/day and replies should read as genuinely helpful.',
+  parameters: {
+    type: 'object',
+    properties: {
+      url: {
+        type: 'string',
+        description: 'Full https://reddit.com/... URL of the post or comment to reply to.',
+      },
+      comment: {
+        type: 'string',
+        description: 'The reply body. Plain text. Keep under 800 characters; don\'t lead with a product link.',
+      },
+    },
+    required: ['url', 'comment'],
+  },
+  handler: async (args, ctx) => proxyTool('reddit_post_reply', args, ctx),
+};
+
 export const BUILTIN_TOOLS: ToolDef[] = [
   notify,
   trigger_create,
@@ -3965,6 +3992,7 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   x_search_tweets,
   x_list_mentions,
   x_user_timeline,
+  reddit_post_reply,
 ];
 
 export function allTools(): ToolDef[] {

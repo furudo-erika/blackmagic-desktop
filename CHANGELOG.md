@@ -2,6 +2,34 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.18 — 2026-04-24
+
+### Added
+- **Reply Guy — 16th agent.** Scans Reddit and X for posts that
+  mention our brand, our competitors, or any of our tracked buyer-
+  intent phrases, and ships on-brand peer replies that lead with a
+  useful answer (never a pitch). Doctrine enforces hard rules:
+  first Reddit reply never mentions us, no two replies in the same
+  subreddit within 24 h, no identical copy across platforms, ≤ 5
+  Reddit replies + ≤ 10 X replies per day.
+- **`reddit_post_reply` tool.** Proxied through
+  blackmagic.engineering so the Naizop relay key never ships to
+  users. Desktop-side call: `reddit_post_reply({ url, comment })`.
+  Server forwards to Naizop `custom-comments` (#15756) and charges
+  the caller's credit balance at **200 % of upstream retail** —
+  Naizop lists at $0.30/comment, so the Reply Guy spends **60
+  credits per Reddit reply**. X replies reuse the existing
+  `x_post_tweet` tool with the user's own BYOK developer
+  credentials — no marketplace charge for those, the user pays X
+  directly.
+- **Reply Guy starters** (6 templates) tailored to the active
+  project's competitors + pain phrases:
+  "Find Reddit threads where someone asks *best alternative to
+  Netlify* in the last 7 days — draft replies for the top 3",
+  "Scan X for *migrating from Netlify* in the last 48 h", etc.
+- **Reply Guy icon** (Lucide `MessageCircleReply`) wired into the
+  sidebar per-slug table and the agent-page hero.
+
 ## 0.5.17 — 2026-04-24
 
 ### Fixed
