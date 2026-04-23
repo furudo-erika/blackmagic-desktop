@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.12 — 2026-04-24
+
+### Fixed
+- **Agent-page starter chips now show the full prompt, multi-line.**
+  The previous 42-char truncation cut off the useful half of
+  doctrine-aware prompts like "Walk through every open deal…" —
+  which defeats the point of writing specific prompts. Chips now
+  render full text in a `rounded-xl` pill with leading-snug
+  wrapping; the row uses flex-wrap so long prompts drop to a
+  second or third row instead of clipping.
+
 ## 0.5.11 — 2026-04-23
 
 ### Fixed

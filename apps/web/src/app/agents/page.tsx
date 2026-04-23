@@ -654,31 +654,28 @@ function AgentStarterStrip({
   });
   const list = q.data?.byAgent[slug] ?? [];
   if (list.length === 0) return null;
-  // 3 chips fits 1 row comfortably on most widths; extra chips below
-  // the viewport get picked up when the user shuffles via the Home
-  // starter row. Truncate to ~42 chars so the last chip never clips
-  // off the right edge.
+  // Show 3 chips full-text; the row wraps when the sum of chip widths
+  // exceeds the viewport. No ellipsis — prompts this specific are
+  // worth reading in full, and operators scan them faster than
+  // hovering to see a tooltip.
   const chips = list.slice(0, 3);
   return (
     <div className="shrink-0 border-t border-line dark:border-[#2A241D] px-6 py-2.5 bg-white/60 dark:bg-[#1B1812]/60">
-      <div className="max-w-4xl mx-auto flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] shrink-0">
+      <div className="max-w-4xl mx-auto flex items-start gap-2 flex-wrap">
+        <span className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] shrink-0 mt-1.5">
           Try:
         </span>
-        {chips.map((c, i) => {
-          const short = c.prompt.length > 42 ? c.prompt.slice(0, 40).replace(/[,\s]+\S*$/, "") + "…" : c.prompt;
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onPick(c.prompt)}
-              title={c.prompt}
-              className="shrink-0 text-left text-[11.5px] px-2.5 py-1 rounded-full border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] text-ink/80 dark:text-[#E6E0D8] hover:border-flame/60 hover:text-flame transition-colors"
-            >
-              {short}
-            </button>
-          );
-        })}
+        {chips.map((c, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onPick(c.prompt)}
+            title={c.prompt}
+            className="text-left text-[11.5px] leading-snug px-2.5 py-1.5 rounded-xl border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] text-ink/80 dark:text-[#E6E0D8] hover:border-flame/60 hover:text-flame transition-colors max-w-full"
+          >
+            {c.prompt}
+          </button>
+        ))}
       </div>
     </div>
   );
