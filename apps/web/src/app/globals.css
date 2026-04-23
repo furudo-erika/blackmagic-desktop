@@ -86,7 +86,7 @@ html.dark .prose-bm em { color: #A89F97; }
 }
 html.dark .prose-bm blockquote { color: #A89F97; background: rgba(232,82,58,0.08); }
 .prose-bm code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.88em; background: rgba(55,50,47,0.06);
   padding: 0.12em 0.38em; border-radius: 4px; color: #1A1614;
 }
