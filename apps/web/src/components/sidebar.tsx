@@ -304,10 +304,10 @@ function AgentsSidebarRow({
   const inside = pathname.startsWith('/agents');
   const search = useSearchParams();
   const activeSlug = search.get('slug') ?? '';
-  // Agents are the product's first-class citizens — default expanded
-  // so a cold-start user sees the full roster at a glance (13 pre-seeded
-  // agents; no need to hide them). User can still collapse manually.
-  const [open, setOpen] = useState<boolean>(true);
+  // Default collapsed so the roster doesn't bleed visually into the
+  // Data section below — opens automatically when you navigate into
+  // /agents, or on manual click.
+  const [open, setOpen] = useState<boolean>(inside);
   useEffect(() => { if (inside) setOpen(true); }, [inside]);
   return (
     <div>

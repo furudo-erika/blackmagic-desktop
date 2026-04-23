@@ -2,6 +2,35 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.3 — 2026-04-23
+
+### Fixed
+- **Home "Not installed in this project" on default agents.** Quick-start
+  cards for Closed-lost revival and Meeting prep routed to `slug=
+  closed-lost-revival-agent` / `meeting-prep-agent`, but the seeded
+  agent files are `closed-lost-revival.md` / `meeting-prep.md` — so
+  both cards sat dimmed on every fresh vault. Fixed the slugs.
+- **Sidebar Agents row collapsed by default.** The expanded roster
+  (15 agents) bled visually into the Data section below, making the
+  whole left rail feel like one undifferentiated wall. Now collapsed
+  unless you're inside `/agents`.
+
+### Changed
+- **Fresh installs now open into a populated Vercel demo project.**
+  Previously a new install dropped you onto an empty "Default" vault
+  — zero runs, zero drafts, zero threads, KPI strip all zeros, heatmap
+  blank. The first-run registry now creates a `Vercel` project seeded
+  with the us/ company pack plus ~33 past agent runs, 3 pending
+  drafts, and 4 chat threads, so the Home page has real activity to
+  show on first launch. Existing users keep their projects; only the
+  cold-start path changes.
+
+### Added
+- `seedVercelRuntime(vaultRoot)` in `daemon/src/us-demo.ts` — writes
+  realistic runs/drafts/chats for the Vercel demo vault. Invoked from
+  `initProjectsRegistry()` on first boot; also runnable standalone
+  via `scripts/seed-vercel-demo-runtime.mjs`.
+
 ## 0.5.2 — 2026-04-23
 
 ### Fixed

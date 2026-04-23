@@ -11,6 +11,7 @@ import path from 'node:path';
 import os from 'node:os';
 import matter from 'gray-matter';
 import { homeVault, setVaultRoot, getVaultRoot } from './paths.js';
+import { seedVercelDemo, seedVercelRuntime } from './us-demo.js';
 
 export interface Project {
   id: string;
@@ -61,16 +62,25 @@ async function writeRegistry(reg: ProjectsRegistry): Promise<void> {
 // active vault root. Returns the current registry.
 export async function initProjectsRegistry(): Promise<ProjectsRegistry> {
   let reg = await readRegistry();
-  const defaultPath = homeVault();
 
   if (!reg || reg.projects.length === 0) {
-    const defaultProject: Project = {
-      id: 'default',
-      name: 'Default',
-      path: defaultPath,
-    };
-    reg = { active: defaultProject.id, projects: [defaultProject] };
+    // Fresh install: bootstrap a Vercel demo project instead of an
+    // empty "Default" vault. First-run users see the app populated
+    // with a realistic company profile + past agent runs, drafts,
+    // and chat threads — the product looks alive immediately instead
+    // of greeting them with a wall of zeros. Users can add their own
+    // project from the sidebar switcher.
+    const vercelPath = path.join(os.homedir(), 'BlackMagic-vercel');
+    await fs.mkdir(vercelPath, { recursive: true });
+    const vercelProject: Project = { id: 'vercel', name: 'Vercel', path: vercelPath };
+    reg = { active: vercelProject.id, projects: [vercelProject] };
     await writeRegistry(reg);
+    // Seed demo content under the new vault root. ensureVault() in
+    // vault.ts handles agent/skeleton seeding on its own pass; the
+    // us/ pack + runtime runs/drafts/chats are owned by us-demo.
+    setVaultRoot(vercelPath);
+    try { await seedVercelDemo(vercelPath); } catch {}
+    try { await seedVercelRuntime(vercelPath); } catch {}
   }
 
   // Ensure the active project still exists in the list; if not, fall back.

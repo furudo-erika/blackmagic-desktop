@@ -566,14 +566,14 @@ const QUICK_STARTS: QuickStart[] = [
     tint: 'text-[#B2558E] bg-[#B2558E]/10',
     title: 'Closed-lost revival',
     subtitle: 'Dead deals → new chances',
-    href: '/agents?slug=closed-lost-revival-agent',
+    href: '/agents?slug=closed-lost-revival',
   },
   {
     icon: CalendarDays,
     tint: 'text-[#5B6BC7] bg-[#5B6BC7]/10',
     title: 'Meeting prep',
     subtitle: 'Pre-call attendee briefs',
-    href: '/agents?slug=meeting-prep-agent',
+    href: '/agents?slug=meeting-prep',
   },
   {
     icon: TrendingUp,
