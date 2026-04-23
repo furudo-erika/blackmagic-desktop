@@ -26,13 +26,11 @@ import {
   History,
   Inbox,
   LayoutDashboard,
-  MessageSquare,
   Moon,
   Plug,
   Search,
   Settings as SettingsIcon,
   Sun,
-  SquarePen,
   Sparkles,
   Users,
   Briefcase,
@@ -73,12 +71,6 @@ const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   Search: SearchIcon,
   Sparkles,
 };
-
-function newThreadId(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-}
 
 export function Sidebar() {
   const router = useRouter();
@@ -187,35 +179,6 @@ export function Sidebar() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  function startNewThread() {
-    const id = newThreadId();
-    localStorage.setItem('bm-last-thread', id);
-    router.push('/chat');
-  }
-
-  // Recent chat threads — populates the collapsible Chat section under
-  // the main nav. Default collapsed so the sidebar stays compact;
-  // expanding lazy-fires the listChats query.
-  const [chatExpanded, setChatExpanded] = useState(false);
-  const recentChats = useQuery({
-    queryKey: ['sidebar-chats'],
-    queryFn: api.listChats,
-    enabled: chatExpanded,
-    refetchInterval: chatExpanded ? 30_000 : false,
-  });
-  const recentThreads = useMemo(() => {
-    return (recentChats.data?.threads ?? [])
-      .slice()
-      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-      .slice(0, 10);
-  }, [recentChats.data]);
-  function openThread(threadId: string) {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('bm-last-thread', threadId);
-    }
-    router.push('/chat');
-  }
-
   return (
     <aside className="w-[220px] shrink-0 bg-cream-light dark:bg-[#17140F] border-r border-line dark:border-[#2A241D] flex flex-col min-h-0">
       {/* macOS traffic-light gutter */}
@@ -250,64 +213,9 @@ export function Sidebar() {
 
         <div className="h-px bg-line dark:bg-[#2A241D] my-2 mx-2" />
 
-        {/* Chat: collapsible row that reveals recent threads. Header
-            click navigates to /chat, chevron toggles the thread list. */}
-        <div>
-          <div className={
-            'flex items-center rounded-md ' +
-            (pathname === '/chat' ? 'bg-white dark:bg-[#1F1B15]' : 'hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
-          }>
-            <Link
-              href="/chat"
-              className="flex-1 flex items-center gap-2 px-2 py-1.5 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
-            >
-              <MessageSquare className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
-              <span className="truncate">Chat</span>
-            </Link>
-            <button
-              type="button"
-              onClick={() => setChatExpanded((v) => !v)}
-              aria-label={chatExpanded ? 'Collapse chat history' : 'Expand chat history'}
-              title={chatExpanded ? 'Hide history' : 'Show history'}
-              className="px-1.5 py-1.5 text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]"
-            >
-              <ChevronDown
-                className={'w-3 h-3 transition-transform ' + (chatExpanded ? '' : '-rotate-90')}
-              />
-            </button>
-          </div>
-          {chatExpanded && (
-            <ul className="ml-5 pl-2 border-l border-line dark:border-[#2A241D] mt-0.5 mb-1 space-y-0.5">
-              <li>
-                <button
-                  type="button"
-                  onClick={startNewThread}
-                  className="w-full text-left flex items-center gap-1.5 px-2 py-1 rounded-md text-[11.5px] text-muted dark:text-[#8C837C] hover:text-flame hover:bg-white/60 dark:hover:bg-[#1F1B15]/60"
-                >
-                  <SquarePen className="w-3 h-3" /> New chat
-                </button>
-              </li>
-              {recentChats.isLoading && (
-                <li className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">loading…</li>
-              )}
-              {!recentChats.isLoading && recentThreads.length === 0 && (
-                <li className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">No history yet.</li>
-              )}
-              {recentThreads.map((t) => (
-                <li key={t.threadId}>
-                  <button
-                    type="button"
-                    onClick={() => openThread(t.threadId)}
-                    title={t.preview || t.threadId}
-                    className="w-full text-left px-2 py-1 rounded-md text-[11.5px] text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 truncate"
-                  >
-                    {t.preview || '(empty thread)'}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        {/* Chat row removed — Home page Composer is the default entry
+            point, and the Agents section below owns per-agent threads.
+            The /chat route still works by direct URL. */}
 
         <AgentsSidebarRow
           pathname={pathname}

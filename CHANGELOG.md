@@ -2,6 +2,15 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.82 — 2026-04-23
+
+### Changed
+- **Chat tab hidden from the sidebar.** Home page composer is the
+  default entry point and Agents (below) own per-agent threads, so
+  the dedicated Chat row was redundant. The `/chat` route still works
+  by direct URL — nothing was removed server-side, just the nav
+  shortcut.
+
 ## 0.4.81 — 2026-04-23
 
 ### Changed
