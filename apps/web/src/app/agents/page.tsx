@@ -30,6 +30,7 @@ import {
 import { api } from '../../lib/api';
 import { AgentIcon, hasAgentTheme } from '../../components/agent-icon';
 import { Markdown } from '../../components/markdown';
+import { Composer } from '../../components/composer';
 
 const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   Bot, Globe, Linkedin, CalendarClock, Copy: CopyIcon, RotateCcw,
@@ -466,40 +467,29 @@ function AgentsInner() {
         </div>
       </div>
 
-      {/* Composer */}
-      <div className="shrink-0 border-t border-line dark:border-[#2A241D] px-6 py-3 bg-cream-light dark:bg-[#17140F]">
-        <div className="max-w-4xl mx-auto flex items-end gap-2">
-          <textarea
+      {/* Composer — same rounded-card component Home + /chat use, so
+          the input UX is identical everywhere. Submit routes through
+          the existing preflight modal before kicking off the run. */}
+      <div className="shrink-0 border-t border-line dark:border-[#2A241D] px-6 py-4 bg-cream-light dark:bg-[#17140F]">
+        <div className="max-w-4xl mx-auto">
+          <Composer
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
+            onChange={setDraft}
+            onSubmit={(text) => send(text)}
+            agents={[]}
             placeholder={isLive
-              ? `Add context for the running ${agent.name}…`
-              : `Tell ${agent.name} what to do (Shift+Enter for newline)`}
-            rows={1}
-            className="flex-1 resize-none bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg px-3 py-2 text-sm leading-5 text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
-            style={{ minHeight: 40, maxHeight: 200 }}
+              ? `Add context for the running ${agent.name}… ( @ to loop in another agent · / for commands )`
+              : `Tell ${agent.name} what to do… ( @ to loop in another agent · / for commands )`}
+            submitLabel={kickoff.isPending ? 'Starting…' : isLive ? 'Add' : 'Run'}
+            disabled={kickoff.isPending}
+            showKeyboardHints={false}
           />
-          <button
-            type="button"
-            onClick={() => send()}
-            disabled={kickoff.isPending || !draft.trim()}
-            className="h-10 px-4 rounded-lg bg-flame text-white text-sm font-medium hover:opacity-90 disabled:opacity-40 flex items-center gap-1.5"
-          >
-            <Send className="w-4 h-4" />
-            {kickoff.isPending ? 'Starting…' : isLive ? 'Add' : 'Run'}
-          </button>
+          {kickoff.error && (
+            <div className="mt-2 text-[11px] text-flame">
+              {(kickoff.error as Error).message}
+            </div>
+          )}
         </div>
-        {kickoff.error && (
-          <div className="max-w-4xl mx-auto mt-2 text-[11px] text-flame">
-            {(kickoff.error as Error).message}
-          </div>
-        )}
       </div>
 
       {preflightOpen && slug && (

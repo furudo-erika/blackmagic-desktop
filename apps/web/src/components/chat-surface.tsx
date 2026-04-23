@@ -339,6 +339,14 @@ export function ChatSurface({
       // for (user switches thread in another window) can safely
       // wait until the current send finishes.
       if (sendPendingRef.current) return;
+      // Home→Chat handoff: when Home's composer hands off via
+      // `bm-pending-prompt`, the thread id it wrote is brand-new and
+      // has no server-side history. Running loadThread anyway races
+      // with the auto-send's optimistic setMessages and wipes the
+      // user message (the "first send shows empty" bug). Skip the
+      // fetch while a handoff is pending; auto-send will populate
+      // the thread from scratch.
+      if (pendingAutoSendRef.current) return;
       const last = localStorage.getItem(effectiveThreadKey);
       if (last && last !== threadIdRef.current) loadThread(last);
       else if (!last && !threadIdRef.current) {
@@ -348,9 +356,17 @@ export function ChatSurface({
       }
     }
     // Reset visible state when threadKey changes so stale messages from
-    // the previous agent don't flash before the new thread loads.
-    setThreadId('');
-    setMessages([]);
+    // the previous agent don't flash before the new thread loads. Skip
+    // the reset during a home handoff so the optimistic user message
+    // from auto-send isn't wiped — and pick up the fresh thread id
+    // Home just wrote so sendMut posts to the right thread.
+    if (!pendingAutoSendRef.current) {
+      setThreadId('');
+      setMessages([]);
+    } else if (typeof window !== 'undefined') {
+      const preset = localStorage.getItem(effectiveThreadKey);
+      if (preset) setThreadId(preset);
+    }
     syncThread();
     if (isGlobal) {
       window.addEventListener('storage', syncThread);

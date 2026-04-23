@@ -189,15 +189,40 @@ export function Composer({
           onChange(e.target.value);
           const cursor = e.target.selectionStart ?? e.target.value.length;
           const det = detectPopover(e.target.value, cursor);
-          setPopover(det);
+          // Preserve the user's ↑/↓ navigation index across keystrokes.
+          // detectPopover always starts index:0, but if the popover was
+          // already open at the same anchor+kind, we keep whatever index
+          // the user arrow-keyed to. Without this every keyup snapped
+          // selection back to the first item.
+          setPopover((prev) => {
+            if (!det) return null;
+            if (prev && prev.anchor === det.anchor && prev.kind === det.kind) {
+              return { ...det, index: prev.index };
+            }
+            return det;
+          });
         }}
         onKeyUp={(e) => {
           const t = e.currentTarget;
-          setPopover(detectPopover(t.value, t.selectionStart ?? 0));
+          const det = detectPopover(t.value, t.selectionStart ?? 0);
+          setPopover((prev) => {
+            if (!det) return null;
+            if (prev && prev.anchor === det.anchor && prev.kind === det.kind) {
+              return { ...det, index: prev.index };
+            }
+            return det;
+          });
         }}
         onClick={(e) => {
           const t = e.currentTarget;
-          setPopover(detectPopover(t.value, t.selectionStart ?? 0));
+          const det = detectPopover(t.value, t.selectionStart ?? 0);
+          setPopover((prev) => {
+            if (!det) return null;
+            if (prev && prev.anchor === det.anchor && prev.kind === det.kind) {
+              return { ...det, index: prev.index };
+            }
+            return det;
+          });
         }}
         onKeyDown={(e) => {
           if (popover && popoverItems.length > 0) {

@@ -2,6 +2,31 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.91 — 2026-04-23
+
+### Fixed
+- **@-mention popover and `/` slash popover selection kept snapping
+  back to the first item.** Every keystroke's `onKeyUp` handler
+  re-ran `detectPopover`, which always returned `index: 0`, wiping
+  whatever ↑/↓ nav the user had done on the preceding keydown. Now
+  the popover state is merged: when the anchor + kind are unchanged,
+  the user's existing `index` is preserved across keyup / click /
+  onChange re-computations.
+- **First Home→Chat send showed an empty thread.** On mount the
+  chat surface's `syncThread` called `loadThread` for the brand-new
+  thread id Home had just written, which 404'd / returned `[]` and
+  stomped the optimistic user message the auto-send had set. The
+  second send looked "fine" because by then the thread had server
+  history. Fix: detect the home handoff at mount, skip `loadThread`
+  while a `bm-pending-prompt` is queued, and hydrate `threadId`
+  from the id Home wrote so `sendMut` posts to the right thread.
+
+### Changed
+- **Agent pages now use the shared Composer component** (same one
+  Home + /chat use). Kills the one-off textarea that was stuck on
+  the `/agents` pages — @-mention, slash commands, auto-size, the
+  press-state animation, all work the same everywhere.
+
 ## 0.4.90 — 2026-04-23
 
 ### Changed
