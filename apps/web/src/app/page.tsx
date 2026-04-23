@@ -27,7 +27,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, AtSign, ScanSearch, MousePointerClick, CalendarDays, Target, TrendingUp } from 'lucide-react';
+import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, RotateCw } from 'lucide-react';
 import { api } from '../lib/api';
 import { Composer } from '../components/composer';
 
@@ -278,47 +278,26 @@ export default function HomePage() {
           <Stat label="Threads" value={chats.data?.threads?.length ?? 0} hint="total" href="/chat" />
         </div>
 
-        {/* Quick starts — 6 cards, one per SwanAI-style flow. Click a
-            card → open that agent's page with a prefilled starter
-            prompt. No more two-row split by category; keep the grid
-            tight so users don't feel overwhelmed the moment they
-            land. Content Studio agent holds the video/image/copy
-            skills internally. */}
-        <div className="mt-6">
-          <div className="flex items-end justify-between mb-3">
-            <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-muted dark:text-[#8C837C]">
-              Quick starts
-            </div>
-            <Link
-              href="/agents"
-              className="text-[10px] font-mono text-muted dark:text-[#8C837C] hover:text-flame inline-flex items-center gap-1"
-            >
-              See all agents <ChevronRight className="w-3 h-3" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {QUICK_STARTS.map((q) => {
-              // Validate the target agent is actually seeded in this vault.
-              // If it's not, dim the card + tooltip "Not installed" instead
-              // of letting the user click through to /agents?slug=<missing>
-              // and stare at a "loading agent…" forever.
-              const slug = q.href.match(/slug=([^&]+)/)?.[1];
-              const installed =
-                !slug || (agentList.data ?? []).some((a) => a.slug === slug);
-              return (
-                <QuickStartCard
-                  key={q.title}
-                  icon={q.icon}
-                  tint={q.tint}
-                  title={q.title}
-                  subtitle={installed ? q.subtitle : 'Not installed in this project'}
-                  onClick={() => (installed ? router.push(q.href) : undefined)}
-                  disabled={!installed}
-                />
-              );
-            })}
-          </div>
-        </div>
+        {/* Starter prompts — replaces the old "Quick starts" nav cards
+            with click-to-send prompts tailored to the active project
+            (slots filled from us/company, us/market/competitors,
+            us/customers/top, us/market/icp). When the composer pill
+            is set to a specific agent, the row swaps to that agent's
+            own starter list. Each card click dispatches directly —
+            no extra Send step, no intermediate agent-page detour. */}
+        <StarterPromptRow
+          agentSlug={homeAgent}
+          onSend={(prompt, slug) => {
+            setDraft('');
+            const id = newThreadId();
+            if (typeof window !== 'undefined') {
+              const threadKey = slug ? `bm-team-thread-${slug}` : 'bm-last-thread';
+              window.localStorage.setItem(threadKey, id);
+              window.localStorage.setItem('bm-pending-prompt', prompt);
+            }
+            router.push(slug ? `/chat?agent=${encodeURIComponent(slug)}` : '/chat');
+          }}
+        />
 
         {/* Live rows — running + pending + recent threads, compact */}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -519,114 +498,162 @@ function Card({
   );
 }
 
-// Quick starts — 6 cards, one per SwanAI-style GTM flow. Each card
-// routes to the owning agent's page (the agent prompt + its UI take
-// it from there). Mapping:
-//   Lookalike outbound   → Lookalike Discovery Agent
-//   LinkedIn intent      → LinkedIn Outreach Agent
-//   Website visitors     → Website Visitor Agent
-//   Closed-lost revival  → Closed-Lost Revival Agent
-//   Meeting prep         → Meeting Prep Agent
-//   Deal inspection      → Pipeline Ops Agent (Clari/Salesforce term)
-// Content skills (video / image / copy) live inside the Content Studio
-// agent's page, not on Home — they're one click deeper so Home stays
-// focused on the "GTM operator" headline use-cases.
-type QuickStart = {
-  icon: React.ComponentType<{ className?: string }>;
-  tint: string;
-  title: string;
-  subtitle: string;
-  href: string;
+// Agent-slug → display tint for starter cards. Mirrors the per-agent
+// accent palette the sidebar uses, but keyed on the handful of agents
+// Home surfaces so the row reads as 6 distinct colored chips rather
+// than a monochrome grid.
+const STARTER_TINTS: Record<string, string> = {
+  'lookalike-discovery': 'text-[#E8634A] bg-[#E8634A]/10',
+  'linkedin-outreach':   'text-[#0A66C2] bg-[#0A66C2]/10',
+  'website-visitor':     'text-[#3B9DA8] bg-[#3B9DA8]/10',
+  'pipeline-ops':        'text-[#8BA83C] bg-[#8BA83C]/10',
+  'closed-lost-revival': 'text-[#B2558E] bg-[#B2558E]/10',
+  'meeting-prep':        'text-[#5B6BC7] bg-[#5B6BC7]/10',
+  'outbound':            'text-[#E8634A] bg-[#E8634A]/10',
+  'researcher':          'text-[#3B82F6] bg-[#3B82F6]/10',
+  'content-studio':      'text-[#A21CAF] bg-[#A21CAF]/10',
+  'brand-monitor':       'text-[#D97706] bg-[#D97706]/10',
+  'geo-analyst':         'text-[#E11D48] bg-[#E11D48]/10',
+  'company-profiler':    'text-[#F59E0B] bg-[#F59E0B]/10',
+  'ae':                  'text-[#D97706] bg-[#D97706]/10',
+  'sdr':                 'text-[#8B5CF6] bg-[#8B5CF6]/10',
+  'x-account':           'text-[#0D9488] bg-[#0D9488]/10',
 };
 
-const QUICK_STARTS: QuickStart[] = [
-  {
-    icon: Target,
-    tint: 'text-[#E8634A] bg-[#E8634A]/10',
-    title: 'Lookalike outbound',
-    subtitle: 'Won deals → new accounts',
-    href: '/agents?slug=lookalike-discovery',
-  },
-  {
-    icon: AtSign,
-    tint: 'text-[#3FA0C7] bg-[#3FA0C7]/10',
-    title: 'LinkedIn intent',
-    subtitle: 'Engagement-triggered DMs',
-    href: '/agents?slug=linkedin-outreach',
-  },
-  {
-    icon: MousePointerClick,
-    tint: 'text-[#3B9DA8] bg-[#3B9DA8]/10',
-    title: 'Website visitors',
-    subtitle: 'RB2B de-anon + qualify',
-    href: '/agents?slug=website-visitor',
-  },
-  {
-    icon: ScanSearch,
-    tint: 'text-[#B2558E] bg-[#B2558E]/10',
-    title: 'Closed-lost revival',
-    subtitle: 'Dead deals → new chances',
-    href: '/agents?slug=closed-lost-revival',
-  },
-  {
-    icon: CalendarDays,
-    tint: 'text-[#5B6BC7] bg-[#5B6BC7]/10',
-    title: 'Meeting prep',
-    subtitle: 'Pre-call attendee briefs',
-    href: '/agents?slug=meeting-prep',
-  },
-  {
-    icon: TrendingUp,
-    tint: 'text-[#8BA83C] bg-[#8BA83C]/10',
-    title: 'Deal inspection',
-    subtitle: 'Stale deals + next steps',
-    href: '/agents?slug=pipeline-ops',
-  },
-];
+const AGENT_LABEL: Record<string, string> = {
+  'lookalike-discovery': 'Lookalike',
+  'linkedin-outreach':   'LinkedIn',
+  'website-visitor':     'Website',
+  'pipeline-ops':        'Pipeline',
+  'closed-lost-revival': 'Revival',
+  'meeting-prep':        'Meeting prep',
+  'outbound':            'Outbound',
+  'researcher':          'Research',
+  'content-studio':      'Content',
+  'brand-monitor':       'Brand',
+  'geo-analyst':         'GEO',
+  'company-profiler':    'Profile',
+  'ae':                  'AE desk',
+  'sdr':                 'SDR',
+  'x-account':           'X',
+};
 
-function QuickStartCard({
-  icon: Icon,
-  tint,
-  title,
-  subtitle,
-  onClick,
-  disabled,
+function StarterPromptRow({
+  agentSlug,
+  onSend,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
-  tint: string;
-  title: string;
-  subtitle: string;
-  onClick: () => void;
-  disabled?: boolean;
+  agentSlug: string | undefined;
+  onSend: (prompt: string, slug: string) => void;
 }) {
+  // Fetch filled starters for the active project. When the composer
+  // pill is set to a specific agent we request that agent's list; when
+  // empty we request the global cross-agent best-of. Both paths return
+  // `{ global, byAgent }` — we branch locally on which to render.
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['starters', agentSlug ?? '_global'],
+    queryFn: () => api.getStarters(agentSlug),
+    staleTime: 5 * 60_000,
+  });
+
+  const [rotation, setRotation] = useState(0);
+  const cards = useMemo(() => {
+    if (!data) return [] as Array<{ slug: string; prompt: string }>;
+    if (agentSlug) {
+      const list = data.byAgent[agentSlug] ?? [];
+      const slice = 6;
+      const out: Array<{ slug: string; prompt: string }> = [];
+      for (let i = 0; i < Math.min(slice, list.length); i++) {
+        const pick = list[(i + rotation) % list.length];
+        if (pick) out.push({ slug: pick.agent, prompt: pick.prompt });
+      }
+      return out;
+    }
+    // Global: 6 best, one per agent in GLOBAL_SLUGS order. For shuffle,
+    // we pull the (rotation)-th available starter of each agent when
+    // possible so clicking ↻ yields a genuinely new row rather than
+    // the same sentences reshuffled.
+    const out: Array<{ slug: string; prompt: string }> = [];
+    for (const g of data.global) {
+      const list = data.byAgent[g.agent] ?? [g];
+      const pick = list[rotation % Math.max(1, list.length)] ?? g;
+      out.push({ slug: pick.agent, prompt: pick.prompt });
+    }
+    return out;
+  }, [data, agentSlug, rotation]);
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-end justify-between mb-3">
+        <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-muted dark:text-[#8C837C]">
+          {agentSlug
+            ? `Try with ${AGENT_LABEL[agentSlug] ?? agentSlug}`
+            : 'Try one of these — tailored to this project'}
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => { setRotation((r) => r + 1); refetch(); }}
+            className="text-[10px] font-mono text-muted dark:text-[#8C837C] hover:text-flame inline-flex items-center gap-1"
+            title="Shuffle to another set of starters"
+            disabled={isFetching}
+          >
+            <RotateCw className={'w-3 h-3 ' + (isFetching ? 'animate-spin' : '')} />
+            shuffle
+          </button>
+          <Link
+            href="/agents"
+            className="text-[10px] font-mono text-muted dark:text-[#8C837C] hover:text-flame inline-flex items-center gap-1"
+          >
+            see all agents <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {isLoading && Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="bg-cream-light dark:bg-[#17140F] border border-line/70 dark:border-[#2A241D]/70 rounded-lg px-4 py-3.5 min-h-[108px] animate-pulse"
+          />
+        ))}
+        {!isLoading && cards.length === 0 && (
+          <div className="col-span-full text-[12px] text-muted dark:text-[#8C837C] px-2 py-4">
+            No starter prompts available for this project yet. Type your own
+            above, or run <code className="font-mono">bootstrap-self</code> on
+            the Company Profiler to fill in us/ data.
+          </div>
+        )}
+        {!isLoading && cards.map((c, i) => (
+          <StarterCard key={`${c.slug}-${i}`} card={c} onClick={() => onSend(c.prompt, c.slug)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StarterCard({
+  card,
+  onClick,
+}: {
+  card: { slug: string; prompt: string };
+  onClick: () => void;
+}) {
+  const tint = STARTER_TINTS[card.slug] ?? 'text-muted bg-muted/10';
+  const label = AGENT_LABEL[card.slug] ?? card.slug;
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
-      title={disabled ? 'This agent is not installed in the current project' : undefined}
-      className={
-        'group text-left bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg px-4 py-3.5 transition-all flex flex-col gap-2.5 min-h-[108px] ' +
-        (disabled
-          ? 'opacity-40 cursor-not-allowed'
-          : 'hover:border-flame/60 hover:shadow-sm hover:-translate-y-0.5')
-      }
+      title={card.prompt}
+      className="group text-left bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg px-4 py-3.5 transition-all flex flex-col gap-2.5 min-h-[108px] hover:border-flame/60 hover:shadow-sm hover:-translate-y-0.5"
     >
       <div className="flex items-center justify-between">
-        <div className={'w-9 h-9 rounded-lg flex items-center justify-center ' + tint}>
-          <Icon className="w-[18px] h-[18px]" />
-        </div>
-        {!disabled && (
-          <ArrowRight className="w-3.5 h-3.5 text-muted/50 dark:text-[#6B625C] group-hover:text-flame group-hover:translate-x-0.5 transition-all" />
-        )}
+        <span className={'text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded ' + tint}>
+          {label}
+        </span>
+        <ArrowRight className="w-3.5 h-3.5 text-muted/50 dark:text-[#6B625C] group-hover:text-flame group-hover:translate-x-0.5 transition-all" />
       </div>
-      <div>
-        <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] leading-tight">
-          {title}
-        </div>
-        <div className="text-[11px] text-muted dark:text-[#8C837C] mt-1 leading-snug">
-          {subtitle}
-        </div>
+      <div className="text-[12.5px] text-ink dark:text-[#E6E0D8] leading-snug line-clamp-3">
+        {card.prompt}
       </div>
     </button>
   );

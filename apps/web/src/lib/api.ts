@@ -251,6 +251,18 @@ export const api = {
   ontology: () =>
     request<{ nodes: OntologyNode[]; edges: OntologyEdge[] }>('/api/ontology'),
 
+  // Starter prompts — project-aware click-to-send suggestions. Returns
+  // { global, byAgent, slots }. `global` is ~6 cross-agent picks for
+  // the Home page when no agent is selected; `byAgent[slug]` is the
+  // per-agent list used when the composer pill is set OR on an agent
+  // page. `slots` is returned for debugging only.
+  getStarters: (agent?: string) =>
+    request<{
+      slots: Record<string, string | undefined>;
+      global: Array<{ agent: string; prompt: string; template: string }>;
+      byAgent: Record<string, Array<{ agent: string; prompt: string; template: string }>>;
+    }>(`/api/starters${agent ? `?agent=${encodeURIComponent(agent)}` : ''}`),
+
   // Drafts
   listDrafts: () =>
     request<{ drafts: Array<{ id: string; path: string; channel: string; to: string; subject?: string; body: string; tool: string; status: string; created_at?: string }> }>(

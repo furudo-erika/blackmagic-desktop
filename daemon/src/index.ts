@@ -807,6 +807,16 @@ async function main() {
     }
   });
 
+  app.get('/api/starters', async (c) => {
+    const agent = c.req.query('agent');
+    const { starterPayload } = await import('./starters.js');
+    try {
+      return c.json(await starterPayload(agent || undefined));
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+
   app.get('/api/drafts', async (c) => {
     const drafts = await listDrafts();
     pushDrafts(config).catch(() => {});

@@ -467,6 +467,15 @@ function AgentsInner() {
         </div>
       </div>
 
+      {/* Starter chips — project-aware click-to-send prompts pulled
+          from /api/starters. Always visible above the composer; one
+          click fires the prompt through the same pipeline as typing
+          it manually (preflight modal included). Agents with no
+          filled starters render nothing. */}
+      {slug && (
+        <AgentStarterStrip slug={slug} onPick={(p) => { setDraft(p); send(p); }} />
+      )}
+
       {/* Composer — same rounded-card component Home + /chat use, so
           the input UX is identical everywhere. Submit routes through
           the existing preflight modal before kicking off the run. */}
@@ -603,6 +612,46 @@ function InputPreview({ source }: { source: string }) {
           <>Show full prompt <ChevronDown className="w-3 h-3" /></>
         )}
       </button>
+    </div>
+  );
+}
+
+function AgentStarterStrip({
+  slug,
+  onPick,
+}: {
+  slug: string;
+  onPick: (prompt: string) => void;
+}) {
+  const q = useQuery({
+    queryKey: ["starters", slug],
+    queryFn: () => api.getStarters(slug),
+    staleTime: 5 * 60_000,
+  });
+  const list = q.data?.byAgent[slug] ?? [];
+  if (list.length === 0) return null;
+  const chips = list.slice(0, 4);
+  return (
+    <div className="shrink-0 border-t border-line dark:border-[#2A241D] px-6 py-2.5 bg-white/60 dark:bg-[#1B1812]/60">
+      <div className="max-w-4xl mx-auto flex items-center gap-2 overflow-x-auto">
+        <span className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] shrink-0">
+          Try:
+        </span>
+        {chips.map((c, i) => {
+          const short = c.prompt.length > 64 ? c.prompt.slice(0, 60).replace(/[,\s]+\S*$/, "") + "…" : c.prompt;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onPick(c.prompt)}
+              title={c.prompt}
+              className="shrink-0 text-left text-[11.5px] px-2.5 py-1 rounded-full border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] text-ink/80 dark:text-[#E6E0D8] hover:border-flame/60 hover:text-flame transition-colors"
+            >
+              {short}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

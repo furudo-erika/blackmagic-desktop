@@ -2,6 +2,53 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.6 — 2026-04-23
+
+### Added
+- **Project-aware starter prompts on Home + every agent page.** The
+  old Quick-Starts grid on Home linked to agent pages with no prompt
+  context — users landed on a blank agent page and had to know what
+  to type. The grid is gone. In its place: 6 click-to-send starter
+  cards whose text is filled from the active project's `us/` data
+  (company name, domain, top competitors, top customers, ICP
+  industry / stack / pain). On Vercel the row reads
+  "Find 20 accounts that look like Ramp — same stack, same stage",
+  "Revive 5 deals we lost to Netlify in the last 12 months",
+  "Warm-DM everyone who engaged with Guillermo Rauch's last LinkedIn
+  post" — all filled at request time from `us/company.md`,
+  `us/market/competitors.md`, `us/customers/top.md`, `us/market/icp.md`.
+  Switch project → the prompts switch with it; no config.
+- **`GET /api/starters[?agent=<slug>]`** — daemon endpoint that walks
+  the vault, extracts slots, fills templates, drops any template with
+  an unfilled slot. Returns `{ slots, global, byAgent }`.
+- **`AGENT_STARTERS` template set** — 6 hand-written prompt templates
+  per agent for all 15 seeded agents (90 templates). Every template
+  is a single sentence the operator could have typed — action verbs,
+  concrete nouns, no "help me" hedging.
+- **Shuffle button on Home** — rotates through alternate starters
+  pulled from each agent's template list when you want a different
+  angle.
+- **Starter chip strip on every agent page** — 4 click-to-send chips
+  just above the composer, always visible. Hovering reveals the full
+  prompt; clicking fires it through the same preflight + run pipeline
+  as typing manually.
+- **Composer @-pill → starter swap.** Pick an agent in the Home
+  composer and the starter row swaps to that agent's 6 specific
+  prompts instead of the cross-agent best-of.
+
+### Changed
+- **Composer on Home now owns the "how do I use this?" surface.**
+  Previously Home was a dashboard that happened to have a composer;
+  the 6 nav cards below it were a consolation prize. Now the row
+  under the composer is the whole point — one click = one running
+  agent, no intermediate page.
+
+### Fallbacks
+- Domain-keyed fallback slots for `vercel.com` and `apidog.com` so
+  the starter row is never empty on the demo projects even if the
+  vault's `us/market/competitors.md` or `us/customers/top.md` is a
+  skeleton. Real projects get their values from the filled vault.
+
 ## 0.5.5 — 2026-04-23
 
 ### Fixed
