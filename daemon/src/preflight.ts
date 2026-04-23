@@ -70,6 +70,7 @@ const INTEGRATION_LABELS: Record<string, string> = {
   telegram: 'Telegram',
   hubspot: 'HubSpot',
   salesforce: 'Salesforce',
+  pipedrive: 'Pipedrive',
   attio: 'Attio',
   gmail: 'Gmail',
   notion: 'Notion',

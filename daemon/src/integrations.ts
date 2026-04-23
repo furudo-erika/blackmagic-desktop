@@ -10,6 +10,7 @@ export type IntegrationProvider =
   | 'hubspot'
   | 'attio'
   | 'salesforce'
+  | 'pipedrive'
   | 'gong'
   | 'unipile'
   | 'slack'
@@ -35,7 +36,7 @@ export type IntegrationProvider =
   | 'google_calendar';
 
 export const PROVIDERS: IntegrationProvider[] = [
-  'hubspot', 'attio', 'salesforce', 'gong', 'unipile', 'slack', 'gmail',
+  'hubspot', 'attio', 'salesforce', 'pipedrive', 'gong', 'unipile', 'slack', 'gmail',
   'google_calendar',
   'feishu', 'metabase', 'supabase',
   'calcom', 'discord', 'telegram', 'notion', 'linear', 'github', 'stripe',
@@ -79,7 +80,8 @@ const ENV_MAPPING: Record<IntegrationProvider, Record<string, string>> = {
   feishu:       { token: 'FEISHU_WEBHOOK', endpoint: 'FEISHU_WEBHOOK' },
   hubspot:      { token: 'HUBSPOT_API_KEY' },
   attio:        { token: 'ATTIO_API_KEY', endpoint: 'ATTIO_BASE_URL' },
-  salesforce:   { token: 'SALESFORCE_ACCESS_TOKEN' },
+  salesforce:   { token: 'SALESFORCE_ACCESS_TOKEN', endpoint: 'SALESFORCE_INSTANCE_URL' },
+  pipedrive:    { token: 'PIPEDRIVE_API_KEY', endpoint: 'PIPEDRIVE_DOMAIN' },
   gong:         { token: 'GONG_ACCESS_KEY' },
   unipile:      { token: 'UNIPILE_API_KEY', endpoint: 'UNIPILE_BASE_URL' },
   slack:        { token: 'SLACK_BOT_TOKEN' },

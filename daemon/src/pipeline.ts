@@ -135,7 +135,9 @@ export function evalWhen(when: Record<string, unknown>, record: Record<string, u
   }
   if (when.between !== undefined && Array.isArray(when.between) && when.between.length === 2) {
     const n = Number(v);
-    const [lo, hi] = (when.between as unknown[]).map((x) => Number(x));
+    const bounds = (when.between as unknown[]).map((x) => Number(x));
+    const lo = bounds[0]!;
+    const hi = bounds[1]!;
     if (!Number.isFinite(n) || !Number.isFinite(lo) || !Number.isFinite(hi)) return { hit: false, detail: 'non-numeric' };
     return { hit: n >= lo && n <= hi, detail: `${field}=${n}` };
   }
