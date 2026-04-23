@@ -24,12 +24,49 @@ type ProviderDef = {
 };
 
 /**
- * Brand logo paths from Simple Icons (simpleicons.org, MIT licensed).
- * Each entry is an SVG `d` string rendered in white on the brand's
- * colored background tile. We prefer the canonical brand mark over
- * initials so each card is actually identifiable at a glance.
+ * Real brand logos rendered as <img src="https://logo.clearbit.com/<domain>">.
+ * Clearbit's free logo CDN returns the actual canonical brand mark for any
+ * domain (PNG with transparent background, 128×128). No API key required.
+ * Falls back to an SVG path when Clearbit 404s (small brands like RB2B,
+ * Unipile) or network is offline.
+ *
+ * Why Clearbit: Simple Icons v16 dropped Slack + Salesforce (and others)
+ * per brand-guideline requests, so we can't rely on it for every provider.
+ * Clearbit has every real SaaS brand, at real resolution, in real color.
  */
-const BRAND_PATHS: Record<IntegrationProvider, string> = {
+const BRAND_DOMAIN: Record<IntegrationProvider, string> = {
+  hubspot:          'hubspot.com',
+  attio:            'attio.com',
+  salesforce:       'salesforce.com',
+  pipedrive:        'pipedrive.com',
+  gong:             'gong.io',
+  unipile:          'unipile.com',
+  slack:            'slack.com',
+  gmail:            'gmail.com',
+  feishu:           'feishu.cn',
+  metabase:         'metabase.com',
+  supabase:         'supabase.com',
+  calcom:           'cal.com',
+  discord:          'discord.com',
+  telegram:         'telegram.org',
+  notion:           'notion.so',
+  linear:           'linear.app',
+  github:           'github.com',
+  stripe:           'stripe.com',
+  apify:            'apify.com',
+  amazon_ses:       'aws.amazon.com',
+  gsc:              'search.google.com',
+  google_analytics: 'analytics.google.com',
+  ghost:            'ghost.org',
+  wordpress:        'wordpress.com',
+  rb2b:             'rb2b.com',
+  google_calendar:  'calendar.google.com',
+  x:                'x.com',
+};
+
+// Fallback SVG paths — used only when Clearbit's CDN fails (offline, 404
+// on tiny brands). Kept minimal because Clearbit succeeds 99% of the time.
+const BRAND_FALLBACK_PATHS: Record<IntegrationProvider, string> = {
   hubspot:
     'M18.164 7.93V5.084a2.198 2.198 0 001.267-1.978v-.067A2.2 2.2 0 0017.238.845h-.067a2.2 2.2 0 00-2.193 2.194v.067a2.196 2.196 0 001.252 1.973l.013.005v2.852a6.212 6.212 0 00-2.969 1.31l.012-.01-7.842-6.105A2.516 2.516 0 104.042 4.52l-.015-.008 7.714 6.005a6.228 6.228 0 00-1.042 3.468c0 1.368.442 2.633 1.19 3.66l-.012-.017-2.348 2.352A2.004 2.004 0 008.904 20a2.004 2.004 0 00-.625 1.46v.005c0 .525.202 1.003.533 1.36l-.001-.002A1.988 1.988 0 0010.276 23.4c.52 0 .993-.201 1.346-.528l-.001.001.017-.017 2.318-2.322A6.23 6.23 0 1018.164 7.93zm-4.097 9.336a3.195 3.195 0 110-6.39 3.195 3.195 0 010 6.39z',
   attio:
@@ -104,16 +141,33 @@ const BRAND_PATHS: Record<IntegrationProvider, string> = {
 };
 
 function BrandLogo({ provider, color }: { provider: IntegrationProvider; color: string }) {
-  const d = BRAND_PATHS[provider];
+  const domain = BRAND_DOMAIN[provider];
+  const [failed, setFailed] = useState(false);
+  if (failed || !domain) {
+    const d = BRAND_FALLBACK_PATHS[provider];
+    return (
+      <div
+        aria-hidden
+        className="w-9 h-9 rounded-md flex items-center justify-center shrink-0"
+        style={{ background: color }}
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="#ffffff" aria-hidden>
+          <path d={d} />
+        </svg>
+      </div>
+    );
+  }
   return (
-    <div
-      aria-hidden
-      className="w-9 h-9 rounded-md flex items-center justify-center shrink-0"
-      style={{ background: color }}
-    >
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="#ffffff" aria-hidden>
-        <path d={d} />
-      </svg>
+    <div className="w-9 h-9 rounded-md flex items-center justify-center shrink-0 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] overflow-hidden">
+      <img
+        src={`https://logo.clearbit.com/${domain}`}
+        alt=""
+        width={22}
+        height={22}
+        className="object-contain"
+        onError={() => setFailed(true)}
+        draggable={false}
+      />
     </div>
   );
 }

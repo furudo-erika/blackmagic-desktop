@@ -2,6 +2,31 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.8 — 2026-04-23
+
+### Fixed
+- **Integrations page icons were fake SVGs.** Most of the 27 provider
+  cards rendered hand-drawn geometric placeholders instead of real
+  brand marks — Attio was a circle with a dot, Gong was a target,
+  Metabase was random dots, RB2B was a generic person. Replaced with
+  `<img src="https://logo.clearbit.com/<domain>">` — Clearbit's free
+  logo CDN returns the actual brand mark for every real SaaS company,
+  no auth. Falls back to the hand-drawn path only when Clearbit 404s
+  (tiny brands like RB2B / Unipile) or the machine's offline. Simple
+  Icons v16 dropped Slack + Salesforce per brand-guideline requests,
+  so it wasn't a single-source option.
+- **Settings "Integration keys (legacy)" callout overflowed its card.**
+  The warning headline had `shrink-0` which killed wrapping and let
+  the sentence bleed past the panel border. Swapped to a plain `<p>`
+  with `break-words`.
+
+### Removed
+- **Settings → Engine / Theme / Developer sections.** Engine + model
+  live in `config.toml` only now (advanced users edit directly). The
+  theme toggle already lives on the sidebar footer — one place is
+  enough. The Developer expander (daemon port/token override) was a
+  dev-time escape hatch most users never need.
+
 ## 0.5.7 — 2026-04-23
 
 ### Added

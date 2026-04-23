@@ -152,26 +152,6 @@ export default function SettingsPage() {
             </button>
           </Section>
 
-          <Section icon={Cpu} title="Engine">
-            <KV k="Default model" v={health.data?.model ?? '—'} mono />
-            <KV
-              k="Engine"
-              v={
-                health.data?.engine === 'codex-cli'
-                  ? <span className="text-[#7E8C67]">Codex CLI ✓</span>
-                  : <span>built-in</span>
-              }
-            />
-            <p className="text-[11px] text-muted dark:text-[#8C837C]">
-              Model can be changed by editing{' '}
-              <code className="text-[11px]">{vault}/.bm/config.toml</code>:
-              {' '}
-              <code className="text-[11px]">
-                default_model = "{health.data?.model ?? 'gpt-5.3-codex'}"
-              </code>
-            </p>
-          </Section>
-
           <Section icon={KeyRound} title="Account">
             <KV k="Signed in" v={health.data?.zennConfigured ? <span className="text-[#7E8C67]">yes</span> : <span className="text-flame">no</span>} />
             <KV k="Key" v={<code className="text-[11px]">{vault}/.bm/config.toml</code>} mono />
@@ -196,9 +176,9 @@ export default function SettingsPage() {
 
           <Section icon={KeyRound} title="Integration keys (legacy)">
             <div className="rounded-lg border border-flame/40 bg-flame/5 px-3 py-2.5 mb-3">
-              <div className="flex items-start gap-2 text-[12px] text-ink dark:text-[#F5F1EA]">
-                <span className="font-semibold shrink-0">Looking for Amazon SES, GSC, Ghost, WordPress, Unipile, Discord, Telegram, Notion, Linear, GitHub, Stripe, Cal.com, RB2B?</span>
-              </div>
+              <p className="font-semibold text-[12px] text-ink dark:text-[#F5F1EA] leading-snug break-words">
+                Looking for Amazon SES, GSC, Ghost, WordPress, Unipile, Discord, Telegram, Notion, Linear, GitHub, Stripe, Cal.com, RB2B?
+              </p>
               <p className="text-[11px] text-muted dark:text-[#8C837C] mt-1">
                 Those are newer BYOK integrations and live in <strong>sidebar → Integrations</strong>, not here. This panel is kept only for a handful of legacy config.toml keys that haven't been migrated yet (EnrichLayer, Apollo, Slack webhook, Resend, LinkedIn cookie, From email). Pasting keys in Integrations also mirrors them to <code className="text-[11px]">{vault}/.env</code>.
               </p>
@@ -439,48 +419,9 @@ export default function SettingsPage() {
             )}
           </Section>
 
-          <Section icon={SettingsIcon} title="Theme">
-            <button
-              onClick={toggleTheme}
-              className="h-9 px-4 rounded-md border border-line dark:border-[#2A241D] hover:border-flame text-[12px] text-ink dark:text-[#E6E0D8] flex items-center gap-2"
-            >
-              {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-              Switch to {theme === 'dark' ? 'light' : 'dark'}
-            </button>
-          </Section>
-
           <Section icon={FileText} title="What's new">
             <ChangelogBlock />
           </Section>
-
-          <details className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl">
-            <summary className="cursor-pointer p-5 text-sm font-semibold text-ink dark:text-[#F5F1EA]">
-              Developer
-            </summary>
-            <div className="px-5 pb-5 space-y-3 text-[12px]">
-              <KV k="Daemon port" v={String(bridge.daemonPort)} mono />
-              <KV k="Local token" v={bridge.daemonToken ? bridge.daemonToken.slice(0, 8) + '…' : '—'} mono />
-              <p className="text-[11px] text-muted dark:text-[#8C837C]">
-                Override port/token (when running renderer outside Electron):
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={portDraft}
-                  onChange={(e) => setPortDraft(e.target.value)}
-                  placeholder="port"
-                  className="w-24 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
-                />
-                <input
-                  value={tokenDraft}
-                  onChange={(e) => setTokenDraft(e.target.value)}
-                  placeholder="token"
-                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
-                />
-                <button onClick={saveBridge} className="h-8 px-3 rounded-md bg-flame text-white text-[12px]">Save & reload</button>
-              </div>
-            </div>
-          </details>
 
           <p className="text-[11px] text-muted dark:text-[#6B625C] text-center pt-4">
             v{health.data?.version ?? '…'} · open source · MIT
