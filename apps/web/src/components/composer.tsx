@@ -259,15 +259,15 @@ export function Composer({
       <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F]">
         {/* Agent pill (ChatGPT-style integrated picker — replaces the old
             cards grid). Shows the current routing agent with a chevron;
-            click to swap. "Default" means whichever agent the daemon
-            picks for an unrouted thread. */}
+            click to swap. When no agent is picked the message goes
+            straight to BlackMagic AI with no agent routing. */}
         <div className="relative">
           <button
             ref={agentBtnRef}
             type="button"
             onClick={() => setAgentMenuOpen((v) => !v)}
             className="inline-flex items-center gap-2 px-2 py-1 rounded-md text-[12px] text-ink dark:text-[#E6E0D8] hover:bg-white dark:hover:bg-[#1F1B15] border border-transparent hover:border-line dark:hover:border-[#2A241D]"
-            title={currentAgent ? `Routing through ${currentAgent.name} — click to swap` : 'Choose which agent answers'}
+            title={currentAgent ? `Routing through ${currentAgent.name} — click to swap` : 'No agent — message goes straight to BlackMagic AI. Click to pick an agent.'}
           >
             {currentAgent ? (
               <AgentIcon slug={currentAgent.slug} name={currentAgent.name} size="sm" />
@@ -275,7 +275,7 @@ export function Composer({
               <Bot className="w-3.5 h-3.5 text-muted dark:text-[#8C837C]" />
             )}
             <span className="font-medium">
-              {currentAgent ? currentAgent.name : 'Default agent'}
+              {currentAgent ? currentAgent.name : 'No agent'}
             </span>
             <ChevronDown className="w-3 h-3 text-muted dark:text-[#8C837C]" />
           </button>

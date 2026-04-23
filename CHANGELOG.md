@@ -2,6 +2,18 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.71 — 2026-04-23
+
+### Changed
+- **Composer agent pill relabeled "No agent"** (was "Default agent" /
+  "Default"). There isn't a default agent — when nothing is picked
+  the message goes straight to BlackMagic AI with no agent routing,
+  so the pill now says so plainly.
+- **Sidebar footer: full "BlackMagic AI" wordmark no longer gets
+  truncated.** The version number moved onto its own line under the
+  logo/wordmark row so the name always fits at the narrow sidebar
+  width.
+
 ## 0.4.70 — 2026-04-23
 
 ### Changed

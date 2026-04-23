@@ -334,22 +334,24 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-2 border-t border-line dark:border-[#2A241D] flex items-center gap-2 shrink-0">
-        <img src="/logo.svg" alt="" className="w-5 h-5 shrink-0 dark:invert" />
-        <span className="font-semibold tracking-tight text-[13px] text-ink dark:text-[#F5F1EA] truncate">
-          BlackMagic AI
-        </span>
-        <span className="ml-auto text-[10px] text-muted dark:text-[#6B625C] font-mono">
+      <div className="px-3 py-2 border-t border-line dark:border-[#2A241D] shrink-0">
+        <div className="flex items-center gap-2">
+          <img src="/logo.svg" alt="" className="w-5 h-5 shrink-0 dark:invert" />
+          <span className="font-semibold tracking-tight text-[13px] text-ink dark:text-[#F5F1EA] shrink-0">
+            BlackMagic AI
+          </span>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+            className="ml-auto p-1.5 rounded-md text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA] hover:bg-white dark:hover:bg-[#1F1B15]"
+          >
+            {dark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+        <div className="text-[10px] text-muted dark:text-[#6B625C] font-mono pl-7 -mt-0.5">
           v{health.data?.version ?? '…'}
-        </span>
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-          className="p-1.5 rounded-md text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA] hover:bg-white dark:hover:bg-[#1F1B15]"
-        >
-          {dark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-        </button>
+        </div>
       </div>
 
       {paletteOpen && (
