@@ -41,6 +41,38 @@ export async function loadAgent(name: string): Promise<AgentSpec> {
   };
 }
 
+// Universal output-channel protocol, injected into every agent's system
+// prompt. The chat surface is what the user actually sees — the vault
+// filesystem is the side-effect, not the output. Agents have historically
+// ended runs with "wrote to signals/X.md" and left the user to go find
+// the file. This block forces the inverse: render the full deliverable
+// inline in the chat reply; file paths are a footer, not the main event.
+const OUTPUT_PROTOCOL = `## Output protocol (non-negotiable)
+
+The chat surface is the primary output channel — the vault filesystem
+is a side-effect. When your work produces a deliverable (signal,
+draft, report, brief, digest, classification table, asset bundle,
+etc.):
+
+1. **Your final reply in chat MUST render the full deliverable
+   inline as markdown** — headers, tables, bullet lists, image
+   links, draft bodies. The user reads the chat, not the
+   filesystem.
+2. For tables: produce real markdown tables (\`| col | col |\`),
+   not prose descriptions of tables.
+3. For images / video / audio the agent generated: include the
+   signed URL inline so the chat surface's markdown renderer can
+   display / link to it.
+4. File paths go at the *end* of the reply, under a short
+   \`_Saved to:_\` footer. They are never the reply body.
+5. Never end a run with just "Done." or "See file X." or "Wrote
+   to signals/Y.md". If you only have a path to offer, you haven't
+   finished the job — inline the content first.
+
+If the deliverable is too long for a single chat message, lead with
+a tight TL;DR (3–5 bullets), then the full rendered body, then the
+file-path footer.`;
+
 export async function loadClaudeMd(): Promise<string> {
   try {
     return await fs.readFile(path.join(getVaultRoot(), 'CLAUDE.md'), 'utf-8');
@@ -126,6 +158,7 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
   const systemPrompt =
     (claudeMd ? claudeMd.trim() + '\n\n---\n\n' : '') +
     spec.systemBody +
+    '\n\n---\n\n' + OUTPUT_PROTOCOL +
     '\n\n---\n\n## Available tools\n' +
     enabledTools.map((t) => `- \`${t.name}\` — ${t.description}`).join('\n');
 

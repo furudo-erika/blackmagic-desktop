@@ -5,10 +5,17 @@ All notable changes to BlackMagic AI. Dates in UTC.
 ## 0.4.90 — 2026-04-23
 
 ### Changed
-- **Hero image restored on Home.** Killed it in 0.4.87 while
-  simplifying; user wanted it back. Shortened the aspect ratio
-  (16:5 vs the original 16:7) so it doesn't fight with the heatmap
-  hero right underneath.
+- **Every agent now renders its deliverable inline in the chat.**
+  Baked a universal `OUTPUT_PROTOCOL` block into the system prompt
+  at the daemon level (`agent.ts`), applied to every agent
+  regardless of vault contents. Rule: final chat reply MUST inline
+  the full deliverable as rendered markdown — tables as tables,
+  images as links, drafts as full bodies. File paths go at the end
+  under a `_Saved to:_` footer, never as the main message. Fixes
+  the long-standing "agent writes signals/X.md, chat just says
+  'done', user has to go find the file" problem.
+- **Hero image restored on Home.** Shorter 16:5 aspect so it
+  doesn't fight with the heatmap hero underneath.
 
 ## 0.4.89 — 2026-04-23
 
