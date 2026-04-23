@@ -238,6 +238,8 @@ export function Sidebar() {
         <NavRow icon={Wrench}          label="Integrations" href="/integrations" pathname={pathname} />
         <NavRow icon={SettingsIcon}    label="Settings"     href="/settings"     pathname={pathname} />
 
+        <HistorySidebarRow pathname={pathname} router={router} />
+
         {/* Mechanism pages (Memory / Skills / Ontology / Files) removed
             from the top-level sidebar — agents use them internally and
             most users never need to open them. Still reachable by
@@ -302,7 +304,10 @@ function AgentsSidebarRow({
   const inside = pathname.startsWith('/agents');
   const search = useSearchParams();
   const activeSlug = search.get('slug') ?? '';
-  const [open, setOpen] = useState<boolean>(inside);
+  // Agents are the product's first-class citizens — default expanded
+  // so a cold-start user sees the full roster at a glance (13 pre-seeded
+  // agents; no need to hide them). User can still collapse manually.
+  const [open, setOpen] = useState<boolean>(true);
   useEffect(() => { if (inside) setOpen(true); }, [inside]);
   return (
     <div>
@@ -623,6 +628,77 @@ function CommandPalette({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// History — collapsible, Codex-style list of recent chat threads.
+// Default collapsed so the sidebar stays compact; expanding triggers
+// the listChats query lazily. Click a thread to load it in /chat.
+function HistorySidebarRow({
+  pathname,
+  router,
+}: {
+  pathname: string;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const [open, setOpen] = useState(false);
+  const recent = useQuery({
+    queryKey: ['sidebar-history'],
+    queryFn: api.listChats,
+    enabled: open,
+    refetchInterval: open ? 30_000 : false,
+  });
+  const threads = useMemo(() => {
+    return (recent.data?.threads ?? [])
+      .slice()
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+      .slice(0, 12);
+  }, [recent.data]);
+
+  function openThread(threadId: string) {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('bm-last-thread', threadId);
+    }
+    router.push('/chat');
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 text-[13px] text-ink dark:text-[#E6E0D8]"
+        title={open ? 'Collapse history' : 'Show recent threads'}
+      >
+        <History className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
+        <span className="flex-1 text-left truncate">History</span>
+        <ChevronDown
+          className={'w-3 h-3 text-muted dark:text-[#8C837C] transition-transform ' + (open ? '' : '-rotate-90')}
+        />
+      </button>
+      {open && (
+        <ul className="ml-5 pl-2 border-l border-line dark:border-[#2A241D] mt-0.5 mb-1 space-y-0.5">
+          {recent.isLoading && (
+            <li className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">loading…</li>
+          )}
+          {!recent.isLoading && threads.length === 0 && (
+            <li className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">No threads yet.</li>
+          )}
+          {threads.map((t) => (
+            <li key={t.threadId}>
+              <button
+                type="button"
+                onClick={() => openThread(t.threadId)}
+                title={t.preview || t.threadId}
+                className="w-full text-left px-2 py-1 rounded-md text-[11.5px] text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 truncate"
+              >
+                {t.preview || '(empty thread)'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

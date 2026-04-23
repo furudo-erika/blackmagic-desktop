@@ -2,6 +2,29 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.88 — 2026-04-23
+
+### Added
+- **Brand Monitor Agent (#14)** — dedicated agent for Reddit + X
+  brand-keyword monitoring, modelled on what Apidog runs in-house.
+  Scrapes via Apify, mandatory keyword-presence guard to drop
+  Apify's search-loose false positives, classifies every mention
+  into URGENT / COMPARISON / QUESTION / PRAISE / MENTION, writes
+  `signals/mentions/<date>.md` with counts in frontmatter, escalates
+  via `notify` (fans out to Feishu/Slack/Discord/Telegram if wired).
+  Self-schedules with `trigger_create` when user asks "run this
+  daily".
+- **History section in the sidebar (Codex-style).** Collapsible row
+  at the bottom (above the footer) that lazy-loads the 12 most recent
+  chat threads. Click a row to jump straight into that thread.
+  Default collapsed; no empty-state clutter for cold-start users.
+
+### Changed
+- **Agents sidebar section defaults to expanded.** The 13 (now 14)
+  pre-seeded agents are the product's first-class citizens — hiding
+  them behind a chevron on the Home page hurt discoverability.
+  User can still collapse manually.
+
 ## 0.4.87 — 2026-04-23
 
 ### Changed
