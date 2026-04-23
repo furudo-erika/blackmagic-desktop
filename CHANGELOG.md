@@ -2,6 +2,18 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.73 — 2026-04-23
+
+### Changed
+- **Chat empty state shows the agents as a tiled card grid again.**
+  Regression from 0.4.70 when the agent picker moved into the
+  composer pill — the empty Chat page dropped the gallery along
+  with it, leaving a blank canvas. Now: before you pick an agent
+  or send anything, Chat tiles every vault agent as an icon +
+  name + tagline card; click one to select it as the routing
+  agent for this thread. The whole gallery disappears the moment
+  the first message goes out.
+
 ## 0.4.72 — 2026-04-23
 
 ### Fixed
