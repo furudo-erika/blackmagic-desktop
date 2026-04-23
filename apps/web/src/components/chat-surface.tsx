@@ -369,7 +369,7 @@ export function ChatSurface({
     try {
       const data = await api.getChat(id);
       setThreadId(data.threadId);
-      setMessages(data.messages as Msg[]);
+      setMessages(Array.isArray(data.messages) ? (data.messages as Msg[]) : []);
     } catch {
       setThreadId(id);
       setMessages([]);

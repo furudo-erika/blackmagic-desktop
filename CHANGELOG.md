@@ -2,6 +2,19 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.78 — 2026-04-23
+
+### Fixed
+- **Chat crashed with `Cannot read properties of undefined (reading 'length')`
+  when clicking any agent tile on the empty-state gallery.** Root cause:
+  `loadThread` blindly assigned `data.messages` from `/api/chats/:id` into
+  React state — if the stored chat JSON was missing the `messages` field
+  (older/partial file on disk), the next render choked on `messages.length`
+  / `messages.map` and blew up the whole chat surface with a client-side
+  exception. Now guards with `Array.isArray(data.messages) ? ... : []`, so
+  a corrupt thread file just shows an empty chat instead of bricking the
+  page.
+
 ## 0.4.77 — 2026-04-23
 
 ### Added
