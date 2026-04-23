@@ -35,14 +35,18 @@ export function PageHeader({
   trailing?: ReactNode;
 }) {
   return (
-    <header className="px-6 py-4 border-b border-line dark:border-[#2A241D] flex items-start justify-between gap-4 shrink-0">
-      <div className="min-w-0">
-        <h1 className="text-lg font-semibold text-ink dark:text-[#F5F1EA] flex items-center gap-2">
-          {Icon && <Icon className="w-4 h-4 text-flame shrink-0" />}
-          <span className="truncate">{title}</span>
+    <header className="px-8 pt-8 pb-5 border-b border-line dark:border-[#2A241D] flex items-end justify-between gap-6 shrink-0">
+      <div className="min-w-0 flex-1">
+        {Icon && (
+          <div className="mb-2 w-8 h-8 rounded-md border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] flex items-center justify-center">
+            <Icon className="w-[15px] h-[15px] text-muted dark:text-[#8C837C]" />
+          </div>
+        )}
+        <h1 className="text-[28px] leading-[1.1] font-semibold tracking-tight text-ink dark:text-[#F5F1EA] truncate">
+          {title}
         </h1>
         {subtitle && (
-          <p className="mt-0.5 text-xs text-muted dark:text-[#8C837C] leading-snug">
+          <p className="mt-1.5 text-[13px] text-muted dark:text-[#8C837C] leading-snug max-w-2xl">
             {subtitle}
           </p>
         )}
@@ -76,7 +80,7 @@ export function PageBody({
           '5xl': 'max-w-5xl',
         }[maxWidth];
   return (
-    <div className={clsx('flex-1 overflow-y-auto px-6 py-6', className)}>
+    <div className={clsx('flex-1 overflow-y-auto px-8 py-8', className)}>
       <div className={clsx(maxClass, maxClass && 'mx-auto')}>{children}</div>
     </div>
   );
@@ -110,8 +114,8 @@ export function Panel({
   return (
     <div
       className={clsx(
-        'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl',
-        padded && 'p-4',
+        'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg',
+        padded && 'p-5',
         className,
       )}
     >

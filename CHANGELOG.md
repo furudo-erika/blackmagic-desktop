@@ -2,6 +2,34 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.87 — 2026-04-23
+
+### Changed
+- **SwanAI-style home dashboard.** Killed the pixelated-landscape hero
+  + the getting-started checklist; promoted the 14-week activity
+  heatmap to sit directly under the composer as the page's visual
+  anchor. Quick Starts collapsed from 16 mixed cards into 6
+  GTM-operator-focused cards mapped 1:1 to the SwanAI workflow set
+  (Lookalike outbound, LinkedIn intent, Website visitors, Closed-lost
+  revival, Meeting prep, Deal inspection). Each card routes straight
+  to the owning agent's page.
+- **Sidebar reorganised.** Three clear groups: AGENTS (agent list +
+  Scheduled = renamed Triggers), DATA (Companies, Contacts, Deals,
+  Pipeline, GEO, Knowledge, Sequences), and a bottom row (Desk,
+  Integrations, Settings). Mechanism pages (Memory, Skills, Ontology,
+  Files) are hidden from the sidebar — still reachable by direct URL
+  and ⌘K, but no longer cluttering the nav.
+- **"Deal inspection"** (renamed from "Pipeline health") on the Home
+  quick-start card — matches the Clari / Salesforce industry term and
+  avoids colliding with the Pipeline data page in the sidebar.
+- **Page chrome: Vercel-style.** `PageHeader` now shows a larger
+  tracking-tight 28-pt title with the icon in a monochrome tile
+  above it (not inline + flame-coloured). `PageBody` picks up the
+  wider 32px gutter. `Panel` softened from rounded-xl to rounded-lg
+  and gets a hair more internal padding. Changes cascade to every
+  page that uses the primitives (Agents, Integrations, Pipeline,
+  Companies, Contacts, Deals, etc).
+
 ## 0.4.86 — 2026-04-23
 
 ### Changed

@@ -45,7 +45,6 @@ import {
   Radar,
   Workflow,
   Send,
-  Brain,
   Wrench,
   ChevronRight,
   Search as SearchIcon,
@@ -222,25 +221,28 @@ export function Sidebar() {
           agents={teamAgents.data ?? []}
           liveSlugs={liveAgentSlugs}
         />
-        <NavRow icon={Inbox}           label="Desk"      href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
-        <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} />
-        <NavRow icon={Workflow}        label="Pipeline"  href="/pipeline"  pathname={pathname} />
+        <NavRow icon={Zap}             label="Scheduled" href="/triggers"  pathname={pathname} />
+
+        <SectionLabel>Data</SectionLabel>
         <NavRow icon={Building2}       label="Companies" href="/companies" pathname={pathname} />
         <NavRow icon={Users}           label="Contacts"  href="/contacts"  pathname={pathname} />
         <NavRow icon={Briefcase}       label="Deals"     href="/deals"     pathname={pathname} />
-        <NavRow icon={Send}            label="Outreach"  href="/sequences" pathname={pathname} />
-
-        <SectionLabel>Intelligence</SectionLabel>
+        <NavRow icon={Workflow}        label="Pipeline"  href="/pipeline"  pathname={pathname} />
+        <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} />
         <KnowledgeSidebarRow pathname={pathname} />
-        <NavRow icon={Brain}           label="Memory"    href="/memory"    pathname={pathname} />
-        <NavRow icon={BookOpen}        label="Skills"    href="/skills"    pathname={pathname} />
-        <NavRow icon={Zap}             label="Triggers"  href="/triggers"  pathname={pathname} />
-        <NavRow icon={Wrench}          label="Integrations" href="/integrations" pathname={pathname} />
-        <NavRow icon={Sparkles}        label="Ontology"  href="/ontology"  pathname={pathname} />
-        <NavRow icon={FileText}        label="Files"     href="/vault"     pathname={pathname} />
+        <NavRow icon={Send}            label="Sequences" href="/sequences" pathname={pathname} />
 
-        <SectionLabel>Other</SectionLabel>
-        <NavRow icon={SettingsIcon} label="Account" href="/settings" pathname={pathname} />
+        <div className="h-px bg-line dark:bg-[#2A241D] my-2 mx-2" />
+
+        <NavRow icon={Inbox}           label="Desk"         href="/outreach"     pathname={pathname} badge={pendingDraftCount} />
+        <NavRow icon={Wrench}          label="Integrations" href="/integrations" pathname={pathname} />
+        <NavRow icon={SettingsIcon}    label="Settings"     href="/settings"     pathname={pathname} />
+
+        {/* Mechanism pages (Memory / Skills / Ontology / Files) removed
+            from the top-level sidebar — agents use them internally and
+            most users never need to open them. Still reachable by
+            direct URL (/memory, /skills, /ontology, /vault) and via
+            ⌘K command palette. */}
       </nav>
 
       {/* Footer */}

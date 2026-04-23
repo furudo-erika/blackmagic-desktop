@@ -27,7 +27,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, CheckCircle2, Circle, Clapperboard, Smile, Image as ImageIcon, Images, Rocket, AtSign, Send, ScrollText, ScanSearch, MousePointerClick, CalendarDays, Target, Swords, TrendingUp, LineChart } from 'lucide-react';
+import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, AtSign, ScanSearch, MousePointerClick, CalendarDays, Target, TrendingUp } from 'lucide-react';
 import { api } from '../lib/api';
 import { Composer } from '../components/composer';
 
@@ -96,7 +96,6 @@ export default function HomePage() {
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.listRuns, refetchInterval: 5_000 });
   const chats = useQuery({ queryKey: ['chats'], queryFn: api.listChats });
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.listProjects });
-  const vaultTree = useQuery({ queryKey: ['vault-tree'], queryFn: api.vaultTree, staleTime: 60_000 });
 
   const pending = useMemo(
     () => (drafts.data?.drafts ?? []).filter((d) => (d.status ?? 'pending') === 'pending'),
@@ -161,50 +160,7 @@ export default function HomePage() {
   }, [runs.data]);
 
   // Getting-started checklist — derived from what the user has done.
-  const agentCount = useMemo(
-    () => (vaultTree.data?.tree ?? []).filter(
-      (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
-    ).length,
-    [vaultTree.data],
-  );
-  const totalRuns = runs.data?.runs?.length ?? 0;
-  const totalDrafts = drafts.data?.drafts?.length ?? 0;
-  const steps = [
-    { label: 'Open a project vault', done: !!projects.data?.active },
-    { label: 'Install an agent', done: agentCount > 0, href: '/agents' },
-    { label: 'Run your first agent', done: totalRuns > 0, href: '/agents' },
-    { label: 'Review a draft before sending', done: totalDrafts > 0, href: '/outreach' },
-  ];
-  const stepsDone = steps.filter((s) => s.done).length;
-
   const orgName = projects.data?.projects.find((p) => p.id === projects.data?.active)?.name ?? 'BlackMagic';
-
-  // Quick-start click → load the template into the composer. We also
-  // scroll the composer into view so a tall screen doesn't leave the
-  // user confused about where the text landed, and we focus the
-  // textarea so their next keypress replaces the placeholder.
-  function prefill(text: string) {
-    setDraft(text);
-    if (typeof window !== 'undefined') {
-      // Give React one paint to push the value in, then focus the
-      // first textarea in the composer and select the first bracket
-      // placeholder so typing replaces it in one shot.
-      requestAnimationFrame(() => {
-        const ta = document.querySelector<HTMLTextAreaElement>(
-          'textarea',
-        );
-        if (!ta) return;
-        ta.focus();
-        const match = text.match(/\[([^\]]+)\]/);
-        if (match && match.index !== undefined) {
-          ta.setSelectionRange(match.index, match.index + match[0].length);
-        } else {
-          ta.setSelectionRange(text.length, text.length);
-        }
-        ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
-    }
-  }
 
   function send(textArg?: string) {
     const text = (textArg ?? draft).trim();
@@ -230,22 +186,6 @@ export default function HomePage() {
   return (
     <div className="h-full overflow-y-auto bg-cream dark:bg-[#0F0D0A]">
       <div className="max-w-4xl mx-auto px-8 pt-10 pb-12">
-        {/* Hero — retro pixelated landscape from the marketing site,
-            sets the brand tone before the user sees any chrome. */}
-        <div className="relative rounded-2xl overflow-hidden border border-line dark:border-[#2A241D] mb-8 aspect-[16/7] bg-cream-light dark:bg-[#17140F]">
-          <img
-            src="/hero.webp"
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-            draggable={false}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-cream dark:from-[#0F0D0A] via-transparent to-transparent" />
-          <div className="absolute top-3 left-4 inline-flex items-center gap-1.5 text-[10px] font-mono text-white/85 px-2 py-1 rounded-md bg-black/30 backdrop-blur-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-flame animate-pulse" />
-            BlackMagic · control center
-          </div>
-        </div>
-
         {/* Headline */}
         <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-muted dark:text-[#8C837C] mb-2">
           Control center
@@ -257,9 +197,7 @@ export default function HomePage() {
           </span>
         </h1>
 
-        {/* Composer — same component used at /chat. Keeps UX (agent
-            picker, @-mention, slash commands, auto-size) identical
-            between the two surfaces. */}
+        {/* Composer */}
         <Composer
           value={draft}
           onChange={setDraft}
@@ -272,8 +210,6 @@ export default function HomePage() {
             else if (action === 'skills') router.push('/skills');
           }}
         />
-        {/* Keyboard hint strip under the composer — stays as a footer
-            callout here since Home has more real estate than /chat. */}
         <div className="mt-2 flex items-center gap-3 px-1 text-[10px] font-mono text-muted dark:text-[#8C837C]">
           <Kbd>⌘↵</Kbd> <span>send</span>
           <span>·</span>
@@ -282,15 +218,55 @@ export default function HomePage() {
           <span>@ agent · / commands</span>
         </div>
 
-        {/* Quick starts — skill shortcuts grouped into two buckets so
-            the grid doesn't just look like a pile of random cards.
-            Click a card to prefill the composer with a ready-to-edit
-            invocation template; cursor auto-selects the first
-            [bracket placeholder] so the user's next keypress replaces
-            it. "See all agents →" routes to /agents because the
-            agent-grouped view reads better than the raw /skills list
-            for someone who just wants to know "what can this do". */}
-        <div className="mt-8">
+        {/* Activity heatmap — promoted to hero-below-composer as the
+            visual signature of the app. 14-week view, full width, no
+            flanking widgets stealing its thunder. */}
+        <section className="mt-8 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-5">
+          <header className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Activity className="w-3.5 h-3.5 text-muted dark:text-[#8C837C]" />
+              <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C]">
+                Activity
+              </h2>
+            </div>
+            <div className="text-[10px] font-mono text-muted dark:text-[#8C837C] tabular-nums">
+              {heatmap.total} runs · 14 weeks
+            </div>
+          </header>
+          <Heatmap cells={heatmap.cells} max={heatmap.max} />
+          <footer className="mt-3 flex items-center justify-between text-[10px] font-mono text-muted dark:text-[#8C837C]">
+            <span>
+              {heatmap.start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              {' → '}
+              {heatmap.end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            </span>
+            <span className="flex items-center gap-1.5">
+              less
+              <span className="w-2.5 h-2.5 rounded-[2px] bg-line dark:bg-[#2A241D]" />
+              <span className="w-2.5 h-2.5 rounded-[2px] bg-flame/25" />
+              <span className="w-2.5 h-2.5 rounded-[2px] bg-flame/55" />
+              <span className="w-2.5 h-2.5 rounded-[2px] bg-flame/80" />
+              <span className="w-2.5 h-2.5 rounded-[2px] bg-flame" />
+              more
+            </span>
+          </footer>
+        </section>
+
+        {/* KPI strip */}
+        <div className="mt-4 grid grid-cols-4 gap-px bg-line dark:bg-[#2A241D] border border-line dark:border-[#2A241D] rounded-xl overflow-hidden">
+          <Stat label="Today" value={todayRuns.length} hint="runs" href="/runs" />
+          <Stat label="Running" value={running.length} hint="now" tone={running.length > 0 ? 'flame' : undefined} href="/runs" />
+          <Stat label="Approvals" value={pending.length} hint="pending" tone={pending.length > 0 ? 'flame' : undefined} href="/outreach" />
+          <Stat label="Threads" value={chats.data?.threads?.length ?? 0} hint="total" href="/chat" />
+        </div>
+
+        {/* Quick starts — 6 cards, one per SwanAI-style flow. Click a
+            card → open that agent's page with a prefilled starter
+            prompt. No more two-row split by category; keep the grid
+            tight so users don't feel overwhelmed the moment they
+            land. Content Studio agent holds the video/image/copy
+            skills internally. */}
+        <div className="mt-6">
           <div className="flex items-end justify-between mb-3">
             <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-muted dark:text-[#8C837C]">
               Quick starts
@@ -302,126 +278,18 @@ export default function HomePage() {
               See all agents <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
-
-          <div className="text-[10px] uppercase tracking-wider font-mono text-muted/70 dark:text-[#6B625C] mb-2">
-            Content
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            {QUICK_STARTS_CONTENT.map((q) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {QUICK_STARTS.map((q) => (
               <QuickStartCard
                 key={q.title}
                 icon={q.icon}
                 tint={q.tint}
                 title={q.title}
                 subtitle={q.subtitle}
-                onClick={() => prefill(q.prompt)}
+                onClick={() => router.push(q.href)}
               />
             ))}
           </div>
-
-          <div className="text-[10px] uppercase tracking-wider font-mono text-muted/70 dark:text-[#6B625C] mb-2">
-            Intelligence & ops
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {QUICK_STARTS_INTEL.map((q) => (
-              <QuickStartCard
-                key={q.title}
-                icon={q.icon}
-                tint={q.tint}
-                title={q.title}
-                subtitle={q.subtitle}
-                onClick={() => prefill(q.prompt)}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Today strip — live KPIs at a glance */}
-        <div className="mt-8 grid grid-cols-4 gap-px bg-line dark:bg-[#2A241D] border border-line dark:border-[#2A241D] rounded-xl overflow-hidden">
-          <Stat label="Today" value={todayRuns.length} hint="runs" href="/runs" />
-          <Stat label="Running" value={running.length} hint="now" tone={running.length > 0 ? 'flame' : undefined} href="/runs" />
-          <Stat label="Approvals" value={pending.length} hint="pending" tone={pending.length > 0 ? 'flame' : undefined} href="/outreach" />
-          <Stat label="Threads" value={chats.data?.threads?.length ?? 0} hint="total" href="/chat" />
-        </div>
-
-        {/* Activity heatmap + getting-started */}
-        <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
-          <section className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4">
-            <header className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Activity className="w-3.5 h-3.5 text-muted dark:text-[#8C837C]" />
-                <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C]">
-                  Activity
-                </h2>
-              </div>
-              <div className="text-[10px] font-mono text-muted dark:text-[#8C837C] tabular-nums">
-                {heatmap.total} runs · 14 weeks
-              </div>
-            </header>
-            <Heatmap cells={heatmap.cells} max={heatmap.max} />
-            <footer className="mt-3 flex items-center justify-between text-[10px] font-mono text-muted dark:text-[#8C837C]">
-              <span>
-                {heatmap.start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                {' → '}
-                {heatmap.end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              </span>
-              <span className="flex items-center gap-1.5">
-                less
-                <span className="w-2.5 h-2.5 rounded-[2px] bg-line dark:bg-[#2A241D]" />
-                <span className="w-2.5 h-2.5 rounded-[2px] bg-flame/25" />
-                <span className="w-2.5 h-2.5 rounded-[2px] bg-flame/55" />
-                <span className="w-2.5 h-2.5 rounded-[2px] bg-flame/80" />
-                <span className="w-2.5 h-2.5 rounded-[2px] bg-flame" />
-                more
-              </span>
-            </footer>
-          </section>
-
-          <section className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4">
-            <header className="flex items-center justify-between mb-3">
-              <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C]">
-                Getting started
-              </h2>
-              <span className="text-[10px] font-mono tabular-nums text-muted dark:text-[#8C837C]">
-                {stepsDone}/{steps.length}
-              </span>
-            </header>
-            <div className="h-1 bg-cream-light dark:bg-[#17140F] rounded-full overflow-hidden mb-3">
-              <div
-                className="h-full bg-flame transition-all"
-                style={{ width: `${(stepsDone / steps.length) * 100}%` }}
-              />
-            </div>
-            <ul className="space-y-1.5">
-              {steps.map((s) => (
-                <li key={s.label}>
-                  {s.href ? (
-                    <Link href={s.href} className="flex items-center gap-2 text-[12px] hover:text-flame">
-                      {s.done ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-flame shrink-0" />
-                      ) : (
-                        <Circle className="w-3.5 h-3.5 text-muted dark:text-[#6B625C] shrink-0" />
-                      )}
-                      <span className={s.done ? 'text-muted dark:text-[#8C837C] line-through' : 'text-ink dark:text-[#E6E0D8]'}>
-                        {s.label}
-                      </span>
-                    </Link>
-                  ) : (
-                    <div className="flex items-center gap-2 text-[12px]">
-                      {s.done ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-flame shrink-0" />
-                      ) : (
-                        <Circle className="w-3.5 h-3.5 text-muted dark:text-[#6B625C] shrink-0" />
-                      )}
-                      <span className={s.done ? 'text-muted dark:text-[#8C837C] line-through' : 'text-ink dark:text-[#E6E0D8]'}>
-                        {s.label}
-                      </span>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
         </div>
 
         {/* Live rows — running + pending + recent threads, compact */}
@@ -623,135 +491,68 @@ function Card({
   );
 }
 
-// Quick-start shortcuts — split into two groups so the grid actually
-// tells a user what the product is for. "Content" is the Hypereal /
-// drafting side; "Intelligence & ops" is the monitoring / research /
-// inbox-and-calendar side. Clicking a card prefills the composer with
-// a template that has [bracket placeholders]; prefill() on Home selects
-// the first bracket so the user's next keystroke replaces it.
+// Quick starts — 6 cards, one per SwanAI-style GTM flow. Each card
+// routes to the owning agent's page (the agent prompt + its UI take
+// it from there). Mapping:
+//   Lookalike outbound   → Lookalike Discovery Agent
+//   LinkedIn intent      → LinkedIn Outreach Agent
+//   Website visitors     → Website Visitor Agent
+//   Closed-lost revival  → Closed-Lost Revival Agent
+//   Meeting prep         → Meeting Prep Agent
+//   Deal inspection      → Pipeline Ops Agent (Clari/Salesforce term)
+// Content skills (video / image / copy) live inside the Content Studio
+// agent's page, not on Home — they're one click deeper so Home stays
+// focused on the "GTM operator" headline use-cases.
 type QuickStart = {
   icon: React.ComponentType<{ className?: string }>;
-  tint: string; // tailwind text-* color for the icon + matching bg-*/10 tile
+  tint: string;
   title: string;
   subtitle: string;
-  prompt: string;
+  href: string;
 };
 
-const QUICK_STARTS_CONTENT: QuickStart[] = [
+const QUICK_STARTS: QuickStart[] = [
   {
-    icon: Clapperboard,
+    icon: Target,
     tint: 'text-[#E8634A] bg-[#E8634A]/10',
-    title: 'Announcement video',
-    subtitle: '8-sec launch clip',
-    prompt: 'Use the announcement-video skill.\nTopic: [what are you announcing?]\nAspect: 16:9',
-  },
-  {
-    icon: Smile,
-    tint: 'text-[#D79B3C] bg-[#D79B3C]/10',
-    title: 'UGC testimonial',
-    subtitle: 'Faux-UGC for paid ads',
-    prompt: 'Use the ugc-video skill.\nPersona: [e.g. dev in hoodie at home desk]\nTalking point: [what do they say about the product?]',
-  },
-  {
-    icon: ImageIcon,
-    tint: 'text-[#C9547C] bg-[#C9547C]/10',
-    title: 'Blog hero image',
-    subtitle: 'Editorial hero for a post',
-    prompt: 'Use the blog-post-hero skill.\nPost path: [path to the .md or CMS slug]\nStyle: editorial',
-  },
-  {
-    icon: Images,
-    tint: 'text-[#8B6FD6] bg-[#8B6FD6]/10',
-    title: 'Social carousel',
-    subtitle: '5-slide LinkedIn pack',
-    prompt: 'Use the social-carousel skill.\nTopic: [what is the carousel about?]\nSlides: 5\nNetwork: linkedin',
-  },
-  {
-    icon: Rocket,
-    tint: 'text-[#3F7EC7] bg-[#3F7EC7]/10',
-    title: 'Product Hunt kit',
-    subtitle: 'Thumb + gallery + copy',
-    prompt: 'Use the product-hunt-kit skill.\nLaunch name: [what are you launching on PH?]\nTagline: [one-line pitch, ≤60 chars]',
+    title: 'Lookalike outbound',
+    subtitle: 'Won deals → new accounts',
+    href: '/agents?slug=lookalike-discovery',
   },
   {
     icon: AtSign,
     tint: 'text-[#3FA0C7] bg-[#3FA0C7]/10',
-    title: 'Launch tweet thread',
-    subtitle: '7-tweet thread w/ hero',
-    prompt: 'Use the launch-tweet-thread skill.\nFeature: [what are you launching?]\nTweets: 7',
-  },
-  {
-    icon: Send,
-    tint: 'text-[#3FA36B] bg-[#3FA36B]/10',
-    title: 'Cold email sequence',
-    subtitle: '3-touch drafts',
-    prompt: 'Use the cold-email-sequence skill.\nICP: [who are you writing to?]\nOffer: [one-line offer]',
-  },
-  {
-    icon: ScrollText,
-    tint: 'text-[#8C847A] bg-[#8C847A]/10',
-    title: 'Founder update',
-    subtitle: 'Monthly investor draft',
-    prompt: 'Use the founder-monthly-update skill.\nMonth: [YYYY-MM]',
-  },
-];
-
-const QUICK_STARTS_INTEL: QuickStart[] = [
-  {
-    icon: ScanSearch,
-    tint: 'text-[#B2558E] bg-[#B2558E]/10',
-    title: 'Brand monitor',
-    subtitle: 'Daily mention sweep',
-    prompt: 'Use the brand-monitor-apify skill. Scan Reddit, X, and the open web for mentions of my brand from the last 24h, classify them, and write today\'s signal file.',
+    title: 'LinkedIn intent',
+    subtitle: 'Engagement-triggered DMs',
+    href: '/agents?slug=linkedin-outreach',
   },
   {
     icon: MousePointerClick,
     tint: 'text-[#3B9DA8] bg-[#3B9DA8]/10',
-    title: 'Visitor sweep',
-    subtitle: 'Yesterday\'s RB2B hits',
-    prompt: 'Use the rb2b-visitor-sweep skill. Pull yesterday\'s identified site visitors, score HOT/WARM against us/market/icp.md, and drop them into companies/ + contacts/.',
+    title: 'Website visitors',
+    subtitle: 'RB2B de-anon + qualify',
+    href: '/agents?slug=website-visitor',
   },
   {
-    icon: Inbox,
-    tint: 'text-[#3FA36B] bg-[#3FA36B]/10',
-    title: 'Inbox triage',
-    subtitle: 'Who needs a reply today',
-    prompt: 'Use the inbox-triage skill. Classify my unread Gmail from the last 24h into REPLY_TODAY / FYI / SPAM and write today\'s digest.',
+    icon: ScanSearch,
+    tint: 'text-[#B2558E] bg-[#B2558E]/10',
+    title: 'Closed-lost revival',
+    subtitle: 'Dead deals → new chances',
+    href: '/agents?slug=closed-lost-revival-agent',
   },
   {
     icon: CalendarDays,
     tint: 'text-[#5B6BC7] bg-[#5B6BC7]/10',
-    title: 'Meeting digest',
-    subtitle: 'Tomorrow\'s prep briefs',
-    prompt: 'Use the meeting-digest skill. Pull tomorrow\'s Google Calendar meetings, enrich external attendees via CRM + Gmail, and write prep briefs.',
-  },
-  {
-    icon: Target,
-    tint: 'text-[#E8634A] bg-[#E8634A]/10',
-    title: 'GEO brand sweep',
-    subtitle: 'AI SOV across ChatGPT/PPX',
-    prompt: 'Run the daily GEO brand sweep — execute every prompt under signals/geo/prompts/ across ChatGPT, Perplexity, and Google AI Overviews, then report share-of-voice + gaps.',
-  },
-  {
-    icon: Swords,
-    tint: 'text-[#D79B3C] bg-[#D79B3C]/10',
-    title: 'Competitor radar',
-    subtitle: 'Weekly intel pack',
-    prompt: 'Use the competitor-radar skill. Sweep each competitor listed in us/market/competitors.md for product-page diffs, new pricing, and notable posts this week.',
+    title: 'Meeting prep',
+    subtitle: 'Pre-call attendee briefs',
+    href: '/agents?slug=meeting-prep-agent',
   },
   {
     icon: TrendingUp,
     tint: 'text-[#8BA83C] bg-[#8BA83C]/10',
-    title: 'GA traffic brief',
-    subtitle: 'SURGE / DROP / CONVERT',
-    prompt: 'Use the ga-traffic-brief skill. Pull the last 28 days from Google Analytics 4, flag SURGE / DROP / CONVERT pages, and report top action.',
-  },
-  {
-    icon: LineChart,
-    tint: 'text-[#3F7EC7] bg-[#3F7EC7]/10',
-    title: 'GSC content brief',
-    subtitle: 'REWRITE / PUSH / GAP',
-    prompt: 'Use the gsc-content-brief skill. Scan Search Console for queries worth rewriting, pushing, or chasing (GAP) and propose the top 5 actions.',
+    title: 'Deal inspection',
+    subtitle: 'Stale deals + next steps',
+    href: '/agents?slug=pipeline-ops',
   },
 ];
 
