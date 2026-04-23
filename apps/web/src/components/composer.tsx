@@ -18,8 +18,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Bot, ChevronDown, Check } from 'lucide-react';
-import { AgentIcon } from './agent-icon';
+import { ArrowRight } from 'lucide-react';
 
 export type ComposerAgent = {
   slug: string;
@@ -69,8 +68,6 @@ export function Composer({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [popover, setPopover] = useState<PopoverState>(null);
-  const [agentMenuOpen, setAgentMenuOpen] = useState(false);
-  const agentBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -84,18 +81,6 @@ export function Composer({
   useEffect(() => {
     if (autoFocus) textareaRef.current?.focus();
   }, [autoFocus]);
-
-  // Close the agent menu on outside click.
-  useEffect(() => {
-    if (!agentMenuOpen) return;
-    function onDown(e: MouseEvent) {
-      if (!agentBtnRef.current) return;
-      const container = agentBtnRef.current.parentElement;
-      if (container && !container.contains(e.target as Node)) setAgentMenuOpen(false);
-    }
-    window.addEventListener('mousedown', onDown);
-    return () => window.removeEventListener('mousedown', onDown);
-  }, [agentMenuOpen]);
 
   function detectPopover(v: string, cursor: number): PopoverState {
     let i = cursor - 1;
@@ -159,8 +144,6 @@ export function Composer({
     if (!text || disabled) return;
     onSubmit(text);
   }
-
-  const currentAgent = agents.find((a) => a.slug === agentSlug) ?? null;
 
   return (
     <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl shadow-sm overflow-visible relative">
@@ -256,71 +239,11 @@ export function Composer({
         style={{ minHeight: 80, maxHeight: 320 }}
       />
 
-      <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F]">
-        {/* Agent pill (ChatGPT-style integrated picker — replaces the old
-            cards grid). Shows the current routing agent with a chevron;
-            click to swap. When no agent is picked the message goes
-            straight to BlackMagic AI with no agent routing. */}
-        <div className="relative">
-          <button
-            ref={agentBtnRef}
-            type="button"
-            onClick={() => setAgentMenuOpen((v) => !v)}
-            className="inline-flex items-center gap-2 px-2 py-1 rounded-md text-[12px] text-ink dark:text-[#E6E0D8] hover:bg-white dark:hover:bg-[#1F1B15] border border-transparent hover:border-line dark:hover:border-[#2A241D]"
-            title={currentAgent ? `Routing through ${currentAgent.name} — click to swap` : 'No agent — message goes straight to BlackMagic AI. Click to pick an agent.'}
-          >
-            {currentAgent ? (
-              <AgentIcon slug={currentAgent.slug} name={currentAgent.name} size="sm" />
-            ) : (
-              <Bot className="w-3.5 h-3.5 text-muted dark:text-[#8C837C]" />
-            )}
-            <span className="font-medium">
-              {currentAgent ? currentAgent.name : 'No agent'}
-            </span>
-            <ChevronDown className="w-3 h-3 text-muted dark:text-[#8C837C]" />
-          </button>
-          {agentMenuOpen && (
-            <div className="absolute bottom-full mb-2 left-0 w-72 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg shadow-lg overflow-hidden z-40">
-              <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] border-b border-line dark:border-[#2A241D]">
-                Route this message through
-              </div>
-              <ul className="max-h-[320px] overflow-y-auto py-1">
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => { onAgentChange?.(undefined); setAgentMenuOpen(false); }}
-                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12px] text-ink dark:text-[#E6E0D8] hover:bg-cream dark:hover:bg-[#0F0D0A]"
-                  >
-                    <Bot className="w-4 h-4 text-muted dark:text-[#8C837C]" />
-                    <span className="flex-1">Default</span>
-                    {!agentSlug && <Check className="w-3.5 h-3.5 text-flame" />}
-                  </button>
-                </li>
-                {agents.map((a) => {
-                  const picked = agentSlug === a.slug;
-                  return (
-                    <li key={a.slug}>
-                      <button
-                        type="button"
-                        onClick={() => { onAgentChange?.(a.slug); setAgentMenuOpen(false); }}
-                        className="w-full text-left flex items-start gap-2 px-3 py-2 text-[12px] text-ink dark:text-[#E6E0D8] hover:bg-cream dark:hover:bg-[#0F0D0A]"
-                      >
-                        <AgentIcon slug={a.slug} name={a.name} size="sm" />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate">{a.name}</div>
-                          {a.tagline && (
-                            <div className="text-[10.5px] text-muted dark:text-[#8C837C] line-clamp-1">{a.tagline}</div>
-                          )}
-                        </div>
-                        {picked && <Check className="w-3.5 h-3.5 text-flame mt-0.5" />}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </div>
+      <div className="flex items-center justify-end gap-3 px-3 py-2 border-t border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F]">
+        {/* Agent picker pill removed — it didn't reflect the current
+            route reliably and the /agents page already scopes the agent
+            by URL. Home sends unrouted; if the user wants a specific
+            agent to run something, they open that agent's page. */}
 
         <div className="flex items-center gap-3">
           {showKeyboardHints && (

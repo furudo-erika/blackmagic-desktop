@@ -2,6 +2,27 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.86 — 2026-04-23
+
+### Changed
+- **Quick-start cards redesigned.** Each card now has its own tinted
+  icon tile (no more all-orange monotone), bigger 36×36 rounded-square
+  with an 18px icon inside, and better icon choices:
+  Clapperboard (announcement video), Smile (UGC), Images (carousel),
+  AtSign (tweet thread), Send (email), ScrollText (founder update),
+  ScanSearch (brand monitor), MousePointerClick (visitor sweep),
+  TrendingUp (GA), LineChart (GSC). Eight distinct pastel tints
+  distribute across both rows so the grid reads as a palette, not
+  a wall of orange squares.
+
+### Removed
+- **Composer agent-picker pill gone.** It showed "No agent" regardless
+  of what the user picked upstream — the state was never wired
+  through reliably — and the /agents page already scopes the routing
+  agent via URL. One less broken UI element; Home now sends unrouted
+  and users open an agent's page if they want to run something
+  through a specific agent.
+
 ## 0.4.85 — 2026-04-23
 
 ### Changed

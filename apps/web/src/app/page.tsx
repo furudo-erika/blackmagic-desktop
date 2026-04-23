@@ -27,7 +27,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, CheckCircle2, Circle, Film, Video, Image as ImageIcon, LayoutGrid, Rocket, Megaphone, Mail, FileText, Radar, UserCheck, CalendarDays, Target, Swords, BarChart3, Search } from 'lucide-react';
+import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, CheckCircle2, Circle, Clapperboard, Smile, Image as ImageIcon, Images, Rocket, AtSign, Send, ScrollText, ScanSearch, MousePointerClick, CalendarDays, Target, Swords, TrendingUp, LineChart } from 'lucide-react';
 import { api } from '../lib/api';
 import { Composer } from '../components/composer';
 
@@ -311,6 +311,7 @@ export default function HomePage() {
               <QuickStartCard
                 key={q.title}
                 icon={q.icon}
+                tint={q.tint}
                 title={q.title}
                 subtitle={q.subtitle}
                 onClick={() => prefill(q.prompt)}
@@ -326,6 +327,7 @@ export default function HomePage() {
               <QuickStartCard
                 key={q.title}
                 icon={q.icon}
+                tint={q.tint}
                 title={q.title}
                 subtitle={q.subtitle}
                 onClick={() => prefill(q.prompt)}
@@ -629,6 +631,7 @@ function Card({
 // the first bracket so the user's next keystroke replaces it.
 type QuickStart = {
   icon: React.ComponentType<{ className?: string }>;
+  tint: string; // tailwind text-* color for the icon + matching bg-*/10 tile
   title: string;
   subtitle: string;
   prompt: string;
@@ -636,49 +639,57 @@ type QuickStart = {
 
 const QUICK_STARTS_CONTENT: QuickStart[] = [
   {
-    icon: Film,
+    icon: Clapperboard,
+    tint: 'text-[#E8634A] bg-[#E8634A]/10',
     title: 'Announcement video',
     subtitle: '8-sec launch clip',
     prompt: 'Use the announcement-video skill.\nTopic: [what are you announcing?]\nAspect: 16:9',
   },
   {
-    icon: Video,
+    icon: Smile,
+    tint: 'text-[#D79B3C] bg-[#D79B3C]/10',
     title: 'UGC testimonial',
     subtitle: 'Faux-UGC for paid ads',
     prompt: 'Use the ugc-video skill.\nPersona: [e.g. dev in hoodie at home desk]\nTalking point: [what do they say about the product?]',
   },
   {
     icon: ImageIcon,
+    tint: 'text-[#C9547C] bg-[#C9547C]/10',
     title: 'Blog hero image',
     subtitle: 'Editorial hero for a post',
     prompt: 'Use the blog-post-hero skill.\nPost path: [path to the .md or CMS slug]\nStyle: editorial',
   },
   {
-    icon: LayoutGrid,
+    icon: Images,
+    tint: 'text-[#8B6FD6] bg-[#8B6FD6]/10',
     title: 'Social carousel',
     subtitle: '5-slide LinkedIn pack',
     prompt: 'Use the social-carousel skill.\nTopic: [what is the carousel about?]\nSlides: 5\nNetwork: linkedin',
   },
   {
     icon: Rocket,
+    tint: 'text-[#3F7EC7] bg-[#3F7EC7]/10',
     title: 'Product Hunt kit',
     subtitle: 'Thumb + gallery + copy',
     prompt: 'Use the product-hunt-kit skill.\nLaunch name: [what are you launching on PH?]\nTagline: [one-line pitch, ≤60 chars]',
   },
   {
-    icon: Megaphone,
+    icon: AtSign,
+    tint: 'text-[#3FA0C7] bg-[#3FA0C7]/10',
     title: 'Launch tweet thread',
     subtitle: '7-tweet thread w/ hero',
     prompt: 'Use the launch-tweet-thread skill.\nFeature: [what are you launching?]\nTweets: 7',
   },
   {
-    icon: Mail,
+    icon: Send,
+    tint: 'text-[#3FA36B] bg-[#3FA36B]/10',
     title: 'Cold email sequence',
     subtitle: '3-touch drafts',
     prompt: 'Use the cold-email-sequence skill.\nICP: [who are you writing to?]\nOffer: [one-line offer]',
   },
   {
-    icon: FileText,
+    icon: ScrollText,
+    tint: 'text-[#8C847A] bg-[#8C847A]/10',
     title: 'Founder update',
     subtitle: 'Monthly investor draft',
     prompt: 'Use the founder-monthly-update skill.\nMonth: [YYYY-MM]',
@@ -687,49 +698,57 @@ const QUICK_STARTS_CONTENT: QuickStart[] = [
 
 const QUICK_STARTS_INTEL: QuickStart[] = [
   {
-    icon: Radar,
+    icon: ScanSearch,
+    tint: 'text-[#B2558E] bg-[#B2558E]/10',
     title: 'Brand monitor',
     subtitle: 'Daily mention sweep',
     prompt: 'Use the brand-monitor-apify skill. Scan Reddit, X, and the open web for mentions of my brand from the last 24h, classify them, and write today\'s signal file.',
   },
   {
-    icon: UserCheck,
+    icon: MousePointerClick,
+    tint: 'text-[#3B9DA8] bg-[#3B9DA8]/10',
     title: 'Visitor sweep',
     subtitle: 'Yesterday\'s RB2B hits',
     prompt: 'Use the rb2b-visitor-sweep skill. Pull yesterday\'s identified site visitors, score HOT/WARM against us/market/icp.md, and drop them into companies/ + contacts/.',
   },
   {
     icon: Inbox,
+    tint: 'text-[#3FA36B] bg-[#3FA36B]/10',
     title: 'Inbox triage',
     subtitle: 'Who needs a reply today',
     prompt: 'Use the inbox-triage skill. Classify my unread Gmail from the last 24h into REPLY_TODAY / FYI / SPAM and write today\'s digest.',
   },
   {
     icon: CalendarDays,
+    tint: 'text-[#5B6BC7] bg-[#5B6BC7]/10',
     title: 'Meeting digest',
     subtitle: 'Tomorrow\'s prep briefs',
     prompt: 'Use the meeting-digest skill. Pull tomorrow\'s Google Calendar meetings, enrich external attendees via CRM + Gmail, and write prep briefs.',
   },
   {
     icon: Target,
+    tint: 'text-[#E8634A] bg-[#E8634A]/10',
     title: 'GEO brand sweep',
     subtitle: 'AI SOV across ChatGPT/PPX',
     prompt: 'Run the daily GEO brand sweep — execute every prompt under signals/geo/prompts/ across ChatGPT, Perplexity, and Google AI Overviews, then report share-of-voice + gaps.',
   },
   {
     icon: Swords,
+    tint: 'text-[#D79B3C] bg-[#D79B3C]/10',
     title: 'Competitor radar',
     subtitle: 'Weekly intel pack',
     prompt: 'Use the competitor-radar skill. Sweep each competitor listed in us/market/competitors.md for product-page diffs, new pricing, and notable posts this week.',
   },
   {
-    icon: BarChart3,
+    icon: TrendingUp,
+    tint: 'text-[#8BA83C] bg-[#8BA83C]/10',
     title: 'GA traffic brief',
     subtitle: 'SURGE / DROP / CONVERT',
     prompt: 'Use the ga-traffic-brief skill. Pull the last 28 days from Google Analytics 4, flag SURGE / DROP / CONVERT pages, and report top action.',
   },
   {
-    icon: Search,
+    icon: LineChart,
+    tint: 'text-[#3F7EC7] bg-[#3F7EC7]/10',
     title: 'GSC content brief',
     subtitle: 'REWRITE / PUSH / GAP',
     prompt: 'Use the gsc-content-brief skill. Scan Search Console for queries worth rewriting, pushing, or chasing (GAP) and propose the top 5 actions.',
@@ -738,11 +757,13 @@ const QUICK_STARTS_INTEL: QuickStart[] = [
 
 function QuickStartCard({
   icon: Icon,
+  tint,
   title,
   subtitle,
   onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
+  tint: string;
   title: string;
   subtitle: string;
   onClick: () => void;
@@ -751,19 +772,19 @@ function QuickStartCard({
     <button
       type="button"
       onClick={onClick}
-      className="group text-left bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl px-3.5 py-3 hover:border-flame/60 hover:-translate-y-0.5 transition-all flex flex-col gap-2 min-h-[96px]"
+      className="group text-left bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl px-4 py-3.5 hover:border-flame/60 hover:shadow-sm hover:-translate-y-0.5 transition-all flex flex-col gap-2.5 min-h-[108px]"
     >
       <div className="flex items-center justify-between">
-        <div className="w-7 h-7 rounded-md bg-flame/10 text-flame flex items-center justify-center">
-          <Icon className="w-3.5 h-3.5" />
+        <div className={'w-9 h-9 rounded-lg flex items-center justify-center ' + tint}>
+          <Icon className="w-[18px] h-[18px]" />
         </div>
-        <ArrowRight className="w-3 h-3 text-muted/70 dark:text-[#6B625C] group-hover:text-flame transition-colors" />
+        <ArrowRight className="w-3.5 h-3.5 text-muted/50 dark:text-[#6B625C] group-hover:text-flame group-hover:translate-x-0.5 transition-all" />
       </div>
       <div>
         <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] leading-tight">
           {title}
         </div>
-        <div className="text-[11px] text-muted dark:text-[#8C837C] mt-0.5 leading-snug">
+        <div className="text-[11px] text-muted dark:text-[#8C837C] mt-1 leading-snug">
           {subtitle}
         </div>
       </div>
