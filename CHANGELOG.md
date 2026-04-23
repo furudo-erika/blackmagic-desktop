@@ -2,6 +2,14 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.90 — 2026-04-23
+
+### Changed
+- **Hero image restored on Home.** Killed it in 0.4.87 while
+  simplifying; user wanted it back. Shortened the aspect ratio
+  (16:5 vs the original 16:7) so it doesn't fight with the heatmap
+  hero right underneath.
+
 ## 0.4.89 — 2026-04-23
 
 ### Added

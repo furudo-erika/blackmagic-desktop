@@ -186,6 +186,24 @@ export default function HomePage() {
   return (
     <div className="h-full overflow-y-auto bg-cream dark:bg-[#0F0D0A]">
       <div className="max-w-4xl mx-auto px-8 pt-10 pb-12">
+        {/* Hero — retro pixelated landscape from the marketing site.
+            Sets the brand tone before any chrome loads. Shorter
+            aspect than the original (16/5 vs 16/7) so it doesn't
+            overshadow the heatmap hero further down. */}
+        <div className="relative rounded-2xl overflow-hidden border border-line dark:border-[#2A241D] mb-6 aspect-[16/5] bg-cream-light dark:bg-[#17140F]">
+          <img
+            src="/hero.webp"
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            draggable={false}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-cream dark:from-[#0F0D0A] via-transparent to-transparent" />
+          <div className="absolute top-3 left-4 inline-flex items-center gap-1.5 text-[10px] font-mono text-white/85 px-2 py-1 rounded-md bg-black/30 backdrop-blur-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-flame animate-pulse" />
+            BlackMagic · control center
+          </div>
+        </div>
+
         {/* Headline */}
         <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-muted dark:text-[#8C837C] mb-2">
           Control center
