@@ -1,10 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Briefcase, Building2, MessageCircle, ArrowRight, X } from 'lucide-react';
 import { api } from '../../lib/api';
+import { SkeletonList } from '../../components/ui/skeleton';
+
+/** Hand off to the home composer with a prefilled prompt. Matches the
+ *  pattern home uses (see `/` page): stash in localStorage under
+ *  bm-pending-prompt, then navigate. Home reads + clears on mount. */
+function askChat(router: ReturnType<typeof useRouter>, prompt: string) {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem('bm-pending-prompt', prompt);
+  }
+  router.push('/');
+}
 
 type Deal = { path: string; state: string; frontmatter: Record<string, unknown> };
 
@@ -21,6 +32,7 @@ const HEALTH_COLOR: Record<string, string> = {
 };
 
 export default function DealsPage() {
+  const router = useRouter();
   const search = useSearchParams();
   const stageFilter = (search.get('stage') ?? '').trim().toLowerCase();
   const deals = useQuery({
@@ -58,7 +70,7 @@ export default function DealsPage() {
         )}
       </header>
       <div className="h-full overflow-y-auto px-6 py-6">
-        {deals.isLoading && <div className="text-sm text-muted">loading…</div>}
+        {deals.isLoading && <SkeletonList count={3} />}
         {deals.error && <div className="text-sm text-flame">{(deals.error as Error).message}</div>}
         {!deals.isLoading && (deals.data?.length ?? 0) === 0 && (
           <div className="mx-auto max-w-lg mt-8 rounded-xl border border-dashed border-line bg-white p-6 text-center">
@@ -77,12 +89,13 @@ export default function DealsPage() {
               >
                 <Building2 className="h-3 w-3" /> Enrich a company <ArrowRight className="h-3 w-3" />
               </Link>
-              <Link
-                href="/chat"
+              <button
+                type="button"
+                onClick={() => askChat(router, 'Draft a new deal for ')}
                 className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-ink hover:border-flame"
               >
                 <MessageCircle className="h-3 w-3" /> Ask chat to draft one
-              </Link>
+              </button>
             </div>
           </div>
         )}
@@ -101,6 +114,18 @@ export default function DealsPage() {
                   {LABELS[st]} · {list.length}
                 </div>
                 <div className="space-y-2">
+                  {list.length === 0 && (deals.data?.length ?? 0) > 0 && (
+                    <div className="rounded-xl border border-dashed border-line bg-white/50 p-4 text-center text-xs text-muted">
+                      <div>Nothing here yet.</div>
+                      <button
+                        type="button"
+                        onClick={() => askChat(router, `Draft a new deal for ${(LABELS[st] ?? st).toLowerCase()}`)}
+                        className="mt-1 inline-flex items-center gap-1 text-flame hover:underline"
+                      >
+                        <MessageCircle className="h-3 w-3" /> Ask chat to draft one
+                      </button>
+                    </div>
+                  )}
                   {list.map((d) => {
                     const fm = d.frontmatter;
                     const h = String(fm.health ?? '');

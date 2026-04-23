@@ -13,7 +13,8 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Brain, Check, Save } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
-import { PageShell, PageHeader, PageBody, Panel, Button } from '../../components/ui/primitives';
+import { PageShell, PageHeader, PageBody, Button } from '../../components/ui/primitives';
+import { Composer } from '../../components/composer';
 
 const MEMORY_PATH = 'MEMORY.md';
 
@@ -72,14 +73,15 @@ export default function MemoryPage() {
         }
       />
       <PageBody maxWidth="3xl">
-        <Panel padded={false}>
-          <textarea
-            value={text}
-            onChange={(e) => { setText(e.target.value); setDirty(true); }}
-            placeholder={`Add notes the agents should remember across every run.\n\nExamples:\n- "We never email contacts on weekends"\n- "Always check us/market/icp.md before scoring leads"\n- "Use the casual brand voice — drop the corporate-speak"`}
-            className="w-full h-[60vh] resize-none bg-transparent border-0 px-4 py-3 text-[13px] leading-relaxed text-ink dark:text-[#E6E0D8] focus:outline-none font-mono"
-          />
-        </Panel>
+        <Composer
+          value={text}
+          onChange={(v) => { setText(v); setDirty(true); }}
+          onSubmit={() => save.mutate()}
+          agents={[]}
+          submitLabel="Save"
+          placeholder={`Add notes the agents should remember across every run.\n\nExamples:\n- "We never email contacts on weekends"\n- "Always check us/market/icp.md before scoring leads"\n- "Use the casual brand voice — drop the corporate-speak"`}
+          showKeyboardHints={false}
+        />
         <p className="mt-3 text-[11px] text-muted dark:text-[#8C837C]">
           Stored at <code className="font-mono">{MEMORY_PATH}</code> in your vault — version-control it
           alongside the rest of your project.

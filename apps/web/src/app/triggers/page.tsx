@@ -167,15 +167,27 @@ export default function TriggersPage() {
         )}
 
         {triggers.data && filtered.length === 0 && (
-          <EmptyState
-            icon={Zap}
-            title={q ? 'No triggers match that filter.' : 'No triggers yet.'}
-            hint={
-              q
-                ? 'Try a different search term, or clear the filter to see everything.'
-                : 'Install the brand-monitor preset above, or drop a .md file in triggers/ to define your own cron.'
-            }
-          />
+          <>
+            <EmptyState
+              icon={Zap}
+              title={q ? 'No triggers match that filter.' : 'No triggers yet.'}
+              hint={
+                q
+                  ? 'Try a different search term, or clear the filter to see everything.'
+                  : 'Agents can self-schedule. Ask any agent to "run this daily".'
+              }
+            />
+            {!q && (
+              <div className="-mt-4 text-center">
+                <a
+                  href="/agents"
+                  className="inline-flex items-center gap-1 text-[12px] text-flame hover:underline"
+                >
+                  Go to agents →
+                </a>
+              </div>
+            )}
+          </>
         )}
 
         {filtered.length > 0 && (

@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Repeat, Play, Users, CheckCircle2, Square } from 'lucide-react';
+import Link from 'next/link';
+import { Repeat, Play, Users, CheckCircle2, Square, Building2 } from 'lucide-react';
 import {
   PageShell,
   PageHeader,
@@ -146,25 +147,36 @@ export default function SequencesPage() {
 
                 {isEnrolling && (
                   <div className="mt-3 pt-3 border-t border-line dark:border-[#2A241D] flex items-center gap-2">
-                    <select
-                      value={picked}
-                      onChange={(e) => setPicked(e.target.value)}
-                      className="flex-1 h-8 px-2 rounded-md border border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] text-[12px] text-ink dark:text-[#E6E0D8]"
-                    >
-                      <option value="">— pick a contact —</option>
-                      {contacts.data?.map((c) => (
-                        <option key={c.path} value={c.path}>
-                          {c.path.replace(/^contacts\//, '').replace(/\.md$/, '')}
-                        </option>
-                      ))}
-                    </select>
-                    <Button
-                      variant="primary"
-                      disabled={!picked || enroll.isPending}
-                      onClick={() => enroll.mutate({ contact: picked, sequence: s.path })}
-                    >
-                      {enroll.isPending ? 'Enrolling…' : 'Enroll'}
-                    </Button>
+                    {(contacts.data?.length ?? 0) === 0 ? (
+                      <div className="flex-1 flex items-center gap-2 text-[12px] text-muted dark:text-[#8C837C]">
+                        <span>No contacts yet.</span>
+                        <Link href="/companies" className="inline-flex items-center gap-1 text-flame hover:underline">
+                          <Building2 className="w-3 h-3" /> Enrich a company →
+                        </Link>
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          value={picked}
+                          onChange={(e) => setPicked(e.target.value)}
+                          className="flex-1 h-8 px-2 rounded-md border border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] text-[12px] text-ink dark:text-[#E6E0D8]"
+                        >
+                          <option value="">— pick a contact —</option>
+                          {contacts.data?.map((c) => (
+                            <option key={c.path} value={c.path}>
+                              {c.path.replace(/^contacts\//, '').replace(/\.md$/, '')}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="primary"
+                          disabled={!picked || enroll.isPending}
+                          onClick={() => enroll.mutate({ contact: picked, sequence: s.path })}
+                        >
+                          {enroll.isPending ? 'Enrolling…' : 'Enroll'}
+                        </Button>
+                      </>
+                    )}
                   </div>
                 )}
 

@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
 import { Markdown } from '../../components/markdown';
+import { Composer } from '../../components/composer';
 import { Search, Save, Pencil, Eye, FileText } from 'lucide-react';
 
 type FileEntry = { path: string; type: 'file' | 'dir' };
@@ -262,11 +263,17 @@ function VaultContent() {
               </div>
 
               {editing ? (
-                <textarea
-                  value={draftBody}
-                  onChange={(e) => setDraftBody(e.target.value)}
-                  className="w-full mt-2 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl px-4 py-3 text-sm font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame min-h-[320px]"
-                />
+                <div className="mt-2">
+                  <Composer
+                    value={draftBody}
+                    onChange={setDraftBody}
+                    onSubmit={save}
+                    agents={[]}
+                    submitLabel="Save"
+                    placeholder="Edit markdown…"
+                    showKeyboardHints={false}
+                  />
+                </div>
               ) : (
                 <div className="mt-2 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl px-6 py-5">
                   <Markdown source={file.data.body} />
