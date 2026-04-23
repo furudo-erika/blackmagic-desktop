@@ -170,125 +170,156 @@ export async function extractSlots(): Promise<Slots> {
 // shuffle works even when some templates drop for missing slots.
 
 export const AGENT_STARTERS: Record<string, string[]> = {
-  'lookalike-discovery': [
-    'Find 20 accounts that look like {top_customer} — same stack, same stage.',
-    "Lookalikes for our top {icp_industry} wins we haven't touched this quarter.",
-    'Series B+ {icp_industry} companies on {icp_stack} similar to {top_customer_b}.',
-    'Who else looks like {top_customer} and {top_customer_b}? Give me 15.',
-    'Accounts in the {icp_industry} space that match our top 3 closed-wons.',
-    "10 lookalikes of {top_customer} that aren't already in our CRM.",
-  ],
-  'linkedin-outreach': [
-    "Warm-DM everyone who engaged with {public_voice}'s last LinkedIn post.",
-    'Draft DMs to every VP Engineering who liked our last launch post.',
-    'Connection requests to Heads of Platform at {icp_industry} Series B+.',
-    "Re-engage LinkedIn connections who opened but didn't reply last quarter.",
-    "DM templates for anyone who commented 'interested' on our {product_a} thread.",
-    "Pull prospects from {public_voice}'s 2nd-degree network working at {icp_industry} companies.",
-  ],
-  'website-visitor': [
-    'Which {icp_industry} companies hit /pricing on {domain} in the last 7 days?',
-    'De-anon last week\'s {domain} visitors and score them against our ICP.',
-    'Who from Series B+ viewed /enterprise on {domain} this month?',
-    'Anonymous {domain} traffic spikes from target accounts this quarter.',
-    'Route top 10 de-anonymized visitors to the AE queue.',
-    'Which target accounts read our last {product_a} blog post?',
-  ],
-  'outbound': [
-    'Build a 5-touch sequence for the lookalikes of {top_customer}.',
-    'Cold-email sequence targeting {icp_industry} teams stuck on {competitor_a}.',
-    'Draft outbound for 20 Heads of Platform — hook them on {product_a}.',
-    '3-touch email + LinkedIn combo for {icp_industry} companies at Series B.',
-    'Replace our current sequence with one referencing the pain of {icp_pain}.',
-    'Outreach to accounts that viewed /pricing but never booked a demo.',
-  ],
-  'meeting-prep': [
-    'Brief for tomorrow\'s {top_customer} call — who\'s in the room, what matters.',
-    'Pre-call research on the next meeting on my calendar.',
-    'Summarize every touchpoint we\'ve had with {top_customer_b} in the last 90 days.',
-    'Brief me on the {icp_industry} prospect I\'m meeting next — public signals, hooks.',
-    'What did {top_customer} blog about last month? Any angle for tomorrow\'s call?',
-    'Prep for the expansion QBR with {top_customer} — risks + upsell openings.',
-  ],
-  'pipeline-ops': [
-    'Which deals in Negotiation haven\'t moved in 14+ days? Next moves for each.',
-    'Stale pipeline audit — flag at-risk ARR and suggest the owner nudge per deal.',
-    'Commit-forecast reality check — which deals are really going to close this quarter?',
-    'Deals without a scheduled next-step in the calendar — list owners.',
-    'Pipeline gaps by segment — where are we thin against quota?',
-    'Show me every deal where the champion has gone quiet for 10+ days.',
-  ],
-  'closed-lost-revival': [
-    'Revive 5 deals we lost to {competitor_a} in the last 12 months.',
-    'Closed-lost in {icp_industry} — who\'s worth a warm re-open?',
-    "Accounts that churned from {competitor_b} — are any ripe for us now?",
-    'Find the 10 best closed-lost deals to revive this month.',
-    'Why did we lose to {competitor_a} last quarter, and which of those are reopen-worthy?',
-    'Every closed-lost where the champion has since changed jobs.',
-  ],
+  // Generalist chat agent — reads/writes vault, enriches, drafts, enrolls.
+  // Starters lean toward vault housekeeping + cross-cutting research no
+  // other specialist agent owns end-to-end.
   'researcher': [
-    'Deep-dive on {competitor_a} — funding, tech, moat vs. us.',
-    'Profile {top_customer} — why they picked us, what\'s expandable.',
-    'Competitive teardown: {competitor_a} vs {competitor_b} vs {company}.',
-    'Research the top 10 Series B {icp_industry} companies on {icp_stack}.',
-    'What\'s {competitor_a} shipping this quarter that we need an answer to?',
-    'Full landscape of the {category} market — who\'s growing, who\'s losing ground.',
+    'Enrich every company in companies/ that is missing a firmographic profile — write icp_score and a one-paragraph why-they-fit.',
+    'Deep-research {top_customer}: write companies/{top_customer}.md with firmographics, likely champion, and the last 30 days of news.',
+    'Scan signals/ from the last 7 days, score each by intent, and propose ONE concrete action per top-5 signal.',
+    'Cross-check companies/ against us/market/icp.md — flag every account with icp_score below 40 as "archive candidate" and list them.',
+    'Read the last 20 entries in runs/, summarize what shipped, what stalled, and what needs a human decision.',
+    'Competitive teardown on {competitor_a} — funding, tech stack, pricing, comparative moat vs {company}. Write to companies/{competitor_a}.md.',
   ],
-  'content-studio': [
-    'Write a 3-tweet thread announcing our latest {product_a} feature.',
-    'Draft a LinkedIn post from {public_voice} for next week\'s launch.',
-    'Blog outline: how {top_customer} ships on {product_a}.',
-    'Landing-page copy for the {icp_industry} segment.',
-    'Customer-story interview questions for {top_customer_b}.',
-    'Short demo video script for {product_a} — 45 seconds, no filler.',
-  ],
-  'brand-monitor': [
-    'What are devs saying about {company} on Hacker News this week?',
-    'Scrape Reddit /r/{icp_stack} for {company} mentions in the last 30 days.',
-    'Sentiment digest across Twitter / Reddit / HN for the past week.',
-    '{competitor_a} vs {company} — who\'s winning the mindshare war right now?',
-    'Surface every public complaint about {product_a} from the last 14 days.',
-    'Top 5 posts where someone recommended a competitor over us this month.',
-  ],
-  'geo-analyst': [
-    'GEO audit on {domain} — which queries are we missing from ChatGPT answers?',
-    'Which competitors own the "{category} for {icp_industry}" query on Perplexity?',
-    'Pages on {domain} that should be rewritten for LLM retrieval.',
-    'What does ChatGPT say when you ask "best {category} in 2026"?',
-    'Find gaps in our docs that LLMs cite {competitor_a} for instead of us.',
-    'Weekly GEO delta — ranking changes since last scan.',
-  ],
-  'company-profiler': [
-    'Profile {top_customer} — who they are, what they care about, ICP fit.',
-    'Enrich every company in companies/ that\'s missing a profile.',
-    'Deep profile on our next 5 inbound leads.',
-    'Profile the top 10 Series B {icp_industry} companies on {icp_stack}.',
-    'Update the {top_customer} profile with anything new from the last 30 days.',
-    'Bootstrap a profile for {competitor_a} as if it were a prospect.',
-  ],
-  'ae': [
-    'Walk through every open deal I own — status, next step, risk.',
-    'Which of my deals need a push today to stay on track?',
-    'Draft MEDDPICC updates for every active opp in my name.',
-    'Send a check-in to every champion I haven\'t touched in 7+ days.',
-    'Pre-call brief for today\'s next call on my calendar.',
-    'Which of my deals are most at risk of slipping to next quarter?',
-  ],
+  // SDR — drafts outbound emails into drafts/ given contact+company. No
+  // sending. Every starter points at drafts/ output, not the send step.
   'sdr': [
-    'Draft personalized first-touch emails for the 10 newest leads in companies/.',
-    'Enroll the top 10 lookalikes of {top_customer} into the default sequence.',
-    '3-touch LinkedIn + email sequence targeting Heads of Platform in {icp_industry}.',
-    'Every stalled sequence — figure out why and suggest a reset.',
-    "Draft reply to every prospect who asked 'what do you cost' this week.",
-    'Qualify and route every inbound from the last 48 hours.',
+    'Draft personalized first-touch emails for the 10 newest companies in companies/ — one .md per draft, in drafts/.',
+    'Draft outbound to every contact in contacts/ whose last_touched_at is 60+ days ago. Angle: {icp_pain}.',
+    'Re-draft everything in drafts/pending/ with a sharper hook on the pain of {icp_pain}.',
+    '5 cold-email drafts to {icp_industry} teams currently on {competitor_a} — each with a specific switching hook.',
+    'Draft replies to every unhandled inbound from the last 48h — qualify, schedule, or defer.',
+    'Draft a two-email re-engagement sequence to every contact pitched 90+ days ago with no reply.',
   ],
+  // Outbound — full loop: scrape → enrich → draft → send via SES + LinkedIn
+  // DMs → trigger sequences. These are end-to-end kickoffs, not drafts.
+  'outbound': [
+    'Run the full outbound loop against the 20 top lookalikes of {top_customer} — scrape, enrich, draft email + LinkedIn DM, enroll in sequence.',
+    'Cold outbound campaign: 30 Series B+ {icp_industry} companies on {icp_stack}. Email + LinkedIn, one touch each, staged.',
+    'Rebuild the outbound sequence for the {icp_industry} segment using us/brand/voice.md as the style reference.',
+    'Re-engage every contact whose last sequence ended no-reply: pick top 10 by icp_score and launch a tailored 2-touch.',
+    'Launch outbound to every account that visited /pricing on {domain} in the last 14 days but never booked a demo.',
+    'Run the full outbound loop on the 15 best closed-lost revival candidates, anchored to each deal\'s original loss reason.',
+  ],
+  // AE / Deal Manager — reads deals/, flags stalls, edits frontmatter
+  // (next_step, health), appends notes. Starters mutate deals/ in place.
+  'ae': [
+    'Monday deal review: walk every file in deals/open/ and update next_step + health (green/yellow/red) with a one-line rationale.',
+    'Flag every deal in deals/open/ where last_activity_at is 10+ days ago — propose a recovery step per deal and write it to next_step.',
+    'Stale-deal triage: top 5 at-risk deals by ARR — append a "Triage <date>" note with the concrete nudge.',
+    'Every open deal missing a next_step: fill it in based on stage + prior notes. Edit frontmatter in place.',
+    'Re-score deals/open/ end-to-end — update health, write a 5-bullet summary of what moved red→yellow or yellow→green.',
+    'Draft champion-check-in notes for every deal whose champion has gone quiet 7+ days.',
+  ],
+  // Company Profiler — runs ONCE per project to populate the us/ tree.
+  // Bootstrap / refresh / fill-missing framing.
+  'company-profiler': [
+    'Bootstrap the us/ tree from {domain} — identity, ICP, positioning, competitors, product, brand voice, customers.',
+    'Re-run bootstrap-self: refresh us/market/competitors.md + us/customers/top.md with the last 60 days of signals.',
+    'Rebuild us/brand/voice.md from our last 10 blog posts and 20 LinkedIn posts from {public_voice}.',
+    'Audit every file in us/ — list the ones still holding the seed template or last-edited >90 days ago.',
+    'Update us/market/icp.md with the last 30 days of deal-outcome evidence from deals/closed-won/ and deals/closed-lost/.',
+    'Profile {competitor_a} as if it were a prospect — write companies/{competitor_a}.md with firmographics + positioning + gaps.',
+  ],
+  // Website Visitor — one deanonymized visit → enrich → qualify → draft.
+  // All starters anchor on signals/visits/ artifacts.
+  'website-visitor': [
+    'Process every visit in signals/visits/ from the last 7 days: enrich, score against us/market/icp.md, draft where score>70.',
+    'Top 10 /pricing visitors on {domain} last 14 days — enrich, qualify, route to outbound with a tailored draft each.',
+    'De-anon visits from Series B+ {icp_industry} companies only — draft outreach for anyone above 60 icp_score.',
+    'Run the full visit-loop end-to-end on the newest batch in signals/visits/ — enrich → score → draft → enroll.',
+    'Which target accounts read our {product_a} blog posts in the last 14 days? Draft warm outreach for each.',
+    'Quality check: drop visitors we already have in contacts/ whose last_touched_at is <14 days — no double-tap.',
+  ],
+  // LinkedIn Outreach — li-campaign-loop: signals/linkedin/<date>.md →
+  // top 5 → enrich → connect+DM drafts → enroll in sequence.
+  'linkedin-outreach': [
+    'Run the LinkedIn campaign loop on today\'s signals/linkedin/<today>.md — pick top 5, enrich, draft connect+DM, enroll.',
+    "Engage with {public_voice}'s last post: pull everyone who liked or commented, filter to ICP, draft a warm DM per person.",
+    'LinkedIn campaign against Heads of Platform at {icp_industry} Series B+ — 10 contacts, full loop, enroll in sequences/linkedin-post-signal.md.',
+    'Scan signals/linkedin/ from the last 7 days — rank the top 10 prospects by engagement intent and draft follow-up DMs.',
+    'Draft re-engagement DMs to LinkedIn connections who went quiet 30+ days ago — 5 contacts, tailored to each\'s last post.',
+    'Enroll every new connection from this week into sequences/linkedin-post-signal.md with a personalized opener.',
+  ],
+  // Meeting Prep — writes drafts/<ts>-prep-<company>.md, ≤1 page, no
+  // fabrication. Starters should say "brief for X call" concretely.
+  'meeting-prep': [
+    'Brief for my next meeting on the calendar — attendees, their recent public signals, 3 open questions.',
+    'Prep the next 3 calendar events: one brief each in drafts/, ranked by priority.',
+    'QBR prep for {top_customer} — stakeholder map, champion status, risks, 2 upsell openings.',
+    'Pre-call brief for tomorrow\'s call with {top_customer_b} — what changed at them in the last 30 days.',
+    'Prep pack for the {icp_industry} prospect on the next demo slot — ICP signals, competitive framing, likely objections.',
+    "Brief on everyone I'm meeting this week. Drop the ones where we've already met in the last 30 days.",
+  ],
+  // Lookalike Discovery — seed account → 20-50 twins with icp_score +
+  // a one-liner "why". Always writes companies/<slug>.md.
+  'lookalike-discovery': [
+    'Seed: the highest-ARR deal in deals/closed-won/. Find 20 twins, write companies/<slug>.md with icp_score + champion guess per hit.',
+    'Find 30 lookalikes of {top_customer} — same size, same stack, same stage. Rank by icp_score, stop at 50.',
+    'Twins of our 3 top {icp_industry} wins ({top_customer}, {top_customer_b}, {top_customer_c}) — 15 per seed, deduped.',
+    'Lookalikes on {icp_stack} that match {top_customer} firmographically — cap at 25, include a likely champion name per account.',
+    'Re-run lookalike discovery on every closed-won from the last quarter — cap 50 total across seeds.',
+    'Find Series B {icp_industry} companies similar to {top_customer_b} that we have NOT already touched — cross-check contacts/.',
+  ],
+  // Closed-Lost Revival — scan deals/closed-lost/, match to fresh
+  // triggers, draft re-engagement emails. Named trigger in sentence 1.
+  'closed-lost-revival': [
+    'Scan deals/closed-lost/ — rank by fresh-trigger strength (last 30d), draft revival emails for top 5.',
+    'Revive every deal we lost to {competitor_a} in the last 12 months where a new trigger fired. Draft one reopen per deal.',
+    'Closed-lost-to-timing in the last year — find 5 deals with new signals and draft a "timing has changed" reopen.',
+    'Every closed-lost deal where the champion has since changed jobs — draft a "saw you moved to X" reopen.',
+    'Fresh-trigger scan across deals/closed-lost/ — look for funding rounds, exec hires, or product launches in the last 60 days.',
+    'Revive the 10 freshest closed-lost deals in {icp_industry} — each draft names the original loss reason AND the new trigger.',
+  ],
+  // Pipeline Ops — Monday review writing signals/pipeline-health/<date>.md.
+  // Four failure modes: stale, no next_step, pushed, sparse.
+  'pipeline-ops': [
+    'Run the Monday pipeline review — write signals/pipeline-health/<today>.md, flag the four failure modes, one action per deal.',
+    'Flag every deal in deals/open/ with no activity 14+ days. Propose ONE recovery per deal — no multiples.',
+    'Commit-forecast reality check: which deals in deals/open/ will actually close this quarter? Rank and cite why.',
+    'At-risk ARR report — rank deals/open/ by ARR-at-risk and propose one save action each.',
+    'Proposal-stage deals without a next_step — surface them and propose next_step for each.',
+    'Deals pushed 2+ times — list them and diagnose the root cause per deal (champion-change, budget, technical, competitive).',
+  ],
+  // GEO Analyst — GEO (Generative Engine Optimization): prompts, brands,
+  // SOV reports, gap sources. Invoke the geo_* tools.
+  'geo-analyst': [
+    'Run the daily GEO scan (geo_run_daily) and write the SOV report for {company} vs {competitor_a} + {competitor_b}.',
+    'GEO gaps: which prompts does ChatGPT answer with {competitor_a} instead of us? Propose docs pages to rewrite.',
+    '30-day SOV trend for {company} — which tracked prompts are we gaining on, which are we losing? One-line recommendation each.',
+    'Add 10 new prompts to track for {category} in {icp_industry} — via geo_add_prompt.',
+    'Run geo_gap_sources across all tracked prompts — surface the top 5 sources LLMs cite that we don\'t control.',
+    'Weekly GEO report — brand share-of-voice delta, top 5 wins, top 5 losses, one concrete action each.',
+  ],
+  // Content Studio — creative output: images/videos/copy. Ships, doesn't
+  // describe. Starters pick a concrete format + length + channel.
+  'content-studio': [
+    'Write a 3-tweet thread announcing this week\'s {product_a} release. Hook from us/brand/voice.md; include a 16:9 header image.',
+    '30-second Reel promoting {product_a} — vertical 9:16, subtitles baked in, Seedance 2.0. Save to drafts/.',
+    'Blog post: how {top_customer} ships on {product_a}. 800 words, brand-voice from us/brand/voice.md, plus a 16:9 hero image.',
+    '3 landing-page copy variants for the {icp_industry} segment — different lead-ins, same CTA.',
+    '15-second TikTok promo hooked on {icp_pain}. Vertical 9:16, one clear benefit, CTA to {domain}.',
+    '3 Instagram hero shots of {product_a}, 4:5, different lighting (golden-hour / studio / overhead), gpt-image-2.',
+  ],
+  // Brand Monitor — daily scan Reddit + X for brand-name mentions,
+  // classify, write signals/brand-monitor/<date>.md, escalate urgents.
+  'brand-monitor': [
+    'Run today\'s brand-monitor scan — Reddit + X mentions of {company} last 24h, classify, write signals/brand-monitor/<today>.md.',
+    'Weekly digest of {company} mentions across Reddit / HN / X — bucketed by sentiment, top 10 quotes.',
+    'Classify the most recent 30 mentions of {company}; escalate any urgent bug reports or comparison-to-{competitor_a} threads.',
+    'Sentiment delta: {company} vs {competitor_a} over the last 7 days. Which threads moved the needle?',
+    'Surface every public complaint about {product_a} from the last 14 days. Tag by severity.',
+    'Switching signals: mentions where someone asks "should I leave {competitor_a} for {company}?" Pull and escalate.',
+  ],
+  // X Account — runs the company's X presence. Drafts tweets, flags
+  // replies, watches competitors, escalates urgent incoming mentions.
   'x-account': [
-    'Draft 3 tweets promoting this week\'s {product_a} release.',
-    'Ghostwrite a tweet from {public_voice} reacting to {competitor_a}\'s latest move.',
-    'Reply-guy drafts for every post in our Twitter engagement list today.',
-    'What should {company} post about on X this week? 5 topic ideas.',
-    'Scan replies to our last launch tweet and draft responses.',
-    'Quote-tweet options for the {top_customer} customer story.',
+    'Draft 3 product-builder-voice tweets about this week\'s {product_a} release. Target: 1–2 original tweets/day.',
+    'Scan today\'s X mentions of {company} — draft replies to the interesting ones, flag anything urgent.',
+    'Write one thread this week pulled from us/product/features.md — 5–7 tweets, no fluff, one screenshot slot.',
+    'Reply-guy drafts for every post in our X engagement list today — 3–5 engagements, product-builder voice.',
+    'Competitor watch on X: what are {competitor_a} and {competitor_b} tweeting this week worth a quote-tweet or counter?',
+    'Weekly X recap: engagement on our last 7 days of posts, top-3 winners, bottom-3, one-line lesson each.',
   ],
 };
 

@@ -5,7 +5,7 @@
 //     or the packaged static export (resources/web/index.html).
 //  4. Inject daemon port + local token into window.bmBridge.
 
-const { app, BrowserWindow, Menu, ipcMain, shell, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, Menu, Notification, ipcMain, shell, nativeImage, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -190,6 +190,58 @@ async function createWindow() {
     win.loadURL(`http://127.0.0.1:${discovery.port}/`);
   }
   return win;
+}
+
+// Native macOS notification. Uses Electron's Notification (not osascript)
+// so the notification is attributed to `run.blackmagic.desktop` and shows
+// up under "BlackMagic AI" in System Settings → Notifications. osascript
+// notifications are attributed to Script Editor and get silently dropped
+// unless the user has opened that permission slot — which nobody does.
+function notify({ title, body, subtitle, silent } = {}) {
+  try {
+    if (!Notification.isSupported()) return false;
+    const n = new Notification({
+      title: title || APP_NAME,
+      subtitle: subtitle || undefined,
+      body: body || '',
+      silent: Boolean(silent),
+    });
+    n.show();
+    return true;
+  } catch (err) {
+    console.error('[main] notify failed:', err);
+    return false;
+  }
+}
+
+ipcMain.handle('bm:notify', (_e, payload) => {
+  if (!payload || typeof payload !== 'object') return false;
+  return notify({
+    title: typeof payload.title === 'string' ? payload.title : undefined,
+    body: typeof payload.body === 'string' ? payload.body : '',
+    subtitle: typeof payload.subtitle === 'string' ? payload.subtitle : undefined,
+    silent: Boolean(payload.silent),
+  });
+});
+
+// Warmup: on first-ever run fire a silent notification so macOS adds
+// BlackMagic AI to System Settings → Notifications and prompts the user
+// to allow/deny. Without this the first time we try to notify anything
+// the permission slot doesn't exist yet and the notification drops.
+function warmupNotificationsOnce() {
+  try {
+    const flag = path.join(app.getPath('userData'), '.notif-warmed');
+    if (fs.existsSync(flag)) return;
+    notify({
+      title: APP_NAME,
+      body: 'Notifications enabled. You can turn these off in System Settings → Notifications.',
+      silent: true,
+    });
+    fs.mkdirSync(path.dirname(flag), { recursive: true });
+    fs.writeFileSync(flag, String(Date.now()), 'utf-8');
+  } catch (err) {
+    console.error('[main] notification warmup failed:', err);
+  }
 }
 
 ipcMain.handle('bm:pick-folder', async () => {
@@ -453,13 +505,12 @@ function launchBrewUpgradeAndRelaunch(brewPath) {
       try { progressWindow.webContents.send('bm:upgrade-init', { logPath }); } catch {}
     });
   } else {
-    // Fallback: notification if the window couldn't open.
-    try {
-      spawn('/usr/bin/osascript', [
-        '-e',
-        'display notification "Downloading the latest version. Watch ~/Library/Logs/BlackMagic AI/ for progress." with title "BlackMagic AI" subtitle "Upgrade started"',
-      ], { detached: true, stdio: 'ignore' }).unref();
-    } catch {}
+    // Fallback: native notification if the progress window couldn't open.
+    notify({
+      title: APP_NAME,
+      subtitle: 'Upgrade started',
+      body: 'Downloading the latest version. Watch ~/Library/Logs/BlackMagic AI/ for progress.',
+    });
   }
 
   const pid = process.pid;

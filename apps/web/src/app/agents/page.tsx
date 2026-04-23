@@ -25,6 +25,7 @@ import {
   Bot, Sparkles, Search, Briefcase, Globe, Linkedin,
   CalendarClock, Copy as CopyIcon, RotateCcw, Activity, Radar, Send,
   Play, ChevronRight, ChevronDown, FileOutput, FileInput, Loader2, Check, AlertCircle,
+  Target, MessageCircle, Eye,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../../lib/api';
@@ -35,6 +36,30 @@ import { Composer } from '../../components/composer';
 const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   Bot, Globe, Linkedin, CalendarClock, Copy: CopyIcon, RotateCcw,
   Activity, Radar, Search, Briefcase, Send, Sparkles,
+  Target, MessageCircle, Eye,
+};
+
+// Per-slug Lucide override so every seeded agent shows a distinct
+// thematic glyph across sidebar + agent-page hero + starter cards.
+// Mirrors the table in components/sidebar.tsx — kept duplicated
+// rather than shared because a shared module would drag lucide into
+// the starter-tint lookup too. Both tables must move together.
+const AGENT_SLUG_ICON: Record<string, LucideIcon> = {
+  'company-profiler':    Sparkles,
+  'researcher':          Search,
+  'sdr':                 Send,
+  'ae':                  Briefcase,
+  'website-visitor':     Globe,
+  'linkedin-outreach':   Linkedin,
+  'meeting-prep':        CalendarClock,
+  'lookalike-discovery': CopyIcon,
+  'closed-lost-revival': RotateCcw,
+  'pipeline-ops':        Activity,
+  'geo-analyst':         Radar,
+  'outbound':            Target,
+  'brand-monitor':       Eye,
+  'content-studio':      Sparkles,
+  'x-account':           MessageCircle,
 };
 
 type AgentMeta = {
@@ -259,7 +284,10 @@ function AgentsInner() {
     );
   }
 
-  const FallbackIcon = AGENT_ICON_MAP[agent.icon] ?? Bot;
+  // Prefer the per-slug Lucide override (consistent with sidebar) over
+  // the frontmatter icon name — several agents' icons were mislabeled
+  // or missing from the map, producing generic Bot fallbacks.
+  const HeaderIcon = AGENT_SLUG_ICON[agent.slug] ?? AGENT_ICON_MAP[agent.icon] ?? Bot;
 
   // Derive the three panels' contents from the latest run.
   const startedMs = latestRun ? runStartedMs(latestRun.runId) : null;
@@ -284,43 +312,39 @@ function AgentsInner() {
 
   return (
     <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A] min-h-0">
-      {/* Hero */}
+      {/* Hero — single row, Lucide glyph in a tinted square, name +
+          right-aligned status + optional Stop. Tagline lives on its
+          own line below, left-aligned under the title (not indented
+          past the icon) so it reads like one clean block instead of
+          three stacked concerns. */}
       <header className="shrink-0 border-b border-line dark:border-[#2A241D] px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-start gap-3">
-          {hasAgentTheme(agent.slug) ? (
-            <AgentIcon slug={agent.slug} name={agent.name} size="lg" />
-          ) : (
-            <div className="w-11 h-11 rounded-xl bg-flame/10 border border-flame/20 flex items-center justify-center shrink-0">
-              <FallbackIcon className="w-5 h-5 text-flame" />
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-flame/10 border border-flame/20 flex items-center justify-center shrink-0">
+              <HeaderIcon className="w-4 h-4 text-flame" />
             </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-ink dark:text-[#F5F1EA] truncate">{agent.name}</h1>
-              <span className="text-[11px] font-mono text-muted dark:text-[#8C837C]">{slug}</span>
-              <span className={
-                'inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full ' +
-                (isLive
-                  ? 'bg-flame/10 text-flame'
-                  : 'bg-cream-light dark:bg-[#17140F] text-muted dark:text-[#8C837C]')
-              }>
-                <span className={'w-1.5 h-1.5 rounded-full ' + (isLive ? 'bg-flame animate-pulse' : 'bg-muted/40 dark:bg-[#6B625C]')} />
-                {isLive ? `Running · ${elapsedShort(startedMs)}` : 'Idle'}
-              </span>
-              {isLive && latestRun && (
-                <button
-                  type="button"
-                  onClick={() => stopMut.mutate(latestRun.runId)}
-                  className="ml-auto text-[11px] text-muted dark:text-[#8C837C] hover:text-flame"
-                >
-                  Stop
-                </button>
-              )}
-            </div>
-            <p className="text-[12px] text-muted dark:text-[#8C837C] mt-0.5 leading-snug">
+            <h1 className="text-[18px] leading-tight font-semibold tracking-tight text-ink dark:text-[#F5F1EA] truncate">
+              {agent.name}
+            </h1>
+            <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-mono text-muted dark:text-[#8C837C]">
+              <span className={'w-1.5 h-1.5 rounded-full ' + (isLive ? 'bg-flame animate-pulse' : 'bg-muted/40 dark:bg-[#6B625C]')} />
+              {isLive ? `running · ${elapsedShort(startedMs)}` : 'idle'}
+            </span>
+            {isLive && latestRun && (
+              <button
+                type="button"
+                onClick={() => stopMut.mutate(latestRun.runId)}
+                className="text-[11px] text-muted dark:text-[#8C837C] hover:text-flame"
+              >
+                Stop
+              </button>
+            )}
+          </div>
+          {agent.tagline && (
+            <p className="text-[12px] text-muted dark:text-[#8C837C] leading-snug mt-1.5">
               {agent.tagline}
             </p>
-          </div>
+          )}
         </div>
       </header>
 
@@ -630,15 +654,19 @@ function AgentStarterStrip({
   });
   const list = q.data?.byAgent[slug] ?? [];
   if (list.length === 0) return null;
-  const chips = list.slice(0, 4);
+  // 3 chips fits 1 row comfortably on most widths; extra chips below
+  // the viewport get picked up when the user shuffles via the Home
+  // starter row. Truncate to ~42 chars so the last chip never clips
+  // off the right edge.
+  const chips = list.slice(0, 3);
   return (
     <div className="shrink-0 border-t border-line dark:border-[#2A241D] px-6 py-2.5 bg-white/60 dark:bg-[#1B1812]/60">
-      <div className="max-w-4xl mx-auto flex items-center gap-2 overflow-x-auto">
+      <div className="max-w-4xl mx-auto flex items-center gap-2 flex-wrap">
         <span className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] shrink-0">
           Try:
         </span>
         {chips.map((c, i) => {
-          const short = c.prompt.length > 64 ? c.prompt.slice(0, 60).replace(/[,\s]+\S*$/, "") + "…" : c.prompt;
+          const short = c.prompt.length > 42 ? c.prompt.slice(0, 40).replace(/[,\s]+\S*$/, "") + "…" : c.prompt;
           return (
             <button
               key={i}

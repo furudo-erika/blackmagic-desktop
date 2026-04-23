@@ -2,6 +2,46 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.10 — 2026-04-23
+
+### Changed
+- **Every starter prompt rewritten to match its agent's real doctrine.**
+  The 0.5.6 templates were generic GTM phrasings that ignored each
+  agent's actual tools, output artifacts, and autonomous loop. The
+  new set (90 templates, 6 per agent, all slot-filled from the active
+  project) references the real things each agent reads and writes:
+    - Pipeline Ops starters name `signals/pipeline-health/<date>.md`
+      and the four failure modes the doctrine flags.
+    - LinkedIn Outreach starters drive the `li-campaign-loop` into
+      `sequences/linkedin-post-signal.md`.
+    - Lookalike Discovery starters seed from `deals/closed-won/` and
+      write `companies/<slug>.md` with `icp_score` — matching the
+      agent's actual output spec.
+    - Website Visitor starters operate on `signals/visits/` batches
+      and score against `us/market/icp.md`.
+    - Closed-Lost Revival starters require naming both the original
+      loss reason AND the new trigger in sentence one.
+    - GEO Analyst starters invoke the `geo_*` tool names directly.
+    - Content Studio starters pick a concrete format (9:16, 4:5,
+      Seedance 2.0, gpt-image-2) rather than vague "make content."
+    - X Account starters match the Apidog-playbook cadence the agent
+      inherits (1–2 tweets/day, 1 thread/week, 3–5 engagements/day).
+
+### Fixed
+- **Agent page hero was ugly and inconsistent.** Icons came from a
+  mix of monogram tiles (for themed slugs) and flame-tinted Lucide
+  fallbacks, with the slug printed inline next to the name and the
+  status pill / Stop button jammed onto the same row. Rebuilt as a
+  single tight row: Lucide glyph in a small flame-tinted square,
+  name, right-aligned status dot + label, tagline on its own line
+  below. Dropped the redundant inline slug (it's already in the URL).
+  Icon is now sourced from the same per-slug table the sidebar uses
+  so every surface shows the same glyph per agent.
+- **Starter chip strip on the agent page clipped the last chip** off
+  the right edge. Truncation is now aggressive enough (42 chars) and
+  the row uses `flex-wrap` so a narrow window drops to two rows
+  instead of chopping text mid-word.
+
 ## 0.5.9 — 2026-04-23
 
 ### Fixed
