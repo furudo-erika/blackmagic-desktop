@@ -17,7 +17,10 @@ import {
 } from './projects.js';
 import { ensureVault, readVaultFile, writeVaultFile, walkTree, installPresetTriggers } from './vault.js';
 import { findBacklinks } from './wikilinks.js';
-import { BUILTIN_TOOLS, allTools } from './tools.js';
+import { BUILTIN_TOOLS, allTools, toolsByName } from './tools.js';
+import {
+  loadRubric, applyRubric, loadRouting, applyRouting,
+} from './pipeline.js';
 import { runAgent } from './agent.js';
 import { listPlaybooks, runPlaybook } from './playbooks.js';
 import { triggerList, fireTrigger, loadCronTriggers } from './triggers.js';
@@ -1373,6 +1376,66 @@ async function main() {
       return c.json(reg);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    }
+  });
+
+// Lead pipeline — exposes the enrich/score/route engine to the UI so the
+  // user can trigger it from a button (and not only from a chat turn).
+  //
+  //   GET  /api/pipeline/rubric         — current ICP rubric + routing config
+  //   POST /api/pipeline/score          — score a record (dry-run, doesn't write)
+  //   POST /api/pipeline/run            — full enrich→score→route→sync for one domain
+  //
+  // These call the same tool handlers the agent uses, so UI + agent can
+  // never drift. Every CRM target that has no credentials is skipped with
+  // `skipped: true` in the response rather than erroring the whole run.
+  app.get('/api/pipeline/rubric', async (c) => {
+    try {
+      const [rubric, routing] = await Promise.all([loadRubric(), loadRouting()]);
+      return c.json({ rubric, routing });
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+
+  app.post('/api/pipeline/score', async (c) => {
+    try {
+      const body = await c.req.json<{ record?: Record<string, unknown> }>();
+      const rubric = await loadRubric();
+      const result = applyRubric(body.record ?? {}, rubric);
+      return c.json({ ok: true, data: result });
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+
+  app.post('/api/pipeline/route', async (c) => {
+    try {
+      const body = await c.req.json<{ record?: Record<string, unknown> }>();
+      const routing = await loadRouting();
+      const result = applyRouting(body.record ?? {}, routing);
+      return c.json({ ok: true, data: result });
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
+
+  app.post('/api/pipeline/run', async (c) => {
+    try {
+      const body = await c.req.json<{
+        domain?: string;
+        name?: string;
+        record?: Record<string, unknown>;
+        sync?: Record<string, boolean>;
+      }>();
+      if (!body.domain) return c.json({ error: 'domain is required' }, 400);
+      const tool = toolsByName().get('enrich_score_route');
+      if (!tool) return c.json({ error: 'enrich_score_route tool not registered' }, 500);
+      const config = loadConfig();
+      const result = await tool.handler(body, { config, runDir: path.join(getVaultRoot(), '.bm', 'runs', 'pipeline') });
+      return c.json(result);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
     }
   });
 

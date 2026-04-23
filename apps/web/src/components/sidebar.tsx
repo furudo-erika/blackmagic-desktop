@@ -45,6 +45,7 @@ import {
   RotateCcw,
   Activity,
   Radar,
+  Workflow,
   Send,
   Brain,
   Wrench,
@@ -315,6 +316,7 @@ export function Sidebar() {
         />
         <NavRow icon={Inbox}           label="Desk"      href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
         <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} />
+        <NavRow icon={Workflow}        label="Pipeline"  href="/pipeline"  pathname={pathname} />
         <NavRow icon={Building2}       label="Companies" href="/companies" pathname={pathname} />
         <NavRow icon={Users}           label="Contacts"  href="/contacts"  pathname={pathname} />
         <NavRow icon={Briefcase}       label="Deals"     href="/deals"     pathname={pathname} />
@@ -651,6 +653,7 @@ function CommandPalette({
       { label: 'Triggers', href: '/triggers', hint: 'automations — scheduled' },
       { label: 'Ontology', href: '/ontology', hint: 'vault graph' },
       { label: 'GEO', href: '/geo', hint: 'dashboard — GEO tab' },
+      { label: 'Pipeline', href: '/pipeline', hint: 'enrich → score → route → CRM sync' },
       { label: 'Integrations', href: '/integrations', hint: 'connect third-party tools' },
       { label: 'Settings', href: '/settings', hint: 'vault path, model, keys' },
     ],

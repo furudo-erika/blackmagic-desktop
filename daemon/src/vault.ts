@@ -167,6 +167,35 @@ kind: us.product.roadmap
   // ── market ─────────────────────────────────────────────────
   'market/icp.md': `---
 kind: us.market.icp
+revision: 1
+# ─────────────────────────────────────────────────────────────────────
+# rubric — weighted predicates applied by the score_lead tool.
+# Every hit adds its weight to the numerator; total possible = sum of
+# weights. Final icp_score = round(100 * hits / total). Edit freely.
+# Predicates: equals | contains | in [..] | any_of [..] | between [lo,hi] | gte | lte
+# ─────────────────────────────────────────────────────────────────────
+rubric:
+  - id: employee_fit
+    weight: 25
+    why: "headcount in our sweet spot"
+    when: { field: employee_count, between: [50, 2000] }
+  - id: industry_fit
+    weight: 20
+    why: "industry on the target list"
+    when: { field: industry, in: [SaaS, Fintech, Devtools, AI, Cloud] }
+  - id: tech_signal
+    weight: 15
+    why: "runs on a stack that integrates cleanly"
+    when: { field: tech_stack, any_of: [nextjs, vercel, typescript, react, node] }
+  - id: us_or_emea
+    weight: 10
+    why: "geo we can support"
+    when: { field: hq, any_of: [us, united states, uk, germany, france, netherlands, emea] }
+  - id: has_website
+    weight: 5
+    why: "basic sanity"
+    when: { field: domain, contains: "." }
+fallback_score: 0
 ---
 
 # ICP — who we sell to
@@ -190,6 +219,14 @@ We fit best when the prospect already uses:
 
 ## Anti-signals (don't chase)
 -
+
+## How the score works
+The frontmatter \`rubric:\` block above is evaluated by the built-in
+\`score_lead\` tool. Each rule is a weighted predicate — hits add to
+the numerator, total possible = sum of weights. Edit the weights,
+predicates, or add new rules and every future \`score_lead\` run picks
+up the change. Bump \`revision:\` when you want to signal "re-score
+everything" to downstream consumers.
 `,
   'market/segments.md': `---
 kind: us.market.segments
@@ -351,6 +388,62 @@ kind: us.team.roster
 | Name | Role | Joined | LinkedIn | Notes |
 |---|---|---|---|---|
 |  |  |  |  |  |
+`,
+  'team/routing.md': `---
+kind: us.team.routing
+revision: 1
+# ─────────────────────────────────────────────────────────────────────
+# routing — evaluated top-to-bottom by the route_lead tool. First match
+# wins. If nothing matches, the default owner is assigned. CRM-specific
+# owner ids (hubspot_owner_id / salesforce_owner_id / pipedrive_owner_id
+# / attio_workspace_member_id) are optional — set them to make
+# enrich_score_route also reassign the owner on the CRM side.
+# Predicates: equals | contains | in [..] | any_of [..] | between [lo,hi] | gte | lte
+# ─────────────────────────────────────────────────────────────────────
+default:
+  owner:
+    id: unassigned
+    name: Unassigned
+    type: user
+rules:
+  - match: { field: icp_score, gte: 80 }
+    owner:
+      id: ae-senior
+      name: Senior AE
+      type: user
+      # hubspot_owner_id: "123456"
+      # salesforce_owner_id: "005XX000001ABCDEAA"
+      # pipedrive_owner_id: "7890"
+  - match: { field: icp_score, between: [50, 79] }
+    owner:
+      id: ae-mid
+      name: AE
+      type: user
+  - match: { field: hq, any_of: [emea, uk, germany, france] }
+    owner:
+      id: emea-team
+      name: EMEA AE team
+      type: team
+---
+
+# Lead routing
+
+Owners + rules consumed by the \`route_lead\` and \`enrich_score_route\`
+tools. First matching rule wins; if none match, the \`default\` owner
+is assigned. Set the CRM-specific owner ids under each \`owner:\` block
+to have the pipeline also reassign the record on HubSpot / Salesforce
+/ Pipedrive / Attio on your behalf.
+
+## How it's used
+- \`route_lead\` reads a single vault file's frontmatter (including
+  \`icp_score\` that \`score_lead\` stamped) and writes \`assignee\` back.
+- \`enrich_score_route\` runs the full pipeline: enrich → score →
+  route → push to every connected CRM.
+
+## Adding rules
+Each rule is \`{ match: <predicate>, owner: <owner spec> }\`. Predicates
+use the same vocabulary as the ICP rubric so the two files stay
+consistent.
 `,
   'team/hiring.md': `---
 kind: us.team.hiring

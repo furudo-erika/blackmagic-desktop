@@ -4,6 +4,7 @@ export type IntegrationProvider =
   | 'hubspot'
   | 'attio'
   | 'salesforce'
+  | 'pipedrive'
   | 'gong'
   | 'unipile'
   | 'slack'
@@ -407,6 +408,35 @@ export const api = {
     request<{ ok: true; assignee: EntityAssignee; previous: EntityAssignee }>('/api/entity/assignee', { method: 'PUT', body: JSON.stringify(body) }),
   entityRuns: (entityPath: string) =>
     request<{ runs: Array<{ runId: string; agent: string; tokensIn: number; tokensOut: number; costCents: number; toolCalls: number; turns: number; preview?: string }> }>(`/api/entity/runs?path=${encodeURIComponent(entityPath)}`),
+
+  // --- Lead pipeline (enrich → score → route → multi-CRM sync) ---
+  pipelineRubric: () =>
+    request<{
+      rubric: {
+        revision: string;
+        rules: Array<{ id: string; weight: number; when: Record<string, unknown>; why?: string }>;
+        fallbackScore: number;
+      };
+      routing: {
+        default: { id: string; name?: string; type?: string } | null;
+        rules: Array<{ match: Record<string, unknown>; owner: { id: string; name?: string; type?: string } }>;
+      };
+    }>('/api/pipeline/rubric'),
+  pipelineScore: (record: Record<string, unknown>) =>
+    request<{ ok: true; data: { score: number; reasons: string[]; matches: Array<{ criterion: string; weight: number; hit: boolean; detail?: string }>; rubricVersion: string } }>(
+      '/api/pipeline/score',
+      { method: 'POST', body: JSON.stringify({ record }) },
+    ),
+  pipelineRun: (body: { domain: string; name?: string; record?: Record<string, unknown>; sync?: Record<string, boolean> }) =>
+    request<{
+      ok: true;
+      data: {
+        domain: string;
+        score: { score: number; reasons: string[]; rubricVersion: string };
+        route: { assignee: { id: string; name?: string } | null; rule: string };
+        targets: Record<string, { ok: boolean; skipped?: boolean; error?: string; data?: any }>;
+      };
+    }>('/api/pipeline/run', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export type EntityActor = { type: 'member' | 'agent' | 'system'; id: string; name?: string };

@@ -2,6 +2,49 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.77 — 2026-04-23
+
+### Added
+- **End-to-end lead pipeline: `enrich → score → route → sync`.**
+  Scoring and routing used to be prompt-driven — the LLM was
+  asked to "stamp an icp_score", results drifted run-to-run, and
+  nothing pushed back to the CRM. This release replaces that
+  with a deterministic rule engine backed by two vault files:
+  - `us/market/icp.md` frontmatter `rubric:` block — weighted
+    predicates (`between`, `in`, `any_of`, `contains`, `gte`,
+    `lte`, `equals`) over any record field. Every hit adds its
+    weight; `icp_score` = round(100 × hits / total).
+  - `us/team/routing.md` frontmatter `rules:` — first-match
+    owner assignment with per-CRM owner ids
+    (`hubspot_owner_id`, `salesforce_owner_id`,
+    `pipedrive_owner_id`, `attio_workspace_member_id`).
+  Both files are seeded with working defaults on new vaults;
+  edit the YAML and every future run picks up the change.
+- **`enrich_score_route` tool.** One-shot orchestrator: given a
+  domain, it enriches, scores against the rubric, picks an
+  owner, and upserts the record into every connected CRM
+  (HubSpot, Attio, Salesforce, Pipedrive) plus the local
+  `companies/<slug>.md`. Per-target results come back
+  independently — a missing Pipedrive key doesn't fail the
+  HubSpot write.
+- **Salesforce CRM — real tools, not just a declaration.** Was
+  listed in integrations with zero handlers. Now ships
+  `salesforce_create_contact`, `salesforce_update_contact`,
+  `salesforce_create_account`, `salesforce_create_note`,
+  `salesforce_search` (SOQL). OAuth2 bearer + instance URL,
+  REST v59.0.
+- **Pipedrive CRM added** — `pipedrive_create_person`,
+  `pipedrive_update_person`, `pipedrive_create_organization`,
+  `pipedrive_create_note`, `pipedrive_search`. API v1.
+- **New `/pipeline` page** in the sidebar. Paste a domain,
+  optionally override fields, hit Run — see the rubric
+  breakdown, the owner rule that fired, and per-target sync
+  status (vault + each CRM). Same engine the agent calls via
+  `enrich_score_route`, so UI and agent can't drift.
+- **HTTP routes:** `GET /api/pipeline/rubric`,
+  `POST /api/pipeline/score`, `POST /api/pipeline/route`,
+  `POST /api/pipeline/run`.
+
 ## 0.4.76 — 2026-04-23
 
 ### Changed

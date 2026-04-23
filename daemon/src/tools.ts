@@ -5,6 +5,9 @@
 // Every handler receives a `ctx` with vault + config + secrets.
 
 import { readVaultFile, writeVaultFile, editVaultFile, renameVaultFile, listDir, grepVault } from './vault.js';
+import {
+  loadRubric, applyRubric, loadRouting, applyRouting, stampVault, slugify,
+} from './pipeline.js';
 import type { Config } from './paths.js';
 import { McpRegistry } from './mcp.js';
 import { enrollContact } from './sequences.js';
@@ -3016,6 +3019,638 @@ const gcal_delete_event: ToolDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Salesforce — OAuth2 bearer token + instance URL. REST v59.0.
+// Tokens come from a Connected App flow (user pastes access_token + the
+// instance_url returned by the token endpoint). Every handler fetches
+// `${instance_url}/services/data/v59.0/...` with `Authorization: Bearer`.
+// ---------------------------------------------------------------------------
+
+const SALESFORCE_API_VERSION = 'v59.0';
+
+async function salesforceFetch(
+  ctx: ToolCtx,
+  path: string,
+  init?: { method?: string; body?: unknown; qs?: Record<string, string> },
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  const token = ctx.config.salesforce_access_token;
+  const base = ctx.config.salesforce_instance_url?.replace(/\/+$/, '');
+  if (!token || !base) {
+    return { ok: false, status: 0, data: null, error: 'set SALESFORCE_ACCESS_TOKEN and SALESFORCE_INSTANCE_URL in Integrations' };
+  }
+  let url = `${base}/services/data/${SALESFORCE_API_VERSION}${path}`;
+  if (init?.qs) {
+    const q = new URLSearchParams(init.qs).toString();
+    url += (url.includes('?') ? '&' : '?') + q;
+  }
+  try {
+    const res = await fetch(url, {
+      method: init?.method ?? 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    });
+    const text = await res.text();
+    let data: any = null;
+    if (text) { try { data = JSON.parse(text); } catch { data = text; } }
+    if (!res.ok) {
+      const msg =
+        (Array.isArray(data) && data[0]?.message) ||
+        (data?.error_description) ||
+        (data?.message) ||
+        String(text).slice(0, 200) ||
+        `salesforce ${res.status}`;
+      return { ok: false, status: res.status, data, error: String(msg) };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+const salesforce_create_contact: ToolDef = {
+  name: 'salesforce_create_contact',
+  description:
+    'Create a Salesforce Contact. `email` is the minimum. Extra Salesforce fields (FirstName, LastName, Title, Phone, AccountId, OwnerId, …) go in `properties`.',
+  parameters: {
+    type: 'object',
+    properties: {
+      email: { type: 'string' },
+      first_name: { type: 'string' },
+      last_name: { type: 'string' },
+      properties: { type: 'object' },
+    },
+    required: ['email'],
+  },
+  handler: async (args, ctx) => {
+    const props: Record<string, unknown> = { Email: args.email, ...(args.properties ?? {}) };
+    if (args.first_name) props.FirstName = args.first_name;
+    if (args.last_name) props.LastName = args.last_name;
+    // LastName is required by Salesforce — default it to the local-part of
+    // the email so a bare `email` call still succeeds.
+    if (!props.LastName) props.LastName = String(args.email).split('@')[0] || 'Unknown';
+    const r = await salesforceFetch(ctx, `/sobjects/Contact`, { method: 'POST', body: props });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { id: r.data?.id, success: r.data?.success } };
+  },
+};
+
+const salesforce_update_contact: ToolDef = {
+  name: 'salesforce_update_contact',
+  description:
+    'Patch a Salesforce Contact by id or email. `properties` is a map of Salesforce field name → value.',
+  parameters: {
+    type: 'object',
+    properties: {
+      id_or_email: { type: 'string' },
+      properties: { type: 'object' },
+    },
+    required: ['id_or_email', 'properties'],
+  },
+  handler: async (args, ctx) => {
+    let id = String(args.id_or_email);
+    if (id.includes('@')) {
+      // Resolve email → Salesforce Id via SOQL.
+      const soql = `SELECT Id FROM Contact WHERE Email = '${id.replace(/'/g, "\\'")}' LIMIT 1`;
+      const s = await salesforceFetch(ctx, `/query`, { qs: { q: soql } });
+      if (!s.ok) return { ok: false, error: s.error };
+      const hit = s.data?.records?.[0];
+      if (!hit) return { ok: false, error: `no salesforce contact with email ${id}` };
+      id = hit.Id;
+    }
+    const r = await salesforceFetch(ctx, `/sobjects/Contact/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: args.properties ?? {},
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { id } };
+  },
+};
+
+const salesforce_create_account: ToolDef = {
+  name: 'salesforce_create_account',
+  description:
+    'Create a Salesforce Account (company). `name` required; extras (Website, Industry, NumberOfEmployees, OwnerId, …) go in `properties`.',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      domain: { type: 'string', description: 'Seeds the Website field if provided.' },
+      properties: { type: 'object' },
+    },
+    required: ['name'],
+  },
+  handler: async (args, ctx) => {
+    const props: Record<string, unknown> = { Name: args.name, ...(args.properties ?? {}) };
+    if (args.domain && !props.Website) props.Website = `https://${String(args.domain).replace(/^https?:\/\//, '')}`;
+    const r = await salesforceFetch(ctx, `/sobjects/Account`, { method: 'POST', body: props });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { id: r.data?.id } };
+  },
+};
+
+const salesforce_create_note: ToolDef = {
+  name: 'salesforce_create_note',
+  description:
+    'Attach a Note to a Salesforce record (Contact, Account, Lead, Opportunity…). Uses ContentNote + ContentDocumentLink under the hood so it shows up in the Notes & Attachments related list.',
+  parameters: {
+    type: 'object',
+    properties: {
+      parent_id: { type: 'string' },
+      title: { type: 'string' },
+      body: { type: 'string' },
+    },
+    required: ['parent_id', 'body'],
+  },
+  handler: async (args, ctx) => {
+    // ContentNote wants Content as base64-encoded HTML.
+    const html = String(args.body).replace(/</g, '&lt;').replace(/\n/g, '<br/>');
+    const contentBase64 = Buffer.from(html, 'utf-8').toString('base64');
+    const note = await salesforceFetch(ctx, `/sobjects/ContentNote`, {
+      method: 'POST',
+      body: { Title: args.title ?? 'Black Magic note', Content: contentBase64 },
+    });
+    if (!note.ok) return { ok: false, status: note.status, error: note.error };
+    const link = await salesforceFetch(ctx, `/sobjects/ContentDocumentLink`, {
+      method: 'POST',
+      body: { ContentDocumentId: note.data?.id, LinkedEntityId: args.parent_id, ShareType: 'V' },
+    });
+    if (!link.ok) return { ok: false, status: link.status, error: link.error };
+    return { ok: true, data: { note_id: note.data?.id, link_id: link.data?.id } };
+  },
+};
+
+const salesforce_search: ToolDef = {
+  name: 'salesforce_search',
+  description:
+    'Run a SOQL query against Salesforce. Full power — useful for custom objects or ad-hoc lookups. Example: `SELECT Id, Name FROM Account WHERE Website LIKE \'%acme%\' LIMIT 10`.',
+  parameters: {
+    type: 'object',
+    properties: { soql: { type: 'string' } },
+    required: ['soql'],
+  },
+  handler: async (args, ctx) => {
+    const r = await salesforceFetch(ctx, `/query`, { qs: { q: String(args.soql) } });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { total: r.data?.totalSize ?? 0, records: r.data?.records ?? [] } };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Pipedrive — api_token + workspace domain. REST v1.
+// https://<domain>.pipedrive.com/api/v1/persons?api_token=…
+// ---------------------------------------------------------------------------
+
+async function pipedriveFetch(
+  ctx: ToolCtx,
+  path: string,
+  init?: { method?: string; body?: unknown; qs?: Record<string, string> },
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  const token = ctx.config.pipedrive_api_key;
+  const domain = ctx.config.pipedrive_domain?.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (!token || !domain) {
+    return { ok: false, status: 0, data: null, error: 'set PIPEDRIVE_API_KEY and PIPEDRIVE_DOMAIN in Integrations' };
+  }
+  const qs = new URLSearchParams({ api_token: token, ...(init?.qs ?? {}) }).toString();
+  const url = `https://${domain}.pipedrive.com/api/v1${path}?${qs}`;
+  try {
+    const res = await fetch(url, {
+      method: init?.method ?? 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    });
+    const text = await res.text();
+    let data: any = null;
+    if (text) { try { data = JSON.parse(text); } catch { data = text; } }
+    if (!res.ok || (data && data.success === false)) {
+      const msg =
+        (data?.error) || (data?.error_info) || String(text).slice(0, 200) || `pipedrive ${res.status}`;
+      return { ok: false, status: res.status, data, error: String(msg) };
+    }
+    return { ok: true, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+const pipedrive_create_person: ToolDef = {
+  name: 'pipedrive_create_person',
+  description:
+    'Create a Pipedrive Person. `name` required; `email`, `phone`, `org_id`, `owner_id`, and custom fields go in `properties`.',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      email: { type: 'string' },
+      properties: { type: 'object' },
+    },
+    required: ['name'],
+  },
+  handler: async (args, ctx) => {
+    const body: Record<string, unknown> = { name: args.name, ...(args.properties ?? {}) };
+    if (args.email) body.email = [{ value: args.email, primary: true }];
+    const r = await pipedriveFetch(ctx, `/persons`, { method: 'POST', body });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { id: r.data?.data?.id } };
+  },
+};
+
+const pipedrive_update_person: ToolDef = {
+  name: 'pipedrive_update_person',
+  description:
+    'Update a Pipedrive Person by id or email. `properties` is a map of Pipedrive field key → value.',
+  parameters: {
+    type: 'object',
+    properties: {
+      id_or_email: { type: 'string' },
+      properties: { type: 'object' },
+    },
+    required: ['id_or_email', 'properties'],
+  },
+  handler: async (args, ctx) => {
+    let id = String(args.id_or_email);
+    if (id.includes('@')) {
+      const s = await pipedriveFetch(ctx, `/persons/search`, { qs: { term: id, fields: 'email', exact_match: 'true' } });
+      if (!s.ok) return { ok: false, error: s.error };
+      const hit = s.data?.data?.items?.[0]?.item;
+      if (!hit) return { ok: false, error: `no pipedrive person with email ${id}` };
+      id = String(hit.id);
+    }
+    const r = await pipedriveFetch(ctx, `/persons/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: args.properties ?? {},
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { id: r.data?.data?.id } };
+  },
+};
+
+const pipedrive_create_organization: ToolDef = {
+  name: 'pipedrive_create_organization',
+  description: 'Create a Pipedrive Organization (company). `name` required; extras go in `properties`.',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      properties: { type: 'object' },
+    },
+    required: ['name'],
+  },
+  handler: async (args, ctx) => {
+    const body: Record<string, unknown> = { name: args.name, ...(args.properties ?? {}) };
+    const r = await pipedriveFetch(ctx, `/organizations`, { method: 'POST', body });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { id: r.data?.data?.id } };
+  },
+};
+
+const pipedrive_create_note: ToolDef = {
+  name: 'pipedrive_create_note',
+  description:
+    'Attach a note to a Pipedrive Person / Organization / Deal. Exactly one of `person_id`, `org_id`, or `deal_id` must be set.',
+  parameters: {
+    type: 'object',
+    properties: {
+      content: { type: 'string' },
+      person_id: { type: 'number' },
+      org_id: { type: 'number' },
+      deal_id: { type: 'number' },
+    },
+    required: ['content'],
+  },
+  handler: async (args, ctx) => {
+    const body: Record<string, unknown> = { content: String(args.content) };
+    if (args.person_id) body.person_id = args.person_id;
+    if (args.org_id) body.org_id = args.org_id;
+    if (args.deal_id) body.deal_id = args.deal_id;
+    const r = await pipedriveFetch(ctx, `/notes`, { method: 'POST', body });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { id: r.data?.data?.id } };
+  },
+};
+
+const pipedrive_search: ToolDef = {
+  name: 'pipedrive_search',
+  description:
+    'Search Pipedrive across items (deals, persons, organizations, products). Useful for dedup.',
+  parameters: {
+    type: 'object',
+    properties: {
+      term: { type: 'string' },
+      item_types: { type: 'string', description: 'Comma-separated: deal,person,organization,product,file,mail_attachment,project,lead' },
+    },
+    required: ['term'],
+  },
+  handler: async (args, ctx) => {
+    const qs: Record<string, string> = { term: String(args.term) };
+    if (args.item_types) qs.item_types = String(args.item_types);
+    const r = await pipedriveFetch(ctx, `/itemSearch`, { qs });
+    if (!r.ok) return { ok: false, status: r.status, error: r.error };
+    return { ok: true, data: { items: r.data?.data?.items ?? [] } };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// score_lead / route_lead / enrich_score_route — the E2E pipeline.
+//
+// score_lead reads us/market/icp.md's `rubric:` block, applies each weighted
+// predicate to the company/contact record, writes `icp_score` +
+// `icp_reasons` frontmatter back to the vault file. Deterministic — same
+// inputs produce the same score, no LLM in the loop.
+//
+// route_lead reads us/team/routing.md's `rules:` stack, picks the first
+// match, writes `assignee` frontmatter back. Falls through to `default`.
+//
+// enrich_score_route is the orchestrator. It:
+//   1. calls enrich_company via the proxy (if domain given and no vault file)
+//   2. runs score_lead
+//   3. runs route_lead
+//   4. for every connected CRM, upserts the company + stamps icp_score +
+//      assigns the mapped owner.
+// ---------------------------------------------------------------------------
+
+const score_lead: ToolDef = {
+  name: 'score_lead',
+  description:
+    "Score a company or contact against us/market/icp.md's weighted rubric. Writes icp_score (0-100), icp_reasons, and icp_rubric_version frontmatter to the given vault file. Deterministic — no LLM. If `record` is omitted, the scorer reads the existing frontmatter at `path`.",
+  parameters: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'Vault file to score + stamp, e.g. companies/acme-com.md' },
+      record: {
+        type: 'object',
+        description: 'Optional override fields (employee_count, industry, tech_stack, hq, …). Merged on top of the file frontmatter.',
+      },
+    },
+    required: ['path'],
+  },
+  handler: async (args) => {
+    const rubric = await loadRubric();
+    let existing: Record<string, unknown> = {};
+    try {
+      const f = await readVaultFile(String(args.path));
+      existing = (f.frontmatter ?? {}) as Record<string, unknown>;
+    } catch {}
+    const record = { ...existing, ...(args.record ?? {}) };
+    const result = applyRubric(record, rubric);
+    await stampVault(String(args.path), {
+      icp_score: result.score,
+      icp_reasons: result.reasons,
+      icp_rubric_version: result.rubricVersion,
+      scored_at: new Date().toISOString(),
+    });
+    return { ok: true, data: result };
+  },
+};
+
+const route_lead: ToolDef = {
+  name: 'route_lead',
+  description:
+    "Pick an owner for a company/contact using us/team/routing.md's rule stack. Writes assignee frontmatter to the vault file. Reads the file's frontmatter (including icp_score stamped by score_lead) so rules can gate on score.",
+  parameters: {
+    type: 'object',
+    properties: {
+      path: { type: 'string' },
+      record: { type: 'object', description: 'Optional fields merged on top of the file frontmatter.' },
+    },
+    required: ['path'],
+  },
+  handler: async (args) => {
+    const routing = await loadRouting();
+    let existing: Record<string, unknown> = {};
+    try {
+      const f = await readVaultFile(String(args.path));
+      existing = (f.frontmatter ?? {}) as Record<string, unknown>;
+    } catch {}
+    const record = { ...existing, ...(args.record ?? {}) };
+    const result = applyRouting(record, routing);
+    if (result.assignee) {
+      await stampVault(String(args.path), {
+        assignee: {
+          type: result.assignee.type,
+          id: result.assignee.id,
+          ...(result.assignee.name ? { name: result.assignee.name } : {}),
+        },
+        routed_at: new Date().toISOString(),
+        routing_rule: result.rule,
+      });
+    }
+    return { ok: true, data: result };
+  },
+};
+
+const enrich_score_route: ToolDef = {
+  name: 'enrich_score_route',
+  description:
+    'Full E2E pipeline for one company: enrich (via proxy enrich_company) → score (icp rubric) → route (owners table) → sync to every connected CRM (HubSpot, Attio, Salesforce, Pipedrive) and a local companies/<slug>.md. Returns a per-target result map so the caller can see which CRMs succeeded/skipped. Idempotent — safe to re-run.',
+  parameters: {
+    type: 'object',
+    properties: {
+      domain: { type: 'string' },
+      name: { type: 'string' },
+      record: {
+        type: 'object',
+        description: 'Optional known fields (employee_count, industry, tech_stack, hq, revenue) to merge on top of enrichment.',
+      },
+      sync: {
+        type: 'object',
+        description: 'Toggle individual CRM targets. Defaults: every connected CRM syncs.',
+        properties: {
+          hubspot: { type: 'boolean' },
+          attio: { type: 'boolean' },
+          salesforce: { type: 'boolean' },
+          pipedrive: { type: 'boolean' },
+          vault: { type: 'boolean' },
+        },
+      },
+    },
+    required: ['domain'],
+  },
+  handler: async (args, ctx) => {
+    const domain = String(args.domain).replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const sync = args.sync ?? {};
+    const want = (k: string, connected: boolean) => (sync[k] === undefined ? connected : Boolean(sync[k]));
+
+    // 1. enrich — best-effort. If proxy enrich fails we still proceed with the
+    //    record the caller passed in.
+    let enriched: Record<string, unknown> = {};
+    try {
+      const r: any = await proxyTool('enrich_company', { domain }, ctx);
+      if (r && typeof r === 'object' && r.data) enriched = r.data as Record<string, unknown>;
+      else if (r && typeof r === 'object' && !('error' in r)) enriched = r as Record<string, unknown>;
+    } catch {}
+
+    const merged: Record<string, unknown> = {
+      domain,
+      ...(args.name ? { name: args.name } : {}),
+      ...enriched,
+      ...(args.record ?? {}),
+    };
+
+    // 2. score.
+    const rubric = await loadRubric();
+    const score = applyRubric(merged, rubric);
+
+    // 3. route (gate on the fresh score, not what's on disk).
+    const routing = await loadRouting();
+    const route = applyRouting({ ...merged, icp_score: score.score }, routing);
+
+    const results: Record<string, { ok: boolean; data?: any; error?: string; skipped?: boolean }> = {};
+
+    // 4a. vault — always the authoritative write.
+    const vaultPath = `companies/${slugify(String(merged.name ?? domain))}.md`;
+    if (want('vault', true)) {
+      try {
+        await stampVault(vaultPath, {
+          kind: 'company',
+          domain,
+          name: merged.name ?? domain,
+          industry: merged.industry,
+          employee_count: merged.employee_count,
+          revenue: merged.revenue,
+          hq: merged.hq,
+          tech_stack: merged.tech_stack,
+          icp_score: score.score,
+          icp_reasons: score.reasons,
+          icp_rubric_version: score.rubricVersion,
+          scored_at: new Date().toISOString(),
+          ...(route.assignee
+            ? {
+                assignee: {
+                  type: route.assignee.type,
+                  id: route.assignee.id,
+                  ...(route.assignee.name ? { name: route.assignee.name } : {}),
+                },
+                routing_rule: route.rule,
+                routed_at: new Date().toISOString(),
+              }
+            : {}),
+        }, `### ${new Date().toISOString().slice(0, 10)} — pipeline run\n\n- score: ${score.score} (${score.reasons.length} hits)\n- route: ${route.rule}`);
+        results.vault = { ok: true, data: { path: vaultPath } };
+      } catch (err) {
+        results.vault = { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+
+    // 4b. HubSpot — upsert company by domain, patch icp_score + owner.
+    if (want('hubspot', Boolean(ctx.config.hubspot_api_key))) {
+      if (!ctx.config.hubspot_api_key) {
+        results.hubspot = { ok: false, skipped: true, error: 'no hubspot key' };
+      } else {
+        const key = ctx.config.hubspot_api_key;
+        // Dedup by domain.
+        const search = await hubspotFetch(key, '/crm/v3/objects/companies/search', {
+          method: 'POST',
+          body: {
+            filterGroups: [{ filters: [{ propertyName: 'domain', operator: 'EQ', value: domain }] }],
+            properties: ['domain'],
+            limit: 1,
+          },
+        });
+        const hit = search.ok && Array.isArray(search.data?.results) ? search.data.results[0] : null;
+        const props: Record<string, unknown> = {
+          domain,
+          name: merged.name ?? domain,
+          icp_score: score.score,
+          icp_reasons: (score.reasons || []).join(' • ').slice(0, 1500),
+        };
+        if (merged.industry) props.industry = merged.industry;
+        if (merged.employee_count) props.numberofemployees = merged.employee_count;
+        if (route.crmOwnerIds?.hubspot) props.hubspot_owner_id = route.crmOwnerIds.hubspot;
+        const wr = hit
+          ? await hubspotFetch(key, `/crm/v3/objects/companies/${hit.id}`, { method: 'PATCH', body: { properties: props } })
+          : await hubspotFetch(key, `/crm/v3/objects/companies`, { method: 'POST', body: { properties: props } });
+        results.hubspot = wr.ok
+          ? { ok: true, data: { id: wr.data?.id, updated: Boolean(hit) } }
+          : { ok: false, error: wr.error, data: wr.data };
+      }
+    }
+
+    // 4c. Attio — upsert a company by domain using matching_attribute.
+    if (want('attio', Boolean(ctx.config.attio_api_key))) {
+      if (!ctx.config.attio_api_key) {
+        results.attio = { ok: false, skipped: true, error: 'no attio key' };
+      } else {
+        const values: Record<string, unknown> = {
+          domains: [{ domain }],
+          name: [{ value: String(merged.name ?? domain) }],
+          icp_score: [{ value: score.score }],
+          icp_reasons: [{ value: (score.reasons || []).join(' • ').slice(0, 1500) }],
+        };
+        if (route.crmOwnerIds?.attio) {
+          values.primary_owner = [{ referenced_actor_type: 'workspace-member', referenced_actor_id: route.crmOwnerIds.attio }];
+        }
+        const wr = await attioFetch(
+          ctx.config.attio_api_key,
+          `/objects/companies/records?matching_attribute=domains`,
+          { method: 'PUT', body: { data: { values } } },
+        );
+        results.attio = wr.ok ? { ok: true, data: wr.data?.data ?? null } : { ok: false, error: wr.error };
+      }
+    }
+
+    // 4d. Salesforce — upsert Account by Website LIKE domain.
+    if (want('salesforce', Boolean(ctx.config.salesforce_access_token && ctx.config.salesforce_instance_url))) {
+      if (!ctx.config.salesforce_access_token || !ctx.config.salesforce_instance_url) {
+        results.salesforce = { ok: false, skipped: true, error: 'no salesforce creds' };
+      } else {
+        const soql = `SELECT Id FROM Account WHERE Website LIKE '%${domain.replace(/'/g, "\\'")}%' LIMIT 1`;
+        const s = await salesforceFetch(ctx, `/query`, { qs: { q: soql } });
+        const hit = s.ok ? s.data?.records?.[0] : null;
+        const props: Record<string, unknown> = {
+          Name: merged.name ?? domain,
+          Website: `https://${domain}`,
+          ICP_Score__c: score.score,
+          ICP_Reasons__c: (score.reasons || []).join(' • ').slice(0, 255),
+        };
+        if (merged.industry) props.Industry = merged.industry;
+        if (merged.employee_count) props.NumberOfEmployees = merged.employee_count;
+        if (route.crmOwnerIds?.salesforce) props.OwnerId = route.crmOwnerIds.salesforce;
+        const wr = hit
+          ? await salesforceFetch(ctx, `/sobjects/Account/${hit.Id}`, { method: 'PATCH', body: props })
+          : await salesforceFetch(ctx, `/sobjects/Account`, { method: 'POST', body: props });
+        results.salesforce = wr.ok
+          ? { ok: true, data: { id: hit ? hit.Id : wr.data?.id, updated: Boolean(hit) } }
+          : { ok: false, error: wr.error };
+      }
+    }
+
+    // 4e. Pipedrive — upsert Organization by name (domain field is custom).
+    if (want('pipedrive', Boolean(ctx.config.pipedrive_api_key && ctx.config.pipedrive_domain))) {
+      if (!ctx.config.pipedrive_api_key || !ctx.config.pipedrive_domain) {
+        results.pipedrive = { ok: false, skipped: true, error: 'no pipedrive creds' };
+      } else {
+        const s = await pipedriveFetch(ctx, `/organizations/search`, { qs: { term: domain } });
+        const hit = s.ok ? s.data?.data?.items?.[0]?.item : null;
+        const body: Record<string, unknown> = {
+          name: merged.name ?? domain,
+          icp_score: score.score,
+          icp_reasons: (score.reasons || []).join(' • ').slice(0, 1500),
+        };
+        if (route.crmOwnerIds?.pipedrive) body.owner_id = Number(route.crmOwnerIds.pipedrive);
+        const wr = hit
+          ? await pipedriveFetch(ctx, `/organizations/${hit.id}`, { method: 'PUT', body })
+          : await pipedriveFetch(ctx, `/organizations`, { method: 'POST', body });
+        results.pipedrive = wr.ok
+          ? { ok: true, data: { id: wr.data?.data?.id, updated: Boolean(hit) } }
+          : { ok: false, error: wr.error };
+      }
+    }
+
+    return {
+      ok: true,
+      data: {
+        domain,
+        score,
+        route,
+        targets: results,
+      },
+    };
+  },
+};
+
 export const BUILTIN_TOOLS: ToolDef[] = [
   notify,
   trigger_create,
@@ -3066,6 +3701,19 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   attio_update_record,
   attio_create_note,
   attio_add_to_list,
+  salesforce_create_contact,
+  salesforce_update_contact,
+  salesforce_create_account,
+  salesforce_create_note,
+  salesforce_search,
+  pipedrive_create_person,
+  pipedrive_update_person,
+  pipedrive_create_organization,
+  pipedrive_create_note,
+  pipedrive_search,
+  score_lead,
+  route_lead,
+  enrich_score_route,
   feishu_notify,
   feishu_send_message,
   feishu_bitable_list_records,
