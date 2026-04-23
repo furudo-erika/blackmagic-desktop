@@ -400,9 +400,9 @@ function AgentsSidebarRow({
       >
         <Link
           href="/agents"
-          className="flex-1 flex items-center gap-2 px-2 py-1.5 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
+          className="flex-1 flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
         >
-          <Bot className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
+          <Bot className="w-4 h-4 shrink-0 text-muted dark:text-[#8C837C]" />
           <span className="truncate">Agents</span>
           {liveSlugs.size > 0 && (
             <span className="ml-auto text-[10px] font-mono text-flame">{liveSlugs.size}</span>
@@ -488,9 +488,9 @@ function KnowledgeSidebarRow({ pathname }: { pathname: string }) {
       >
         <Link
           href="/knowledge"
-          className="flex-1 flex items-center gap-2 px-2 py-1.5 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
+          className="flex-1 flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
         >
-          <BookOpen className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
+          <BookOpen className="w-4 h-4 shrink-0 text-muted dark:text-[#8C837C]" />
           <span className="truncate">Knowledge</span>
         </Link>
         <button
@@ -788,10 +788,10 @@ function HistorySidebarRow({
       >
         <Link
           href="/history"
-          className="flex-1 flex items-center gap-2 px-2 py-1.5 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
+          className="flex-1 flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
           title="Open the Chat History page"
         >
-          <History className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
+          <History className="w-4 h-4 shrink-0 text-muted dark:text-[#8C837C]" />
           <span className="truncate">Chat History</span>
         </Link>
         <button
