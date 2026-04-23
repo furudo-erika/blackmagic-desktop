@@ -2,6 +2,30 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.80 — 2026-04-23
+
+### Added
+- **Content Studio agent.** New agent seeded into every vault at
+  \`agents/content-studio.md\`. Wraps the existing
+  \`hypereal_generate\` tool with a full creative playbook:
+  - **Promo videos + Reels / TikToks / Shorts** via Seedance 2.0
+    (default), Veo-3, Kling-1.6, Hailuo-02, Vidu-Q1 — kind:
+    \`video\`, with aspect + duration defaults that match each
+    surface (9:16 social, 16:9 horizontal, 1:1 square).
+  - **Product + lifestyle stills** (IG, TikTok covers, blog
+    headers) via gpt-image-2 — kind: \`image\`, aspect presets for
+    4:5 feed / 9:16 story / 16:9 blog.
+  - **Voice-over / narration** — kind: \`voice\`, voice_id + script.
+  - **Blog posts** — full drafts anchored in \`us/brand/voice.md\`,
+    saved as CMS drafts (Ghost / WordPress) with a matching
+    generated header image attached in the same run.
+  - **Social captions + ad variants** — 3-5 variants per ask,
+    written to \`drafts/\` for human pick + send.
+  Ships with starter prompts for TikTok hooks, IG product shots,
+  blog posts, and founder-style Reels. Every generation logs
+  provenance (model / prompt / job_id / aspect / duration) into
+  \`signals/content/<iso-date>-<slug>.md\`.
+
 ## 0.4.79 — 2026-04-23
 
 ### Changed

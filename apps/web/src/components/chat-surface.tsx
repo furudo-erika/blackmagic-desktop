@@ -125,6 +125,7 @@ const AGENT_ACCENTS: Record<string, string> = {
   'pipeline-ops':        'text-orange-400',
   'geo-analyst':         'text-flame',
   'company-profiler':    'text-yellow-400',
+  'content-studio':      'text-pink-400',
 };
 
 function friendlyToolName(name: string): string {
