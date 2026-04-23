@@ -2,6 +2,20 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.81 — 2026-04-23
+
+### Changed
+- **Hypereal media generation is no longer BYOK — it's metered
+  through BlackMagic credits at Hypereal's official pricing**
+  (hypereal.cloud/docs/pricing). \`hypereal_generate\` now routes
+  through the blackmagic.engineering proxy (same path as
+  \`enrich_company\` / \`deep_research\`); the upstream Hypereal key
+  lives server-side. End users don't paste anything — the Content
+  Studio agent works the moment you sign in. Main models: Seedance
+  2.0 for video, gpt-image-2 for image.
+- **Removed Hypereal from the Integrations page.** Nothing to
+  connect anymore; the card was misleading now that it's metered.
+
 ## 0.4.80 — 2026-04-23
 
 ### Changed

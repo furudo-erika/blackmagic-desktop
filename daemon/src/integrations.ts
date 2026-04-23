@@ -32,7 +32,6 @@ export type IntegrationProvider =
   | 'ghost'
   | 'wordpress'
   | 'rb2b'
-  | 'hypereal'
   | 'google_calendar';
 
 export const PROVIDERS: IntegrationProvider[] = [
@@ -41,7 +40,7 @@ export const PROVIDERS: IntegrationProvider[] = [
   'feishu', 'metabase', 'supabase',
   'calcom', 'discord', 'telegram', 'notion', 'linear', 'github', 'stripe',
   'apify', 'amazon_ses',
-  'gsc', 'google_analytics', 'ghost', 'wordpress', 'rb2b', 'hypereal',
+  'gsc', 'google_analytics', 'ghost', 'wordpress', 'rb2b',
 ];
 
 export interface IntegrationRecord {
@@ -123,9 +122,6 @@ const ENV_MAPPING: Record<IntegrationProvider, Record<string, string>> = {
   // WordPress — application-password auth (user:app_password) + site URL.
   wordpress:    { token: 'WORDPRESS_APP_PASSWORD', endpoint: 'WORDPRESS_SITE_URL' },
   rb2b:         { token: 'RB2B_API_KEY' },
-  // Hypereal — image/video generation cloud (NeoLab's hypereal.cloud).
-  // Users paste the `sk_live_…` API key from hypereal.cloud/dashboard/keys.
-  hypereal:     { token: 'HYPEREAL_API_KEY', endpoint: 'HYPEREAL_BASE_URL' },
   // Google Calendar — user OAuth via blackmagic.engineering proxy. Daemon
   // receives access_token (+ optional refresh_token, expiry). Scopes:
   // https://www.googleapis.com/auth/calendar (read + write events).

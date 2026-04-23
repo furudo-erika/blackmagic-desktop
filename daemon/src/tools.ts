@@ -2693,48 +2693,32 @@ const rb2b_list_visitors: ToolDef = {
 // hypereal.cloud. One API fans out to Seedance, Veo, Kling, WAN, etc.
 // Docs: https://hypereal.cloud/docs
 // ---------------------------------------------------------------------------
+// Hypereal media generation is proxied through blackmagic.engineering — the
+// end user pays BlackMagic credits per call at Hypereal's official pricing
+// (hypereal.cloud/docs/pricing); we hold the upstream key. No BYOK anymore.
+// Previously this read a user-pasted sk_live_… from integrations.json; that
+// path is gone so the Content Studio agent works out-of-the-box the moment
+// a user logs in.
 const hypereal_generate: ToolDef = {
   name: 'hypereal_generate',
   description:
-    'Generate media (image / video / voice) via hypereal.cloud. Pick a `kind` ("image", "video", or "voice"), pass a `prompt` describing what you want, and optionally a `model` (e.g. "seedance-2.0", "veo-3", "kling-1.6", "elevenlabs-v2"). Returns a signed URL to the finished artifact (or a job_id for long-running video renders — poll `status_url`).',
+    'Generate media (image / video / voice) via hypereal.cloud, billed against your BlackMagic credits at Hypereal\'s official price. Pass `kind` ("image" | "video" | "voice"), a `prompt`, and optionally a `model` (default: "seedance-2.0" for video, "gpt-image-2" for image). `options` passes through model-specific params (aspect, duration_s, voice_id, n, …). Returns a signed URL for the finished artifact or a job_id you poll via `status_url` for long renders.',
   parameters: {
     type: 'object',
     properties: {
       kind: { type: 'string', enum: ['image', 'video', 'voice'] },
       prompt: { type: 'string' },
-      model: { type: 'string', description: 'Optional model override; defaults to Hypereal\'s best-for-kind pick' },
-      options: { type: 'object', description: 'Passthrough model-specific options (duration_s, aspect, voice_id, etc.)' },
+      model: { type: 'string', description: 'Optional model override. Defaults: video → seedance-2.0, image → gpt-image-2.' },
+      options: { type: 'object', description: 'Passthrough model-specific options (duration_s, aspect, voice_id, n, …).' },
     },
     required: ['kind', 'prompt'],
   },
-  handler: async (args) => {
-    const creds = await readIntegrationCreds('hypereal');
-    if (!creds?.token) {
-      return { ok: false, error: 'No Hypereal API key connected. Paste it in sidebar → Integrations → Hypereal.' };
-    }
-    const base = (creds.endpoint ?? 'https://hypereal.cloud').replace(/\/+$/, '');
-    const res = await fetch(`${base}/api/v1/generate`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${creds.token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        kind: args.kind,
-        prompt: args.prompt,
-        model: args.model,
-        options: args.options ?? {},
-      }),
-    });
-    const text = await res.text();
-    if (!res.ok) return { ok: false, status: res.status, error: text.slice(0, 500) };
-    try {
-      return { ok: true, data: JSON.parse(text) };
-    } catch {
-      return { ok: false, error: 'Hypereal returned non-JSON response', raw: text.slice(0, 500) };
-    }
-  },
+  handler: async (args, ctx) => proxyTool('hypereal_generate', {
+    kind: args.kind,
+    prompt: args.prompt,
+    model: args.model,
+    options: args.options ?? {},
+  }, ctx),
 };
 
 // ---------------------------------------------------------------------------

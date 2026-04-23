@@ -1325,7 +1325,7 @@ slug: content-studio
 icon: Sparkles
 accent: fuchsia
 model: gpt-5.3-codex
-revision: 1
+revision: 2
 tools:
   - read_file
   - write_file
@@ -1409,8 +1409,11 @@ don't describe.
   \`signals/content/<iso-date>-<slug>.md\` alongside the asset URL.
 - Drafts only for anything headed to an external platform (Ghost,
   WordPress, social, ad). Never auto-publish.
-- If no Hypereal credential is connected, say so on one line
-  ("connect Hypereal in Integrations") and stop — don't fake URLs.
+- Every \`hypereal_generate\` call is billed against the user's
+  BlackMagic credits at Hypereal's official price
+  (hypereal.cloud/docs/pricing) — no key pasting, works out of the
+  box. If a call returns an error, surface it verbatim on one line
+  rather than retrying blindly.
 - Respect \`us/brand/voice.md\` forbidden-words + length caps. If the
   brief violates them, rewrite and flag the change in your summary.
 - On-brand color palette from \`us/brand/visual.md\` goes into every
