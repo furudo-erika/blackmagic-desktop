@@ -296,6 +296,7 @@ export function Sidebar() {
         <div className="text-[10px] text-muted dark:text-[#6B625C] font-mono pl-7 -mt-0.5">
           v{health.data?.version ?? '…'}
         </div>
+        <CreditsPill />
       </div>
 
       {paletteOpen && (
@@ -307,6 +308,57 @@ export function Sidebar() {
         />
       )}
     </aside>
+  );
+}
+
+// Credit balance pill — polls /api/plan every 60s. Red when out of
+// credits (<=0), amber when low (<=10% of the plan quota), neutral
+// otherwise. Clicking opens the web billing page so the user can top
+// up without leaving their flow. Hidden while unsigned-in (the
+// endpoint 401s and we don't want to nag on the login screen).
+function CreditsPill() {
+  const plan = useQuery({
+    queryKey: ['bm-plan'],
+    queryFn: api.plan,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  const data = plan.data;
+  if (!data) return null;
+  const remaining = data.creditsRemaining;
+  const quota = data.creditsIncluded || 1;
+  const pct = remaining / quota;
+  const out = remaining <= 0;
+  const low = !out && pct <= 0.1;
+  const color = out
+    ? 'text-flame bg-flame/10 border-flame/30'
+    : low
+      ? 'text-[#C77A1F] bg-[#C77A1F]/10 border-[#C77A1F]/30'
+      : 'text-muted dark:text-[#8C837C] bg-white/40 dark:bg-[#1F1B15]/60 border-line dark:border-[#2A241D]';
+  function openBilling() {
+    const url = 'https://blackmagic.engineering/dashboard/billing';
+    if (typeof window !== 'undefined' && window.bmBridge?.openExternal) {
+      window.bmBridge.openExternal(url);
+    } else if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener');
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={openBilling}
+      title={out ? 'Out of credits — click to top up' : low ? 'Credits low — top up soon' : 'Open billing'}
+      className={
+        'mt-1.5 w-full flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10.5px] font-mono ' +
+        color
+      }
+    >
+      <CreditCard className="w-3 h-3 shrink-0" />
+      <span className="truncate flex-1 text-left">
+        {out ? 'Out of credits' : `${remaining.toLocaleString()} credits`}
+      </span>
+      {(out || low) && <span className="shrink-0 uppercase tracking-wider">top up</span>}
+    </button>
   );
 }
 

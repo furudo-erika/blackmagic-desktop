@@ -14,6 +14,7 @@ import { Providers } from '../app/providers';
 import { Sidebar } from './sidebar';
 import { LoginGate } from './login-gate';
 import { UpgradeBanner } from './upgrade-banner';
+import { CreditsBanner } from './credits-banner';
 import { ToastHost } from './ui/toast';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -36,6 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <LoginGate>
           <div className="flex flex-col h-screen">
             <UpgradeBanner />
+            <CreditsBanner />
             <div className="flex flex-1 min-h-0">
               <Sidebar />
               <main className="flex-1 overflow-hidden">{children}</main>

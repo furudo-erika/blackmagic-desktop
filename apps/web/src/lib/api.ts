@@ -75,6 +75,14 @@ export const api = {
       engine?: 'codex-cli' | 'builtin';
       localToken?: string;
     }>('/api/health'),
+  plan: () =>
+    request<{
+      plan: 'free' | 'growth' | 'scale' | 'enterprise';
+      creditsIncluded: number;
+      creditsUsed: number;
+      creditsRemaining: number;
+      resetAt: string | null;
+    }>('/api/plan'),
   setApiKey: (key: string) =>
     request<{ ok: true }>('/api/config/api-key', { method: 'POST', body: JSON.stringify({ key }) }),
   authStart: () => request<{ browserUrl: string; state: string }>('/api/auth/start'),

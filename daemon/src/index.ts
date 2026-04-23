@@ -353,6 +353,33 @@ async function main() {
     return c.json({ content: '# Changelog\n\n_Not bundled with this build._' });
   });
 
+  // Plan/credit balance — fetched from blackmagic.engineering using the
+  // user's ck_ key, cached for 30s so the sidebar indicator doesn't
+  // hammer the server. Shape mirrors /api/v1/plan on the web side.
+  let planCache: { at: number; data: any } | null = null;
+  app.get('/api/plan', async (c) => {
+    const key = config.zenn_api_key;
+    if (!key) return c.json({ error: 'not signed in' }, 401);
+    const now = Date.now();
+    if (planCache && now - planCache.at < 30_000) {
+      return c.json(planCache.data);
+    }
+    const base = (config.billing_url ?? 'https://blackmagic.engineering').replace(/\/+$/, '');
+    try {
+      const res = await fetch(`${base}/api/v1/plan`, {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      if (!res.ok) {
+        return c.json({ error: `plan lookup ${res.status}` }, res.status as any);
+      }
+      const data = await res.json();
+      planCache = { at: now, data };
+      return c.json(data);
+    } catch (err: any) {
+      return c.json({ error: err?.message ?? 'plan lookup failed' }, 502);
+    }
+  });
+
   app.get('/api/health', (c) =>
     c.json({
       ok: true,

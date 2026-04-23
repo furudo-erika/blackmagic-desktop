@@ -2,6 +2,25 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.7 — 2026-04-23
+
+### Added
+- **Billing sub-row under Settings in the sidebar.** Settings is now
+  expandable; the nested "Billing" row opens
+  blackmagic.engineering/dashboard/billing in your default browser.
+  Stripe secrets stay on the web side — the desktop binary never
+  touches them.
+- **Credit balance pill in the sidebar footer.** Shows remaining
+  credits pulled from the cloud every 60s. Neutral when healthy,
+  amber at ≤10% of the plan quota, red at zero. Click to jump to
+  billing.
+- **Out-of-credits banner.** When the cloud proxy will 402 your next
+  run, the app now says so up front — fixed-top red banner with a
+  "Top up" button instead of a cryptic server error downstream.
+- **`GET /api/plan`** — new daemon endpoint that forwards to
+  blackmagic.engineering's `/api/v1/plan` with your `ck_` key and
+  caches the response for 30s.
+
 ## 0.5.6 — 2026-04-23
 
 ### Added
