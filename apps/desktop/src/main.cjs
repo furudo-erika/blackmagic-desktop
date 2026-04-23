@@ -326,9 +326,11 @@ let progressWindow = null;
 function openProgressWindow(logPath) {
   try {
     const win = new BrowserWindow({
-      width: 560,
-      height: 420,
-      resizable: false,
+      width: 760,
+      height: 620,
+      resizable: true,
+      minWidth: 560,
+      minHeight: 420,
       minimizable: true,
       maximizable: false,
       title: 'Upgrading BlackMagic AI',

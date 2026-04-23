@@ -2,6 +2,14 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.5 — 2026-04-23
+
+### Fixed
+- **Upgrade progress window too small.** Default was 560×420, which
+  clipped the brew log after ~5 lines. Bumped to 760×620 and made
+  it resizable (min 560×420) so the full `==> Upgrading / Backing /
+  Moving / Purging` trace is visible without a Reveal-log detour.
+
 ## 0.5.4 — 2026-04-23
 
 ### Added
