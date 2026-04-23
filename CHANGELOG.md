@@ -2,6 +2,28 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.15 — 2026-04-24
+
+### Fixed
+- **Integrations page logos bundled locally, not from Clearbit CDN.**
+  The CDN-based approach rendered inconsistently — different image
+  sizes, Electron sometimes blocks external requests in packaged
+  builds, Clearbit 404s on small brands. Now every supported
+  provider (20 of 27) loads a real brand SVG/PNG from
+  `/public/integrations/`, mirroring the approach the marketing
+  site already uses. The remaining 7 (pipedrive, gong, unipile,
+  feishu, apify, amazon_ses, rb2b) fall back to the hand-drawn
+  SVG with a colored tile — intentional, because sourcing a real
+  logo for these without press-page scraping or a manual negotiation
+  isn't worth the effort.
+- **Vault editor was clipping body content.** The edit mode reused
+  the chat `Composer` component, which caps at `maxHeight: 320px`
+  (tuned for prompts, not for files). Long agent prompts or
+  `us/` pages scrolled to ~8 lines and hid the rest. Replaced
+  with a plain full-height `<textarea>` that runs min-h-[70vh] and
+  is resizable via the browser's native corner grip. ⌘↵ still
+  saves.
+
 ## 0.5.14 — 2026-04-24
 
 ### Changed

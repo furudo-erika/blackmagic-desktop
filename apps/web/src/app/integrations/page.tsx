@@ -24,44 +24,42 @@ type ProviderDef = {
 };
 
 /**
- * Real brand logos rendered as <img src="https://logo.clearbit.com/<domain>">.
- * Clearbit's free logo CDN returns the actual canonical brand mark for any
- * domain (PNG with transparent background, 128×128). No API key required.
- * Falls back to an SVG path when Clearbit 404s (small brands like RB2B,
- * Unipile) or network is offline.
+ * Real brand logos bundled as local static files under
+ * /public/integrations/<name>.{svg,png}. Simple Icons for the brands
+ * it still publishes; Clearbit-sourced PNGs for Simple-Icons holdouts
+ * (Slack, Salesforce, Attio, Apollo). Missing brands fall through to
+ * a hand-drawn SVG path (see BRAND_FALLBACK_PATHS below).
  *
- * Why Clearbit: Simple Icons v16 dropped Slack + Salesforce (and others)
- * per brand-guideline requests, so we can't rely on it for every provider.
- * Clearbit has every real SaaS brand, at real resolution, in real color.
+ * Why local, not a CDN: Electron's packaged renderer runs from
+ * file:// or the daemon's http://127.0.0.1 origin; external requests
+ * are flakier (proxy / offline / corporate network), and an
+ * integrations page that loads broken logos looks worse than one
+ * that uses a placeholder silhouette. Matches the approach the
+ * marketing site (blackmagic-web) already uses.
  */
-const BRAND_DOMAIN: Record<IntegrationProvider, string> = {
-  hubspot:          'hubspot.com',
-  attio:            'attio.com',
-  salesforce:       'salesforce.com',
-  pipedrive:        'pipedrive.com',
-  gong:             'gong.io',
-  unipile:          'unipile.com',
-  slack:            'slack.com',
-  gmail:            'gmail.com',
-  feishu:           'feishu.cn',
-  metabase:         'metabase.com',
-  supabase:         'supabase.com',
-  calcom:           'cal.com',
-  discord:          'discord.com',
-  telegram:         'telegram.org',
-  notion:           'notion.so',
-  linear:           'linear.app',
-  github:           'github.com',
-  stripe:           'stripe.com',
-  apify:            'apify.com',
-  amazon_ses:       'aws.amazon.com',
-  gsc:              'search.google.com',
-  google_analytics: 'analytics.google.com',
-  ghost:            'ghost.org',
-  wordpress:        'wordpress.com',
-  rb2b:             'rb2b.com',
-  google_calendar:  'calendar.google.com',
-  x:                'x.com',
+const BRAND_LOGO: Partial<Record<IntegrationProvider, string>> = {
+  hubspot:          '/integrations/hubspot.svg',
+  attio:            '/integrations/attio.png',
+  salesforce:       '/integrations/salesforce.svg',
+  slack:            '/integrations/slack.svg',
+  gmail:            '/integrations/gmail.svg',
+  metabase:         '/integrations/metabase.svg',
+  supabase:         '/integrations/supabase.svg',
+  calcom:           '/integrations/calcom.svg',
+  discord:          '/integrations/discord.svg',
+  telegram:         '/integrations/telegram.svg',
+  notion:           '/integrations/notion.svg',
+  linear:           '/integrations/linear.svg',
+  github:           '/integrations/github.svg',
+  stripe:           '/integrations/stripe.svg',
+  gsc:              '/integrations/gsc.svg',
+  google_analytics: '/integrations/google_analytics.svg',
+  ghost:            '/integrations/ghost.svg',
+  wordpress:        '/integrations/wordpress.svg',
+  google_calendar:  '/integrations/googlecalendar.svg',
+  x:                '/integrations/x.svg',
+  // Unbundled (fall back to BRAND_FALLBACK_PATHS): pipedrive, gong,
+  // unipile, feishu, apify, amazon_ses, rb2b.
 };
 
 // Fallback SVG paths — used only when Clearbit's CDN fails (offline, 404
@@ -141,9 +139,9 @@ const BRAND_FALLBACK_PATHS: Record<IntegrationProvider, string> = {
 };
 
 function BrandLogo({ provider, color }: { provider: IntegrationProvider; color: string }) {
-  const domain = BRAND_DOMAIN[provider];
+  const src = BRAND_LOGO[provider];
   const [failed, setFailed] = useState(false);
-  if (failed || !domain) {
+  if (!src || failed) {
     const d = BRAND_FALLBACK_PATHS[provider];
     return (
       <div
@@ -158,9 +156,9 @@ function BrandLogo({ provider, color }: { provider: IntegrationProvider; color: 
     );
   }
   return (
-    <div className="w-9 h-9 rounded-md flex items-center justify-center shrink-0 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] overflow-hidden">
+    <div className="w-9 h-9 rounded-md flex items-center justify-center shrink-0 bg-white dark:bg-white/95 border border-line dark:border-[#2A241D] overflow-hidden">
       <img
-        src={`https://logo.clearbit.com/${domain}`}
+        src={src}
         alt=""
         width={22}
         height={22}

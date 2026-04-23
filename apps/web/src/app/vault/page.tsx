@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
 import { Markdown } from '../../components/markdown';
-import { Composer } from '../../components/composer';
 import { Search, Save, Pencil, Eye, FileText } from 'lucide-react';
 
 type FileEntry = { path: string; type: 'file' | 'dir' };
@@ -264,15 +263,26 @@ function VaultContent() {
 
               {editing ? (
                 <div className="mt-2">
-                  <Composer
+                  {/* Plain full-height textarea, not Composer — Composer's
+                      max-height (320px, tuned for chat prompts) was
+                      clipping real vault files to 8-10 lines. This one
+                      grows to fit the viewport and scrolls internally. */}
+                  <textarea
                     value={draftBody}
-                    onChange={setDraftBody}
-                    onSubmit={save}
-                    agents={[]}
-                    submitLabel="Save"
+                    onChange={(e) => setDraftBody(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        e.preventDefault();
+                        save();
+                      }
+                    }}
+                    spellCheck={false}
+                    className="w-full min-h-[70vh] bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl px-5 py-4 text-[13.5px] leading-relaxed font-mono text-ink dark:text-[#E6E0D8] placeholder:text-muted/70 dark:placeholder:text-[#6B625C] focus:outline-none focus:border-flame/50 resize-y"
                     placeholder="Edit markdown…"
-                    showKeyboardHints={false}
                   />
+                  <div className="mt-1.5 text-[10px] font-mono text-muted dark:text-[#8C837C]">
+                    ⌘↵ to save · drag the bottom-right corner to resize
+                  </div>
                 </div>
               ) : (
                 <div className="mt-2 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl px-6 py-5">
