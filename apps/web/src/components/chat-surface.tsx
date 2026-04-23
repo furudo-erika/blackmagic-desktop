@@ -553,45 +553,9 @@ export function ChatSurface({
                 regardless of which page the user lands on, not just the
                 empty-state of /. */}
 
-            {/* Agents gallery — tiled cards of every agent in the vault.
-                Clicking a card selects it as the routing agent for this
-                thread (same as picking from the composer pill), and the
-                starter prompts below update accordingly. The entire
-                empty state collapses the moment the user sends their
-                first message, so the gallery is only visible pre-chat. */}
-            {!effectiveAgent && (agentOptions.data?.length ?? 0) > 0 && (
-              <div>
-                <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-3">
-                  Pick an agent
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {(agentOptions.data ?? []).map((a) => {
-                    const Icon = AGENT_ICONS[a.icon] ?? Bot;
-                    const accent = AGENT_ACCENTS[a.slug] ?? 'text-flame';
-                    return (
-                      <button
-                        key={a.slug}
-                        type="button"
-                        onClick={() => setPickedAgent(a.slug)}
-                        className="text-left p-3 bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl hover:border-flame transition-colors flex items-start gap-3"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] flex items-center justify-center shrink-0">
-                          <Icon className={`w-4 h-4 ${accent}`} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[12.5px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{a.name}</div>
-                          {a.tagline && (
-                            <div className="text-[11px] text-muted dark:text-[#8C837C] line-clamp-2 mt-0.5">
-                              {a.tagline}
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Agents gallery removed — picker is now the pill inside
+                the composer footer. Empty state stays clean: just the
+                starter prompts for the currently-selected agent. */}
 
             {derivedScenarios.length > 0 && (
               <div>

@@ -2,6 +2,16 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.79 — 2026-04-23
+
+### Changed
+- **Removed the agent gallery tiles from the chat empty state** (reverted
+  the 0.4.73 re-add). Picking a card still triggered a client-side
+  exception on some installs via the corrupt-thread path — rolling the
+  UI back to the 0.4.70 layout. Composer with the agent picker pill
+  stays; empty state now only shows the starter-prompt cards for the
+  currently-selected agent.
+
 ## 0.4.78 — 2026-04-23
 
 ### Fixed
