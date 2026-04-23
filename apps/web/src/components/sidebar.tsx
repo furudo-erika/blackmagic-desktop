@@ -52,6 +52,8 @@ import {
   MessageCircle,
   Eye,
   UserPlus,
+  CreditCard,
+  ExternalLink,
   type LucideIcon,
 } from 'lucide-react';
 import { api, type Project } from '../lib/api';
@@ -264,7 +266,7 @@ export function Sidebar() {
 
         <NavRow icon={Inbox}           label="Desk"         href="/outreach"     pathname={pathname} badge={pendingDraftCount} />
         <NavRow icon={Wrench}          label="Integrations" href="/integrations" pathname={pathname} />
-        <NavRow icon={SettingsIcon}    label="Settings"     href="/settings"     pathname={pathname} />
+        <SettingsSidebarRow pathname={pathname} />
 
         <HistorySidebarRow pathname={pathname} router={router} />
 
@@ -468,6 +470,67 @@ function KnowledgeSidebarRow({ pathname }: { pathname: string }) {
               </li>
             );
           })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// Expandable Settings row — header navigates to /settings (local
+// vault/model/keys), sub-row "Billing" opens the web billing page in
+// the user's default browser. Billing lives on blackmagic.engineering
+// because Stripe secrets can't ship inside the desktop binary. Auto-
+// expands while inside /settings.
+function SettingsSidebarRow({ pathname }: { pathname: string }) {
+  const inside = pathname.startsWith('/settings');
+  const [open, setOpen] = useState<boolean>(inside);
+  useEffect(() => { if (inside) setOpen(true); }, [inside]);
+  function openBilling() {
+    const url = 'https://blackmagic.engineering/dashboard/billing';
+    if (typeof window !== 'undefined' && window.bmBridge?.openExternal) {
+      window.bmBridge.openExternal(url);
+    } else if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener');
+    }
+  }
+  return (
+    <div>
+      <div
+        className={
+          'flex items-center rounded-md ' +
+          (inside ? 'bg-white dark:bg-[#1F1B15]' : 'hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
+        }
+      >
+        <Link
+          href="/settings"
+          className="flex-1 flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
+        >
+          <SettingsIcon className="w-4 h-4 shrink-0 text-muted dark:text-[#8C837C]" />
+          <span className="truncate">Settings</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-label={open ? 'Collapse Settings' : 'Expand Settings'}
+          className="px-1.5 py-1.5 text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]"
+        >
+          <ChevronRight className={'w-3 h-3 transition-transform ' + (open ? 'rotate-90' : '')} />
+        </button>
+      </div>
+      {open && (
+        <ul className="ml-5 pl-2 border-l border-line dark:border-[#2A241D] mt-0.5 mb-1 space-y-0.5">
+          <li>
+            <button
+              type="button"
+              onClick={openBilling}
+              title="Opens blackmagic.engineering in your browser"
+              className="w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-[11.5px] text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60"
+            >
+              <CreditCard className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
+              <span className="truncate flex-1 text-left">Billing</span>
+              <ExternalLink className="w-3 h-3 shrink-0 text-muted/70 dark:text-[#6B625C]" />
+            </button>
+          </li>
         </ul>
       )}
     </div>
