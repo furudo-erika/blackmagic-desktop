@@ -164,6 +164,25 @@ async function proxyTool(toolName: string, args: Record<string, unknown>, ctx: T
 // API now, billed per search by the server-side proxy. No local tool
 // definition needed.
 
+// Resolve a company logo URL for a domain. Clearbit's free logo API
+// returns a 128×128 PNG for most B2B SaaS; if it 404s we fall back to
+// Google's favicon service (near-universal coverage, lower fidelity).
+// Both are CDN-hosted with good CORS, so we just store the URL, not the
+// bytes.
+async function fetchLogoUrl(domain: string): Promise<string | null> {
+  const d = String(domain ?? '')
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '')
+    .replace(/^www\./, '');
+  if (!d) return null;
+  const clearbit = `https://logo.clearbit.com/${d}?size=128`;
+  try {
+    const r = await fetch(clearbit, { method: 'HEAD' });
+    if (r.ok) return clearbit;
+  } catch {}
+  return `https://www.google.com/s2/favicons?sz=128&domain=${d}`;
+}
+
 const deep_research: ToolDef = {
   name: 'deep_research',
   description:
@@ -195,7 +214,25 @@ const enrich_company: ToolDef = {
     properties: { domain: { type: 'string' } },
     required: ['domain'],
   },
-  handler: async (args, ctx) => proxyTool('enrich_company', { domain: args.domain }, ctx),
+  handler: async (args, ctx) => {
+    const r: any = await proxyTool('enrich_company', { domain: args.domain }, ctx);
+    // Augment the enrichment with a logo_url so the agent can stamp it
+    // into us/company.md or companies/<slug>.md frontmatter. The sidebar
+    // + companies list render this URL next to the project/company name.
+    try {
+      const logo_url = await fetchLogoUrl(String(args.domain));
+      if (logo_url) {
+        if (r && typeof r === 'object' && !('error' in r)) {
+          if (r.data && typeof r.data === 'object') {
+            r.data = { ...r.data, logo_url };
+          } else {
+            (r as Record<string, unknown>).logo_url = logo_url;
+          }
+        }
+      }
+    } catch {}
+    return r;
+  },
 };
 
 const enrich_contact: ToolDef = {
@@ -3466,6 +3503,14 @@ const enrich_score_route: ToolDef = {
       else if (r && typeof r === 'object' && !('error' in r)) enriched = r as Record<string, unknown>;
     } catch {}
 
+    // Resolve a logo URL for the vault + CRM writes. Best-effort — if
+    // both Clearbit and the favicon fallback fail, we just skip.
+    let logo_url: string | null = null;
+    try {
+      logo_url = await fetchLogoUrl(domain);
+    } catch {}
+    if (logo_url && !enriched.logo_url) enriched.logo_url = logo_url;
+
     const merged: Record<string, unknown> = {
       domain,
       ...(args.name ? { name: args.name } : {}),
@@ -3496,6 +3541,7 @@ const enrich_score_route: ToolDef = {
           revenue: merged.revenue,
           hq: merged.hq,
           tech_stack: merged.tech_stack,
+          ...(merged.logo_url ? { logo_url: merged.logo_url } : {}),
           icp_score: score.score,
           icp_reasons: score.reasons,
           icp_rubric_version: score.rubricVersion,

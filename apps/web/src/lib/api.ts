@@ -516,7 +516,7 @@ export type GeoRunSummary = {
   duration_ms: number;
 };
 
-export type Project = { id: string; name: string; path: string };
+export type Project = { id: string; name: string; path: string; logo_url?: string };
 export type ProjectsRegistry = { active: string; projects: Project[] };
 
 export type OntologyNode = {

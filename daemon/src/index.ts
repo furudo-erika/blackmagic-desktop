@@ -11,6 +11,7 @@ import { loadConfig, getVaultRoot, homeVault } from './paths.js';
 import {
   initProjectsRegistry,
   getRegistry,
+  getRegistryWithLogos,
   addProject,
   activateProject,
   deleteProject,
@@ -1347,7 +1348,11 @@ async function main() {
   // daemon restart. Long-running crons re-read the root on each tick.
   app.get('/api/projects', async (c) => {
     try {
-      const reg = await getRegistry();
+      // Returns the registry plus each project's logo_url (read from
+      // <project>/us/company.md frontmatter, cached 60s). The sidebar
+      // project switcher uses this to render a real logo next to the
+      // active project name once the Company Profiler has enriched it.
+      const reg = await getRegistryWithLogos();
       return c.json(reg);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);

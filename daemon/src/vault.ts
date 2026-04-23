@@ -65,6 +65,7 @@ const US_TEMPLATES: Record<string, string> = {
 kind: us.company
 name:
 domain:
+logo_url:         # filled by enrich_company (Clearbit → favicon fallback); rendered in sidebar
 one_liner:
 stage:            # pre-seed | seed | A | B | C | growth | public
 founded:
