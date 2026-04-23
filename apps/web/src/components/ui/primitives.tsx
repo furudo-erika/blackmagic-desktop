@@ -344,7 +344,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       className={clsx(
-        'rounded-md font-medium inline-flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+        'rounded-md font-medium inline-flex items-center gap-1.5 transition-all duration-100 active:scale-[0.96] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
         sizeCls,
         variantCls,
         className,

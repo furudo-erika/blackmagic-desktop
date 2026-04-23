@@ -6,7 +6,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Radar, Play, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Radar, Play, Plus, Trash2, RefreshCw, Loader2 } from 'lucide-react';
 import { api, type GeoBrand, type GeoBrandRow, type GeoGapRow, type GeoDomainRow, type GeoPrompt, type GeoModel, type GeoBrandDeltaRow, type GeoDomainDeltaRow, type GeoTrendOverlay } from '../../lib/api';
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { PageShell, PageHeader, PageBody, Panel, Button } from '../../components/ui/primitives';
@@ -86,8 +86,12 @@ export default function GeoPage() {
               <option value="google_ai_overview">AI Overview</option>
             </select>
             <Button variant="primary" onClick={() => runMut.mutate()} disabled={runMut.isPending}>
-              <Play className="w-3 h-3 mr-1 inline" />
-              {runMut.isPending ? 'Running…' : 'Run now'}
+              {runMut.isPending ? (
+                <Loader2 className="w-3 h-3 mr-1 inline animate-spin" />
+              ) : (
+                <Play className="w-3 h-3 mr-1 inline" />
+              )}
+              {runMut.isPending ? 'Running… (can take ~30s)' : 'Run now'}
             </Button>
           </div>
         }

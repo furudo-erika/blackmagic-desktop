@@ -2,6 +2,19 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.72 — 2026-04-23
+
+### Fixed
+- **GEO "Run now" button felt unresponsive.** The sweep itself takes
+  ~30s but the button only changed its text label to "Running…" —
+  easy to miss, so people would re-click thinking the first click
+  hadn't registered. Now: swaps in a spinning loader icon the instant
+  you click, label reads "Running… (can take ~30s)" so the wait is
+  expected, and the button is `disabled` against double-fires.
+- **Every primitive Button now has a pressed-state animation** — a
+  quick `scale(0.96)` on `:active` so every click gives immediate
+  tactile feedback, not just the GEO one.
+
 ## 0.4.71 — 2026-04-23
 
 ### Changed
