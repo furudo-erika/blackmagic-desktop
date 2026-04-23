@@ -773,20 +773,38 @@ function HistorySidebarRow({
     router.push('/chat');
   }
 
+  // Clicking the label navigates to the full /history page (search +
+  // star + delete); the chevron toggles the inline peek of recent
+  // threads. Two behaviors, one row — matches the Agents row's
+  // split-target pattern.
+  const inside = pathname.startsWith('/history');
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 text-[13px] text-ink dark:text-[#E6E0D8]"
-        title={open ? 'Collapse chat history' : 'Show recent chat threads'}
+      <div
+        className={
+          'flex items-center rounded-md ' +
+          (inside ? 'bg-white dark:bg-[#1F1B15]' : 'hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
+        }
       >
-        <History className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
-        <span className="flex-1 text-left truncate">Chat History</span>
-        <ChevronDown
-          className={'w-3 h-3 text-muted dark:text-[#8C837C] transition-transform ' + (open ? '' : '-rotate-90')}
-        />
-      </button>
+        <Link
+          href="/history"
+          className="flex-1 flex items-center gap-2 px-2 py-1.5 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
+          title="Open the Chat History page"
+        >
+          <History className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
+          <span className="truncate">Chat History</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-label={open ? 'Collapse preview' : 'Expand recent-thread preview'}
+          className="px-1.5 py-1.5 text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]"
+        >
+          <ChevronDown
+            className={'w-3 h-3 transition-transform ' + (open ? '' : '-rotate-90')}
+          />
+        </button>
+      </div>
       {open && (
         <ul className="ml-5 pl-2 border-l border-line dark:border-[#2A241D] mt-0.5 mb-1 space-y-0.5">
           {recent.isLoading && (

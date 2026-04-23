@@ -1345,6 +1345,7 @@ async function main() {
                 updatedAt: j.updatedAt,
                 preview: String(first).slice(0, 80),
                 count: j.messages?.length ?? 0,
+                starred: Boolean(j.starred),
               };
             } catch {
               return null;
@@ -1365,6 +1366,23 @@ async function main() {
       return c.json({ error: 'not found' }, 404);
     }
   });
+  // Toggle a starred flag on a chat thread. Persisted as a top-level
+  // `starred: true/false` field on <id>.json. Missing = false.
+  app.patch('/api/chats/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!/^[a-zA-Z0-9\-_.]+$/.test(id)) return c.json({ error: 'invalid id' }, 400);
+    const body = await c.req.json<{ starred?: boolean }>().catch(() => ({} as any));
+    const p = path.join(getVaultRoot(), 'chats', `${id}.json`);
+    try {
+      const j = JSON.parse(await fs.readFile(p, 'utf-8'));
+      if (typeof body.starred === 'boolean') j.starred = body.starred;
+      await fs.writeFile(p, JSON.stringify(j, null, 2));
+      return c.json({ ok: true, starred: Boolean(j.starred) });
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 404);
+    }
+  });
+
   app.delete('/api/chats/:id', async (c) => {
     const id = c.req.param('id');
     // Basic path-safety — id should be a flat filename, no slashes / dots.

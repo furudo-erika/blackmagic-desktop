@@ -2,6 +2,31 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.16 — 2026-04-24
+
+### Added
+- **Chat History page at `/history`** — full-list browser with search,
+  star, and delete. Sidebar "Chat History" label now links there;
+  the chevron still toggles the inline 12-thread peek. Starred
+  threads pin to the top of the list.
+- **`PATCH /api/chats/:id`** — toggles `starred: true` on a chat
+  thread's JSON file. Persisted, survives restart. `api.setChatStarred(id, bool)`
+  on the web side.
+- **Chat list API returns `starred`** so the new page and future
+  surfaces can pin favorites without re-fetching each file.
+
+### Fixed
+- **Agent page: nested-scroll trap inside the Output panel's "Final
+  answer" markdown.** The inner `max-h-[420px] overflow-auto`
+  trapped the user inside a 420px markdown scroller; they had to
+  scroll through it AND escape before reaching the composer below.
+  Removed the inner cap — the outer page scrolls as one, markdown
+  flows naturally to the starter-chips / composer below.
+- **Starter chips on agent pages hidden once any run exists** for
+  this agent. They were useful on the empty state; after your first
+  run they just pushed real content down and distracted. Still
+  accessible from Home via `shuffle`.
+
 ## 0.5.15 — 2026-04-24
 
 ### Fixed

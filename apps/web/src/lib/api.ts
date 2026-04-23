@@ -218,15 +218,20 @@ export const api = {
     }
   },
   listChats: () =>
-    request<{ threads: Array<{ threadId: string; agent: string; updatedAt: string; preview: string; count: number }> }>(
+    request<{ threads: Array<{ threadId: string; agent: string; updatedAt: string; preview: string; count: number; starred?: boolean }> }>(
       '/api/chats',
     ),
   getChat: (id: string) =>
-    request<{ threadId: string; agent: string; updatedAt: string; messages: Array<{ role: 'user' | 'assistant'; content: string }> }>(
+    request<{ threadId: string; agent: string; updatedAt: string; starred?: boolean; messages: Array<{ role: 'user' | 'assistant'; content: string }> }>(
       `/api/chats/${encodeURIComponent(id)}`,
     ),
   deleteChat: (id: string) =>
     request<{ ok: true }>(`/api/chats/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  setChatStarred: (id: string, starred: boolean) =>
+    request<{ ok: true; starred: boolean }>(`/api/chats/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ starred }),
+    }),
   runAgent: (agent: string, task: string, opts?: { force?: boolean }) =>
     request<{ runId: string; final: string; tokensIn: number; tokensOut: number; costCents: number }>(
       '/api/agent/run',

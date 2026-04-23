@@ -474,7 +474,12 @@ function AgentsInner() {
                 <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-2">
                   Final answer
                 </div>
-                <div className="bg-cream-light dark:bg-[#17140F] border border-line dark:border-[#2A241D] rounded-md p-4 max-h-[420px] overflow-auto">
+                {/* No inner max-h / overflow — the page's outer
+                    container already scrolls. An inner scrollbox
+                    here created a nested-scroll trap where the user
+                    had to exhaust the markdown before reaching the
+                    composer below. */}
+                <div className="bg-cream-light dark:bg-[#17140F] border border-line dark:border-[#2A241D] rounded-md p-4">
                   <Markdown source={runDetail.data.final} />
                 </div>
               </div>
@@ -496,7 +501,11 @@ function AgentsInner() {
           click fires the prompt through the same pipeline as typing
           it manually (preflight modal included). Agents with no
           filled starters render nothing. */}
-      {slug && (
+      {/* Hide starter chips once this agent has any run in history —
+          the page becomes a continuation surface at that point, and
+          suggesting "try one of these" from scratch is distracting.
+          They're still accessible on Home + via shuffle. */}
+      {slug && !latestRun && (
         <AgentStarterStrip slug={slug} onPick={(p) => { setDraft(p); send(p); }} />
       )}
 
