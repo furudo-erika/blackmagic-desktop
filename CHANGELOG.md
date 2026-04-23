@@ -4,6 +4,11 @@ All notable changes to BlackMagic AI. Dates in UTC.
 
 ## 0.4.80 — 2026-04-23
 
+### Changed
+- **Resend logo swapped again** (landing integrations grid) to a cleaner
+  square "R" asset from gstatic. The previous cdn.resend.com rebrand
+  image was loading inconsistently.
+
 ### Added
 - **Content Studio agent.** New agent seeded into every vault at
   \`agents/content-studio.md\`. Wraps the existing
