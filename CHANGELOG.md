@@ -2,6 +2,51 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.0 — 2026-04-23
+
+First 0.5 release. Visual consistency + routing correctness pass after a
+thorough audit of every page, button, and destination. Kicked off the
+0.5.x series; 0.6.x will take on the deeper design-system work
+(shared button taxonomy in more places, theme tokens instead of
+hardcoded hex, toast system, skeleton loaders).
+
+### Fixed
+- **Knowledge page buttons no longer leak raw file paths in the
+  label.** "Open us/brand/voice.md →" and "Browse us/product/ →" were
+  accurate but unhelpful — the path-as-label told you nothing about
+  what *happens* when you click. Now each card reads "Edit →" /
+  "Browse files →" and routes to the vault editor at the right path.
+- **"Edit profile" on Knowledge routed to /onboarding/bootstrap**,
+  not to the company profile file. Now goes straight to
+  `/vault?path=us/company.md` — which is actually what the user
+  expects when they click "edit".
+- **Contacts page looked broken in dark mode** — bare `bg-white` +
+  `bg-cream-light` with no dark overrides produced the glaring
+  cream-colored panel + the white-flash input-row hover. Rewrote
+  the page on the shared `PageShell` / `PageHeader` / `Panel`
+  primitives so dark mode works.
+- **Contacts group header showed raw filenames (`AHMED-ATEF.MD`)**
+  when contacts were stored flat at `contacts/<x>.md` instead of
+  the nested `contacts/<company>/<x>.md` layout. Now falls back to
+  `frontmatter.company` then "Uncategorized".
+- **Contacts "Enroll" flow dead-ended when no sequences existed** —
+  picker was empty, button disabled, nothing explained why. Now
+  shows "No sequences created yet · Create one →" inline.
+- **Home quick-start cards no longer 404-to-infinity** when the
+  target agent isn't installed in the current vault. Cards render
+  at 40% opacity with a "Not installed in this project" tooltip
+  instead of pushing the user to `/agents?slug=missing`.
+
+### Changed
+- **Single-agent page title bumped to 22px / font-semibold /
+  tracking-tight** from the previous 18px. Matches the scale of
+  every other `PageHeader`-based page.
+- **Full-stack audit report** generated via a sub-agent sweep of
+  every `/apps/web/src/app/*` page. Findings across four buckets —
+  route inventory, button-destination correctness, visual
+  inconsistency, dead-end warnings — are the backlog for 0.5.x
+  and 0.6.0.
+
 ## 0.4.91 — 2026-04-23
 
 ### Fixed

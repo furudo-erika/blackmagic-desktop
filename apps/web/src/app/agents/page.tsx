@@ -296,7 +296,7 @@ function AgentsInner() {
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-[18px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{agent.name}</h1>
+              <h1 className="text-[22px] leading-tight font-semibold tracking-tight text-ink dark:text-[#F5F1EA] truncate">{agent.name}</h1>
               <span className="text-[11px] font-mono text-muted dark:text-[#8C837C]">{slug}</span>
               <span className={
                 'inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full ' +

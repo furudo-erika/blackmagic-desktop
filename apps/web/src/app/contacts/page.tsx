@@ -5,6 +5,13 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Repeat, Users, Sparkles, Building2 } from 'lucide-react';
+import {
+  PageShell,
+  PageHeader,
+  PageBody,
+  Panel,
+  Button,
+} from '../../components/ui/primitives';
 
 type Contact = { path: string; company: string; frontmatter: Record<string, unknown> };
 
@@ -21,7 +28,16 @@ export default function ContactsPage() {
         files.map(async (f) => {
           const r = await api.readFile(f.path);
           const parts = f.path.split('/');
-          return { path: f.path, company: parts[1] ?? 'unknown', frontmatter: r.frontmatter };
+          // Prefer nested directory (contacts/<company>/<person>.md);
+          // fall back to frontmatter.company, then "Uncategorized".
+          // Without this we'd show the filename itself as the group
+          // header when contacts are stored flat at contacts/<x>.md.
+          const dirCompany = parts.length > 2 ? parts[1] : '';
+          const fmCompany = typeof r.frontmatter?.company === 'string'
+            ? String(r.frontmatter.company).trim()
+            : '';
+          const company = dirCompany || fmCompany || 'Uncategorized';
+          return { path: f.path, company, frontmatter: r.frontmatter };
         }),
       );
       return results;
@@ -48,46 +64,63 @@ export default function ContactsPage() {
     (acc[c.company] ||= []).push(c);
     return acc;
   }, {});
+  const totalCount = contacts.data?.length ?? 0;
+  const hasSequences = (sequences.data?.sequences?.length ?? 0) > 0;
 
   return (
-    <div className="h-full flex flex-col">
-      <header className="px-6 py-4 border-b border-line">
-        <h1 className="text-lg font-semibold">Contacts</h1>
-        <p className="text-xs text-muted">People in your vault, grouped by company.</p>
-      </header>
-      <div className="h-full overflow-y-auto px-6 py-6">
-        {contacts.isLoading && <div className="text-sm text-muted">loading…</div>}
-        {contacts.error && <div className="text-sm text-flame">{(contacts.error as Error).message}</div>}
-        {!contacts.isLoading && (contacts.data?.length ?? 0) === 0 && (
-          <div className="max-w-xl mx-auto mt-10 bg-white rounded-2xl border border-line p-8 text-center">
-            <Users className="w-8 h-8 mx-auto mb-3 text-muted opacity-60" />
-            <h2 className="text-base font-semibold text-ink mb-1">No contacts yet</h2>
-            <p className="text-sm text-muted mb-5">
+    <PageShell>
+      <PageHeader
+        title="Contacts"
+        subtitle="People in your vault, grouped by company. Enrich a company to populate its buying committee."
+        icon={Users}
+      />
+      <PageBody maxWidth="4xl">
+        {contacts.isLoading && (
+          <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>
+        )}
+        {contacts.error && (
+          <div className="text-sm text-flame">{(contacts.error as Error).message}</div>
+        )}
+        {!contacts.isLoading && totalCount === 0 && (
+          <Panel className="max-w-xl mx-auto mt-10 text-center" padded>
+            <Users className="w-8 h-8 mx-auto mb-3 text-muted/60 dark:text-[#6B625C]" />
+            <h2 className="text-base font-semibold text-ink dark:text-[#F5F1EA] mb-1">
+              No contacts yet
+            </h2>
+            <p className="text-sm text-muted dark:text-[#8C837C] mb-5">
               Contacts live as markdown under <code className="text-[11px]">contacts/&lt;company&gt;/</code>.
-              Add one by enriching a company, or ask the agent in Chat to
-              pull a buying committee.
+              Add one by enriching a company, or ask an agent on Home to pull a buying committee.
             </p>
             <div className="flex items-center justify-center gap-2">
               <Link
                 href="/companies"
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-flame text-white text-sm font-medium hover:opacity-90"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-flame text-white text-sm font-medium hover:opacity-90 transition-opacity"
               >
                 <Building2 className="w-3.5 h-3.5" /> Enrich a company
               </Link>
               <Link
                 href="/"
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-line text-sm text-ink hover:bg-cream-light"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-line dark:border-[#2A241D] text-sm text-ink dark:text-[#E6E0D8] hover:border-flame/60 transition-colors"
               >
-                <Sparkles className="w-3.5 h-3.5" /> Ask in Chat
+                <Sparkles className="w-3.5 h-3.5" /> Ask on Home
               </Link>
             </div>
+          </Panel>
+        )}
+
+        {totalCount > 0 && (
+          <div className="mb-3 text-[11px] font-mono text-muted dark:text-[#8C837C] tabular-nums">
+            {totalCount} contact{totalCount === 1 ? '' : 's'} · {Object.keys(grouped).length} compan{Object.keys(grouped).length === 1 ? 'y' : 'ies'}
           </div>
         )}
-        <div className="space-y-6 max-w-3xl">
+
+        <div className="space-y-6">
           {Object.entries(grouped).map(([company, list]) => (
-            <div key={company}>
-              <div className="text-xs uppercase tracking-wide text-muted mb-2 font-mono">{company}</div>
-              <div className="bg-white rounded-xl border border-line divide-y divide-line">
+            <section key={company}>
+              <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-2 px-1">
+                {company}
+              </div>
+              <Panel padded={false} className="overflow-hidden divide-y divide-line dark:divide-[#2A241D]">
                 {list.map((c) => {
                   const activeSeq = c.frontmatter.sequence ? String(c.frontmatter.sequence) : null;
                   const status = c.frontmatter.sequence_status ? String(c.frontmatter.sequence_status) : null;
@@ -96,18 +129,26 @@ export default function ContactsPage() {
                       <div className="flex items-center justify-between gap-3">
                         <Link
                           href={`/vault?path=${encodeURIComponent(c.path)}`}
-                          className="flex-1 min-w-0 hover:bg-cream-light -mx-2 px-2 py-1 rounded"
+                          className="flex-1 min-w-0 -mx-2 px-2 py-1 rounded hover:bg-cream-light dark:hover:bg-[#17140F] transition-colors"
                         >
-                          <div className="text-sm text-ink">{String(c.frontmatter.name ?? '')}</div>
-                          <div className="text-xs text-muted">{String(c.frontmatter.role ?? '')}</div>
+                          <div className="text-sm text-ink dark:text-[#E6E0D8] truncate">
+                            {String(c.frontmatter.name ?? c.path.split('/').pop()?.replace(/\.md$/, '') ?? '')}
+                          </div>
+                          {!!c.frontmatter.role && (
+                            <div className="text-xs text-muted dark:text-[#8C837C] truncate">
+                              {String(c.frontmatter.role)}
+                            </div>
+                          )}
                         </Link>
-                        <div className="text-xs text-muted font-mono shrink-0">
-                          {String(c.frontmatter.email ?? '')}
-                        </div>
+                        {!!c.frontmatter.email && (
+                          <div className="text-xs text-muted dark:text-[#8C837C] font-mono shrink-0 truncate max-w-[220px]">
+                            {String(c.frontmatter.email)}
+                          </div>
+                        )}
                         <button
                           type="button"
                           onClick={() => setEnrollFor(enrollFor === c.path ? null : c.path)}
-                          className="shrink-0 h-7 px-2 rounded-md border border-line text-[11px] hover:bg-cream-light flex items-center gap-1"
+                          className="shrink-0 h-7 px-2 rounded-md border border-line dark:border-[#2A241D] text-[11px] text-ink dark:text-[#E6E0D8] hover:border-flame/60 hover:bg-cream-light dark:hover:bg-[#17140F] flex items-center gap-1 transition-colors"
                           title={activeSeq ? `Enrolled: ${activeSeq}` : 'Enroll in sequence'}
                         >
                           <Repeat className="w-3 h-3" />
@@ -117,36 +158,47 @@ export default function ContactsPage() {
                         </button>
                       </div>
                       {enrollFor === c.path && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <select
-                            value={picked}
-                            onChange={(e) => setPicked(e.target.value)}
-                            className="flex-1 h-8 px-2 rounded-md border border-line bg-cream-light text-[12px]"
-                          >
-                            <option value="">— pick a sequence —</option>
-                            {sequences.data?.sequences.map((s) => (
-                              <option key={s.path} value={s.path}>
-                                {s.name} ({s.touches.length} touches)
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            disabled={!picked || enroll.isPending}
-                            onClick={() => enroll.mutate({ contact: c.path, sequence: picked })}
-                            className="h-8 px-3 rounded-md bg-flame text-white text-[12px] font-medium disabled:opacity-40 hover:opacity-90"
-                          >
-                            {enroll.isPending ? '…' : 'Enroll'}
-                          </button>
+                        <div className="mt-3 flex items-center gap-2">
+                          {hasSequences ? (
+                            <>
+                              <select
+                                value={picked}
+                                onChange={(e) => setPicked(e.target.value)}
+                                className="flex-1 h-8 px-2 rounded-md border border-line dark:border-[#2A241D] bg-cream dark:bg-[#0F0D0A] text-[12px] text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+                              >
+                                <option value="">— pick a sequence —</option>
+                                {sequences.data?.sequences.map((s) => (
+                                  <option key={s.path} value={s.path}>
+                                    {s.name} ({s.touches.length} touches)
+                                  </option>
+                                ))}
+                              </select>
+                              <Button
+                                variant="primary"
+                                onClick={() => enroll.mutate({ contact: c.path, sequence: picked })}
+                                disabled={!picked || enroll.isPending}
+                              >
+                                {enroll.isPending ? '…' : 'Enroll'}
+                              </Button>
+                            </>
+                          ) : (
+                            <div className="flex-1 flex items-center gap-2 text-[11px] text-muted dark:text-[#8C837C]">
+                              <span>No sequences created yet.</span>
+                              <Link href="/sequences" className="text-flame hover:underline">
+                                Create one →
+                              </Link>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   );
                 })}
-              </div>
-            </div>
+              </Panel>
+            </section>
           ))}
         </div>
-      </div>
-    </div>
+      </PageBody>
+    </PageShell>
   );
 }

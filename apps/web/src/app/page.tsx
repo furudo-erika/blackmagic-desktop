@@ -297,16 +297,26 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {QUICK_STARTS.map((q) => (
-              <QuickStartCard
-                key={q.title}
-                icon={q.icon}
-                tint={q.tint}
-                title={q.title}
-                subtitle={q.subtitle}
-                onClick={() => router.push(q.href)}
-              />
-            ))}
+            {QUICK_STARTS.map((q) => {
+              // Validate the target agent is actually seeded in this vault.
+              // If it's not, dim the card + tooltip "Not installed" instead
+              // of letting the user click through to /agents?slug=<missing>
+              // and stare at a "loading agent…" forever.
+              const slug = q.href.match(/slug=([^&]+)/)?.[1];
+              const installed =
+                !slug || (agentList.data ?? []).some((a) => a.slug === slug);
+              return (
+                <QuickStartCard
+                  key={q.title}
+                  icon={q.icon}
+                  tint={q.tint}
+                  title={q.title}
+                  subtitle={installed ? q.subtitle : 'Not installed in this project'}
+                  onClick={() => (installed ? router.push(q.href) : undefined)}
+                  disabled={!installed}
+                />
+              );
+            })}
           </div>
         </div>
 
@@ -580,24 +590,35 @@ function QuickStartCard({
   title,
   subtitle,
   onClick,
+  disabled,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   tint: string;
   title: string;
   subtitle: string;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group text-left bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl px-4 py-3.5 hover:border-flame/60 hover:shadow-sm hover:-translate-y-0.5 transition-all flex flex-col gap-2.5 min-h-[108px]"
+      disabled={disabled}
+      title={disabled ? 'This agent is not installed in the current project' : undefined}
+      className={
+        'group text-left bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg px-4 py-3.5 transition-all flex flex-col gap-2.5 min-h-[108px] ' +
+        (disabled
+          ? 'opacity-40 cursor-not-allowed'
+          : 'hover:border-flame/60 hover:shadow-sm hover:-translate-y-0.5')
+      }
     >
       <div className="flex items-center justify-between">
         <div className={'w-9 h-9 rounded-lg flex items-center justify-center ' + tint}>
           <Icon className="w-[18px] h-[18px]" />
         </div>
-        <ArrowRight className="w-3.5 h-3.5 text-muted/50 dark:text-[#6B625C] group-hover:text-flame group-hover:translate-x-0.5 transition-all" />
+        {!disabled && (
+          <ArrowRight className="w-3.5 h-3.5 text-muted/50 dark:text-[#6B625C] group-hover:text-flame group-hover:translate-x-0.5 transition-all" />
+        )}
       </div>
       <div>
         <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] leading-tight">
