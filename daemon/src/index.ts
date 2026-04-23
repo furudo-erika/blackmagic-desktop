@@ -24,7 +24,7 @@ import {
 } from './pipeline.js';
 import { runAgent } from './agent.js';
 import { listPlaybooks, runPlaybook } from './playbooks.js';
-import { triggerList, fireTrigger, loadCronTriggers } from './triggers.js';
+import { triggerList, fireTrigger, loadCronTriggers, lastShellRuns } from './triggers.js';
 import { listSequences, listEnrollments, enrollContact, stopEnrollment } from './sequences.js';
 import { startSequenceCron, walkSequencesOnce } from './sequence-cron.js';
 import { listDrafts, approveDraft, rejectDraft } from './drafts.js';
@@ -721,9 +721,9 @@ async function main() {
   });
 
   app.get('/api/triggers', async (c) => {
-    const triggers = await triggerList();
+    const [triggers, lastRuns] = await Promise.all([triggerList(), lastShellRuns()]);
     pushTriggers(config).catch(() => {});
-    return c.json({ triggers });
+    return c.json({ triggers, lastRuns });
   });
   app.post('/api/triggers/:name/fire', async (c) => {
     const name = c.req.param('name');

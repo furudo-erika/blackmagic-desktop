@@ -18,6 +18,19 @@ import {
 
 type Trigger = { path: string; frontmatter: Record<string, unknown> };
 
+function relTime(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return '';
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  return `${d}d ago`;
+}
+
 // fire result shape — shell triggers return a run log path we can link to.
 type FireResult =
   | { ok: true; coming?: never; log?: string; exit?: number | null; durationMs?: number }
@@ -44,6 +57,14 @@ export default function TriggersPage() {
         }),
       );
     },
+  });
+
+  // Persisted last-run map from the daemon — so "view log · exit 0 · 3h ago"
+  // is visible on page load, not just after the user fires in this session.
+  const lastRuns = useQuery({
+    queryKey: ['triggers', 'lastRuns'],
+    queryFn: async () => (await api.listTriggers()).lastRuns ?? {},
+    refetchInterval: 15_000,
   });
 
   const toggle = useMutation({
@@ -90,6 +111,7 @@ export default function TriggersPage() {
     },
     onSuccess: (res) => {
       setLastFire((p) => ({ ...p, [res.name]: res }));
+      qc.invalidateQueries({ queryKey: ['triggers', 'lastRuns'] });
     },
   });
 
@@ -201,7 +223,8 @@ export default function TriggersPage() {
                 (typeof fm.schedule === 'string' && fm.schedule) ||
                 (typeof fm.cron === 'string' && fm.cron) ||
                 '';
-              const recent = lastFire[name];
+              const sessionFire = lastFire[name];
+              const persisted = lastRuns.data?.[name];
               const subtitleParts: string[] = [];
               if (schedule) subtitleParts.push(`cron: ${schedule}`);
               else if (fm.webhook) subtitleParts.push('webhook');
@@ -244,26 +267,36 @@ export default function TriggersPage() {
                   subtitle={<span className="font-mono">{subtitleParts.join(' · ')}</span>}
                   trailing={
                     <div className="flex items-center gap-3 flex-wrap justify-end">
-                      {recent?.ok && recent.log && (
-                        <a
-                          href={`/vault?path=${encodeURIComponent(recent.log)}`}
-                          className="text-[11px] text-muted dark:text-[#8C837C] hover:text-flame underline underline-offset-2"
-                        >
-                          view log
-                          {typeof recent.exit === 'number' ? (
-                            <span
-                              className={
-                                recent.exit === 0 ? 'text-[#7E8C67] ml-1' : 'text-flame ml-1'
-                              }
-                            >
-                              (exit {recent.exit})
-                            </span>
-                          ) : null}
-                        </a>
-                      )}
-                      {recent?.ok && !recent.log && (
-                        <span className="text-[11px] text-[#7E8C67]">queued ✓</span>
-                      )}
+                      {(() => {
+                        // In-session fire wins (most recent signal). Otherwise
+                        // fall back to the persisted last-run from disk so the
+                        // link survives reloads and cron fires.
+                        const log = sessionFire?.ok ? sessionFire.log : persisted?.log;
+                        const exit = sessionFire?.ok ? sessionFire.exit : persisted?.exit;
+                        const finishedAt = persisted?.finishedAt ?? null;
+                        if (sessionFire?.ok && !log) {
+                          return <span className="text-[11px] text-[#7E8C67]">queued ✓</span>;
+                        }
+                        if (!log) return null;
+                        return (
+                          <a
+                            href={`/vault?path=${encodeURIComponent(log)}`}
+                            className="text-[11px] text-muted dark:text-[#8C837C] hover:text-flame underline underline-offset-2"
+                            title={finishedAt ? `finished ${finishedAt}` : undefined}
+                          >
+                            {finishedAt && !sessionFire?.ok ? `last run ${relTime(finishedAt)}` : 'view log'}
+                            {typeof exit === 'number' ? (
+                              <span
+                                className={
+                                  exit === 0 ? 'text-[#7E8C67] ml-1' : 'text-flame ml-1'
+                                }
+                              >
+                                (exit {exit})
+                              </span>
+                            ) : null}
+                          </a>
+                        );
+                      })()}
                       <label className="flex items-center gap-1.5 text-[11px]">
                         <input
                           type="checkbox"

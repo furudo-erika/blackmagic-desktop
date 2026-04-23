@@ -2,6 +2,19 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.4 — 2026-04-23
+
+### Added
+- **Triggers page now shows last-run status per row.** Previously the "view
+  log · exit N" link only appeared for triggers you had fired in the
+  current session — so a cron-driven shell trigger that ran at 09:00 left
+  no visible trace on the Triggers page, and the page looked dead. The
+  daemon now scans `runs/shell-<name>-*.md` and returns the most recent
+  `{ log, exit, finished_at }` per trigger; the UI renders
+  `last run 3h ago · (exit 0) · view log` on every row, polled every 15s
+  and invalidated immediately after a Fire now. Makes the 9 Apidog cron
+  pipelines legible without clicking each one.
+
 ## 0.5.3 — 2026-04-23
 
 ### Fixed

@@ -258,3 +258,54 @@ export async function loadCronTriggers(config: Config) {
 export async function triggerList() {
   return listTriggers();
 }
+
+// Scan runs/ for the most recent shell-run log per trigger name. The UI uses
+// this so users see "last run: 3h ago · exit 0" without having to click Fire
+// now in the current session (runs persist across daemon restarts).
+export async function lastShellRuns(): Promise<Record<string, { log: string; exit: number | null; finishedAt: string | null }>> {
+  const runsDir = path.join(getVaultRoot(), 'runs');
+  const out: Record<string, { log: string; exit: number | null; finishedAt: string | null; _mtime: number }> = {};
+  let entries: string[] = [];
+  try {
+    entries = await fs.readdir(runsDir);
+  } catch {
+    return {};
+  }
+  for (const f of entries) {
+    if (!f.startsWith('shell-') || !f.endsWith('.md')) continue;
+    const abs = path.join(runsDir, f);
+    let st: Awaited<ReturnType<typeof fs.stat>>;
+    try {
+      st = await fs.stat(abs);
+    } catch {
+      continue;
+    }
+    if (!st.isFile()) continue;
+    let raw = '';
+    try {
+      raw = await fs.readFile(abs, 'utf-8');
+    } catch {
+      continue;
+    }
+    const m = matter(raw);
+    const fm = m.data as any;
+    const name = typeof fm.trigger === 'string' ? fm.trigger : null;
+    if (!name) continue;
+    const mtime = st.mtimeMs;
+    const prev = out[name];
+    if (prev && prev._mtime >= mtime) continue;
+    const exit = typeof fm.exit === 'number' ? fm.exit : fm.exit === null ? null : null;
+    const finishedAt = typeof fm.finished_at === 'string' ? fm.finished_at : null;
+    out[name] = {
+      log: path.posix.join('runs', f),
+      exit,
+      finishedAt,
+      _mtime: mtime,
+    };
+  }
+  const result: Record<string, { log: string; exit: number | null; finishedAt: string | null }> = {};
+  for (const [k, v] of Object.entries(out)) {
+    result[k] = { log: v.log, exit: v.exit, finishedAt: v.finishedAt };
+  }
+  return result;
+}

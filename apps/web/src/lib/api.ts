@@ -273,9 +273,19 @@ export const api = {
 
   // Triggers
   listTriggers: () =>
-    request<{ triggers: Array<{ name: string; schedule?: string; webhook?: boolean; playbook: string; enabled: boolean; body: string }> }>(
-      '/api/triggers',
-    ),
+    request<{
+      triggers: Array<{
+        name: string;
+        schedule?: string;
+        webhook?: boolean;
+        playbook?: string;
+        agent?: string;
+        shell?: string;
+        enabled: boolean;
+        body: string;
+      }>;
+      lastRuns?: Record<string, { log: string; exit: number | null; finishedAt: string | null }>;
+    }>('/api/triggers'),
   fireTrigger: (name: string, input: Record<string, unknown> = {}) =>
     request<{ runId?: string; final?: string; error?: string }>(
       `/api/triggers/${encodeURIComponent(name)}/fire`,
