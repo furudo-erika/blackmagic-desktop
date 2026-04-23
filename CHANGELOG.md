@@ -2,6 +2,19 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.14 — 2026-04-24
+
+### Changed
+- **Sidebar "Desk" → "Drafts", moved up below Chat History.** The
+  row was labeled "Desk" but the page is a drafts inbox; renamed
+  to match. Position moved out of the System cluster into the
+  operator-log cluster (Triggers · Chat History · Drafts), where
+  it fits conceptually — all three are "things pending review".
+- **Billing is a flat sibling row under Settings, not nested inside.**
+  Previously Settings was an expandable row with a Billing sub-item;
+  promoting Billing to a top-level row means one click instead of
+  two, and Settings stops pretending to be a category.
+
 ## 0.5.13 — 2026-04-24
 
 ### Changed
