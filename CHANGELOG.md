@@ -2,6 +2,21 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.84 — 2026-04-23
+
+### Added
+- **Quick starts on Home** — 8-card grid under the composer, 2×4 on
+  desktop. Each card (Announcement video, UGC testimonial, Blog hero
+  image, Social carousel, Product Hunt kit, Launch tweet thread, Cold
+  email sequence, Founder update) is a one-click shortcut to the
+  matching content skill. Click → composer prefills with a ready-to-edit
+  template, cursor auto-selects the first `[bracket placeholder]` so
+  the user's next keypress replaces it and ⌘↵ sends. "20+ more →"
+  link in the header takes you to the full /skills catalog. Solves
+  the "why is the composer empty and what can I ask for" discoverability
+  gap — 0.4.83 shipped the skills but left users staring at a blank
+  prompt box.
+
 ## 0.4.83 — 2026-04-23
 
 ### Added
