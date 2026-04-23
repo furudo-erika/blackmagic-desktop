@@ -12,6 +12,8 @@ import {
   EmptyState,
   DetailDrawer,
   Button,
+  StatusBadge,
+  type StatusTone,
 } from '../../components/ui/primitives';
 
 function timeAgo(iso: string | undefined): string {
@@ -24,26 +26,17 @@ function timeAgo(iso: string | undefined): string {
   return `${Math.floor(d / 86400)}d ago`;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  running: 'bg-[#7E8C67]/15 text-[#5D6E4D] dark:text-[#A3B38A]',
-  completed: 'bg-[#7E8C67]/15 text-[#5D6E4D] dark:text-[#A3B38A]',
-  failed: 'bg-flame/15 text-flame',
-  blocked: 'bg-[#F5C24D]/20 text-[#8A6A1A] dark:text-[#E8C063]',
-  canceled: 'bg-muted/20 text-muted dark:text-[#8C837C]',
+const STATUS_TONES: Record<string, StatusTone> = {
+  running: 'info',
+  completed: 'ok',
+  failed: 'bad',
+  blocked: 'warn',
+  canceled: 'muted',
 };
 
-function StatusBadge({ status, done }: { status?: string; done?: boolean }) {
+function RunStatusBadge({ status, done }: { status?: string; done?: boolean }) {
   const s = status ?? (done ? 'completed' : 'running');
-  return (
-    <span
-      className={
-        'inline-flex items-center h-4 px-1.5 rounded text-[9px] font-mono uppercase tracking-wide ' +
-        (STATUS_STYLES[s] ?? 'bg-muted/30 text-muted')
-      }
-    >
-      {s}
-    </span>
-  );
+  return <StatusBadge tone={STATUS_TONES[s] ?? 'muted'}>{s}</StatusBadge>;
 }
 
 function runStarted(runId: string): string | undefined {
@@ -72,8 +65,8 @@ function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () => void
                     <div
                       className={
                         m.role === 'user'
-                          ? 'bg-ink dark:bg-[#3A322A] text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[88%] whitespace-pre-wrap'
-                          : 'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl rounded-bl-sm px-5 py-3 max-w-[92%]'
+                          ? 'bg-ink dark:bg-[#3A322A] text-white rounded-lg rounded-br-sm px-4 py-2.5 text-[13px] max-w-[88%] whitespace-pre-wrap'
+                          : 'bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-lg rounded-bl-sm px-5 py-3 max-w-[92%]'
                       }
                     >
                       {m.role === 'user' ? m.content : <Markdown source={m.content} />}
@@ -158,7 +151,7 @@ export default function RunsPage() {
           subtitle="Every agent invocation, with prompt, tool calls, tokens and cost."
           icon={History}
         />
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto px-8 py-8">
           {runs.isLoading && (
             <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>
           )}
@@ -182,7 +175,7 @@ export default function RunsPage() {
                     leading={<Bot className="w-4 h-4 text-muted dark:text-[#8C837C]" />}
                     title={
                       <span className="flex items-center gap-2 min-w-0">
-                        <StatusBadge status={r.status} done={r.done} />
+                        <RunStatusBadge status={r.status} done={r.done} />
                         <span className="truncate">{r.preview || r.agent || '—'}</span>
                         {r.model && (
                           <span className="text-[10px] font-mono text-muted dark:text-[#8C837C] truncate">
