@@ -2574,6 +2574,166 @@ CONVERT (page with above-average engagement rate and conversions).
 "weekly-ga-brief", cron: "0 9 * * 1", skill: "ga-traffic-brief" })\`.
 `,
 
+  // === RB2B visitor sweep =================================================
+  'rb2b-visitor-sweep.md': `---
+kind: skill
+name: rb2b-visitor-sweep
+group: signals
+agent: researcher
+inputs:
+  - { name: since, required: false, description: "ISO timestamp. Default: last 24h." }
+requires:
+  integrations: [rb2b]
+  optional_integrations: [feishu, slack, discord, telegram]
+---
+
+Pull yesterday's de-anonymized website visitors from RB2B, score them
+against your ICP, and drop the top hits into companies/ + contacts/
+ready for the Outbound Agent to work.
+
+## Pre-flight
+- RB2B integration connected (Integrations → RB2B). Paste the API key
+  from rb2b.com/settings → API.
+- \`us/market/icp.md\` present — defines what "good fit" means. Without
+  it we still write the visitors, but we can't rank them, so every row
+  gets the same priority.
+
+## Steps
+
+1. \`rb2b_list_visitors({ since: "{{since | default: 24h ago}}" })\`.
+   This returns a flat list of sessions: one row per unique (person,
+   page) pair. Expect 20–500 rows/day for most sites.
+2. Deduplicate by \`person.linkedin_url\` — if someone hit three pages,
+   collapse to one record with a \`pages: [...]\` array.
+3. For each unique person, score against \`us/market/icp.md\`:
+   - **HOT**: company matches ICP firmographic filter AND person title
+     includes one of the ICP keywords (e.g. "VP", "Head of", "Director")
+   - **WARM**: company matches firmographic filter only
+   - **COLD**: everything else
+4. For HOT + WARM hits only, upsert:
+   - \`companies/<domain>.md\` with RB2B-supplied industry, size, domain,
+     and any existing CRM fields you already have for this domain
+   - \`contacts/<linkedin-slug>.md\` with name, title, company_domain,
+     linkedin_url, and \`source: rb2b\`, \`first_seen: <ISO>\`
+5. Write \`signals/visitors/<YYYY-MM-DD>.md\` with frontmatter
+   \`kind: signal.visitors, date: <iso>, total: <n>, hot: <h>, warm: <w>\`
+   and a table: person · company · pages · score. Include a "How to
+   act" section suggesting 1–3 HOT visitors for same-day outreach.
+6. \`notify({ subject: "<h> hot + <w> warm site visitors overnight",
+   body: <top-5 HOT summary>, urgency: <"high" if h>=1 else "normal"> })\`.
+
+## Self-schedule
+"Run this every weekday morning" → \`trigger_create({ name:
+"daily-visitor-sweep", cron: "0 9 * * 1-5",
+skill: "rb2b-visitor-sweep" })\`.
+`,
+
+  // === Gmail inbox triage =================================================
+  'inbox-triage.md': `---
+kind: skill
+name: inbox-triage
+group: productivity
+agent: researcher
+inputs:
+  - { name: query, required: false, description: "Gmail search string. Default: is:unread in:inbox newer_than:1d" }
+requires:
+  integrations: [gmail]
+  optional_integrations: [feishu, slack]
+---
+
+Triage the user's Gmail inbox into a single digest: who needs a reply
+today, what can wait, and what can be archived outright. Nothing is
+sent / deleted — this skill only reads + reports.
+
+## Pre-flight
+- Gmail integration connected via OAuth (Integrations → Gmail). Scope
+  \`gmail.modify\`; we don't use modify here but the scope is already
+  in place for future "auto-archive" features.
+
+## Steps
+
+1. \`gmail_list_messages({ query: "{{query | default}}", max: 50 })\`.
+2. For the top 25 results, \`gmail_get_message({ id })\` to grab full
+   bodies (the list only has metadata).
+3. Classify each message:
+   - **REPLY_TODAY**: from a human, direct question or deadline within
+     48h, subject not \`re: unsubscribe\`-shaped
+   - **FYI**: informational — newsletters, receipts, auto-generated
+     digests, calendar invites (Calendar auto-accepts handle these)
+   - **SPAM**: obvious marketing with no prior reply history
+4. Write \`signals/inbox/<YYYY-MM-DD>.md\` with frontmatter
+   \`kind: signal.inbox, date: <iso>, counts: { reply: <r>,
+   fyi: <f>, spam: <s> }\`. Body: table grouped by bucket, each row
+   showing from · subject · one-line gist · suggested response
+   (for REPLY_TODAY only — 1-sentence seed, not a full draft).
+5. \`notify({ subject: "Inbox: <r> to reply, <f> FYI, <s> noise",
+   body: <REPLY_TODAY items>, urgency: <"high" if r>=3 else "normal"> })\`.
+6. Reply with the single most time-sensitive message and one-line
+   context (e.g. "Sarah from Acme is waiting on the contract — she
+   mentions a Friday deadline").
+
+## Not in scope
+This skill never calls \`gmail_send\` and never modifies labels. If you
+want auto-reply drafts, call the \`draft_create\` tool explicitly for
+each REPLY_TODAY message after reviewing this digest.
+`,
+
+  // === Google Calendar meeting digest =====================================
+  'meeting-digest.md': `---
+kind: skill
+name: meeting-digest
+group: productivity
+agent: researcher
+inputs:
+  - { name: days_ahead, required: false, description: "How many days forward to scan. Default 1 (= tomorrow)." }
+requires:
+  integrations: [google_calendar]
+  optional_integrations: [gmail, hubspot, attio, feishu, slack]
+---
+
+End-of-day digest of tomorrow's calendar with a per-meeting prep brief.
+Each upcoming external meeting gets: attendee background (via CRM if
+connected, else LinkedIn lookup), conversation hooks, and any open
+threads from Gmail with the same people.
+
+## Pre-flight
+- Google Calendar integration connected via OAuth (Integrations →
+  Google Calendar). Scope \`calendar\`.
+- Optional: Gmail connection (to scan recent threads with attendees)
+  and CRM connection (HubSpot / Attio) for deal-stage context.
+
+## Steps
+
+1. \`gcal_list_events({ time_min: <tomorrow 00:00 local>,
+   time_max: <tomorrow+{{days_ahead}} 23:59 local>, max: 50 })\`.
+2. Filter out events with \`attendees.length <= 1\` (solo blocks) and
+   events marked declined. Keep recurring + one-off.
+3. For each remaining event, classify attendees into internal vs
+   external by email domain (anything not matching the user's own
+   domain = external).
+4. For each external attendee on each meeting:
+   - If HubSpot / Attio connected: \`hubspot_search\` or
+     \`attio_search_records\` by email → pull deal stage, last touch,
+     recent notes.
+   - If Gmail connected: \`gmail_list_messages({ query:
+     "from:<email> OR to:<email> newer_than:30d", max: 5 })\` for
+     open-thread context.
+   - Otherwise: skip the enrichment step for that attendee.
+5. Write \`signals/meetings/<YYYY-MM-DD>.md\` with frontmatter
+   \`kind: signal.meetings, date: <iso>, total: <n>\`. Body: one H2
+   per meeting in chronological order. Each section includes: time,
+   attendees (external flagged), meet / zoom link, one-paragraph
+   "who they are", 2–3 "conversation hooks", any open-thread gist,
+   suggested opening line.
+6. \`notify({ subject: "Tomorrow: <n> meetings, <x> external",
+   body: <titles + times list>, urgency: "normal" })\`.
+
+## Self-schedule
+"Run this every weekday at 6pm" → \`trigger_create({ name:
+"daily-meeting-digest", cron: "0 18 * * 1-5",
+skill: "meeting-digest" })\`.
+`,
+
   // === CMS skills =========================================================
   // Note: no requires.integrations — this skill works with EITHER Ghost
   // OR WordPress, and requires.integrations is AND-ed. cms_list_posts

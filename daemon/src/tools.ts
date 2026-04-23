@@ -2644,6 +2644,378 @@ const trigger_create: ToolDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// RB2B — de-anonymize US-based website visitors. The user pastes their RB2B
+// API key and we hit RB2B's visitor stream endpoint to pull identified
+// sessions (person + company + page + timestamp). Docs:
+//   https://docs.rb2b.com/
+// ---------------------------------------------------------------------------
+const rb2b_list_visitors: ToolDef = {
+  name: 'rb2b_list_visitors',
+  description:
+    'Pull the most recent identified site visitors from RB2B. Returns person (name, title, linkedin_url) + company (name, domain, industry) + page URL + visit timestamp for each session RB2B could de-anonymize. Use `since` (ISO 8601) to get only sessions after a given time; default is last 24h.',
+  parameters: {
+    type: 'object',
+    properties: {
+      since: { type: 'string', description: 'ISO 8601 timestamp; omit for last 24h' },
+      limit: { type: 'number', description: 'Max visitors to return (default 100)' },
+    },
+    required: [],
+  },
+  handler: async (args) => {
+    const creds = await readIntegrationCreds('rb2b');
+    if (!creds?.token) {
+      return { ok: false, error: 'No RB2B API key connected. Paste it in sidebar → Integrations → RB2B.' };
+    }
+    const since = args.since ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const limit = Math.min(Math.max(Number(args.limit ?? 100), 1), 1000);
+    const url = `https://api.rb2b.com/v1/visitors?since=${encodeURIComponent(since)}&limit=${limit}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${creds.token}`, Accept: 'application/json' },
+    });
+    const text = await res.text();
+    if (!res.ok) return { ok: false, status: res.status, error: text.slice(0, 500) };
+    try {
+      const data = JSON.parse(text);
+      const visitors = Array.isArray(data) ? data : (data?.visitors ?? data?.data ?? []);
+      return { ok: true, count: visitors.length, data: visitors };
+    } catch {
+      return { ok: false, error: 'RB2B returned non-JSON response', raw: text.slice(0, 500) };
+    }
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Hypereal — AI content generation cloud (images, video, voiceovers) via
+// hypereal.cloud. One API fans out to Seedance, Veo, Kling, WAN, etc.
+// Docs: https://hypereal.cloud/docs
+// ---------------------------------------------------------------------------
+const hypereal_generate: ToolDef = {
+  name: 'hypereal_generate',
+  description:
+    'Generate media (image / video / voice) via hypereal.cloud. Pick a `kind` ("image", "video", or "voice"), pass a `prompt` describing what you want, and optionally a `model` (e.g. "seedance-2.0", "veo-3", "kling-1.6", "elevenlabs-v2"). Returns a signed URL to the finished artifact (or a job_id for long-running video renders — poll `status_url`).',
+  parameters: {
+    type: 'object',
+    properties: {
+      kind: { type: 'string', enum: ['image', 'video', 'voice'] },
+      prompt: { type: 'string' },
+      model: { type: 'string', description: 'Optional model override; defaults to Hypereal\'s best-for-kind pick' },
+      options: { type: 'object', description: 'Passthrough model-specific options (duration_s, aspect, voice_id, etc.)' },
+    },
+    required: ['kind', 'prompt'],
+  },
+  handler: async (args) => {
+    const creds = await readIntegrationCreds('hypereal');
+    if (!creds?.token) {
+      return { ok: false, error: 'No Hypereal API key connected. Paste it in sidebar → Integrations → Hypereal.' };
+    }
+    const base = (creds.endpoint ?? 'https://hypereal.cloud').replace(/\/+$/, '');
+    const res = await fetch(`${base}/api/v1/generate`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${creds.token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        kind: args.kind,
+        prompt: args.prompt,
+        model: args.model,
+        options: args.options ?? {},
+      }),
+    });
+    const text = await res.text();
+    if (!res.ok) return { ok: false, status: res.status, error: text.slice(0, 500) };
+    try {
+      return { ok: true, data: JSON.parse(text) };
+    } catch {
+      return { ok: false, error: 'Hypereal returned non-JSON response', raw: text.slice(0, 500) };
+    }
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Gmail — user OAuth via blackmagic.engineering proxy. Credentials arrive as
+// access_token (+ optional refresh_token) and we hit the Gmail REST API.
+// Scope: gmail.modify (read + label + send, never permanent delete).
+// ---------------------------------------------------------------------------
+async function gmailAccessToken(): Promise<string> {
+  const creds = await readIntegrationCreds('gmail');
+  if (!creds) throw new Error('No Gmail connection. Connect in sidebar → Integrations → Gmail.');
+  // Prefer the modern access_token field; fall back to legacy `token`.
+  const token = creds.access_token ?? creds.token;
+  if (!token) throw new Error('Gmail credentials missing access_token. Reconnect Gmail.');
+  // NOTE: refresh-token rotation happens in the OAuth proxy; the daemon
+  // doesn't hold Google client_id/secret. If access_token is stale, user
+  // reconnects from the integrations tab.
+  return token;
+}
+
+const gmail_list_messages: ToolDef = {
+  name: 'gmail_list_messages',
+  description:
+    'List recent Gmail messages matching a search query (Gmail query syntax, e.g. `is:unread from:@customer.com newer_than:1d`). Returns message ids + snippets + from/subject/date headers. Use `gmail_get_message` to fetch a full body.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Gmail query string (default: "in:inbox newer_than:1d")' },
+      max: { type: 'number', description: 'Max messages (default 25, cap 100)' },
+    },
+    required: [],
+  },
+  handler: async (args) => {
+    const token = await gmailAccessToken();
+    const q = args.query ?? 'in:inbox newer_than:1d';
+    const max = Math.min(Math.max(Number(args.max ?? 25), 1), 100);
+    const list = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=${max}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!list.ok) return { ok: false, status: list.status, error: (await list.text()).slice(0, 500) };
+    const { messages = [] } = (await list.json()) as { messages?: { id: string }[] };
+    const details = await Promise.all(
+      messages.map(async (m) => {
+        const r = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!r.ok) return { id: m.id, error: `${r.status}` };
+        const d = (await r.json()) as any;
+        const hdr = Object.fromEntries(
+          (d?.payload?.headers ?? []).map((h: any) => [String(h.name).toLowerCase(), h.value]),
+        );
+        return {
+          id: m.id,
+          thread_id: d.threadId,
+          snippet: d.snippet,
+          from: hdr.from,
+          subject: hdr.subject,
+          date: hdr.date,
+          label_ids: d.labelIds,
+        };
+      }),
+    );
+    return { ok: true, count: details.length, data: details };
+  },
+};
+
+const gmail_get_message: ToolDef = {
+  name: 'gmail_get_message',
+  description: 'Fetch a single Gmail message in full — decoded text/plain body, all headers, attachments metadata. Pass the message `id` from `gmail_list_messages`.',
+  parameters: {
+    type: 'object',
+    properties: { id: { type: 'string' } },
+    required: ['id'],
+  },
+  handler: async (args) => {
+    const token = await gmailAccessToken();
+    const r = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(args.id)}?format=full`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!r.ok) return { ok: false, status: r.status, error: (await r.text()).slice(0, 500) };
+    const msg = (await r.json()) as any;
+    // Walk MIME tree and extract text/plain parts.
+    function extractText(part: any): string {
+      if (!part) return '';
+      if (part.mimeType === 'text/plain' && part.body?.data) {
+        return Buffer.from(part.body.data, 'base64url').toString('utf-8');
+      }
+      if (Array.isArray(part.parts)) return part.parts.map(extractText).join('\n');
+      return '';
+    }
+    const body = extractText(msg.payload).trim();
+    const headers = Object.fromEntries(
+      (msg.payload?.headers ?? []).map((h: any) => [String(h.name).toLowerCase(), h.value]),
+    );
+    return { ok: true, data: { id: msg.id, thread_id: msg.threadId, snippet: msg.snippet, headers, body, label_ids: msg.labelIds } };
+  },
+};
+
+const gmail_send: ToolDef = {
+  name: 'gmail_send',
+  description:
+    'Send an email from the connected Gmail account. Prefer this over `send_email` when the user wants the message to show up in their own Sent folder (native Gmail send, not SES/Resend). `body_markdown` is required; `body_html` overrides the auto-converted markdown.',
+  parameters: {
+    type: 'object',
+    properties: {
+      to: { type: 'string' },
+      subject: { type: 'string' },
+      body_markdown: { type: 'string' },
+      body_html: { type: 'string' },
+      cc: { type: 'string' },
+      bcc: { type: 'string' },
+      reply_to: { type: 'string' },
+      in_reply_to: { type: 'string', description: 'Message-ID header of the email being replied to (Gmail threads the reply)' },
+    },
+    required: ['to', 'subject', 'body_markdown'],
+  },
+  handler: async (args) => {
+    const token = await gmailAccessToken();
+    const creds = await readIntegrationCreds('gmail');
+    const from = creds?.email ?? 'me';
+    const html =
+      args.body_html ??
+      args.body_markdown
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+    const headers = [
+      `From: ${from}`,
+      `To: ${args.to}`,
+      args.cc ? `Cc: ${args.cc}` : null,
+      args.bcc ? `Bcc: ${args.bcc}` : null,
+      args.reply_to ? `Reply-To: ${args.reply_to}` : null,
+      args.in_reply_to ? `In-Reply-To: ${args.in_reply_to}` : null,
+      args.in_reply_to ? `References: ${args.in_reply_to}` : null,
+      `Subject: ${args.subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      '',
+      html,
+    ].filter(Boolean).join('\r\n');
+    const raw = Buffer.from(headers, 'utf-8').toString('base64url');
+    const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw }),
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: (await r.text()).slice(0, 500) };
+    const data = (await r.json()) as any;
+    return { ok: true, data: { id: data.id, thread_id: data.threadId, provider: 'gmail', from } };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Google Calendar — user OAuth; daemon hits the Calendar v3 REST API with
+// the stored access_token. Scope: https://www.googleapis.com/auth/calendar.
+// ---------------------------------------------------------------------------
+async function gcalAccessToken(): Promise<{ token: string; calendarId: string }> {
+  const creds = await readIntegrationCreds('google_calendar');
+  if (!creds) throw new Error('No Google Calendar connection. Connect in sidebar → Integrations → Google Calendar.');
+  const token = creds.access_token ?? creds.token;
+  if (!token) throw new Error('Google Calendar credentials missing access_token. Reconnect.');
+  return { token, calendarId: creds.calendar_id ?? 'primary' };
+}
+
+const gcal_list_events: ToolDef = {
+  name: 'gcal_list_events',
+  description:
+    'List upcoming Google Calendar events on the connected calendar. Default window is next 7 days from now. Returns id, summary, start, end, attendees, conference link (Meet / Zoom), and description for each event.',
+  parameters: {
+    type: 'object',
+    properties: {
+      time_min: { type: 'string', description: 'ISO 8601; default now' },
+      time_max: { type: 'string', description: 'ISO 8601; default +7d' },
+      q: { type: 'string', description: 'Free-text query against summary/description' },
+      max: { type: 'number', description: 'Max events (default 50, cap 250)' },
+    },
+    required: [],
+  },
+  handler: async (args) => {
+    const { token, calendarId } = await gcalAccessToken();
+    const now = new Date();
+    const timeMin = args.time_min ?? now.toISOString();
+    const timeMax = args.time_max ?? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const max = Math.min(Math.max(Number(args.max ?? 50), 1), 250);
+    const params = new URLSearchParams({
+      timeMin, timeMax, singleEvents: 'true', orderBy: 'startTime', maxResults: String(max),
+    });
+    if (args.q) params.set('q', args.q);
+    const r = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!r.ok) return { ok: false, status: r.status, error: (await r.text()).slice(0, 500) };
+    const data = (await r.json()) as any;
+    const events = (data.items ?? []).map((e: any) => ({
+      id: e.id,
+      summary: e.summary,
+      description: e.description,
+      start: e.start?.dateTime ?? e.start?.date,
+      end: e.end?.dateTime ?? e.end?.date,
+      attendees: (e.attendees ?? []).map((a: any) => ({ email: a.email, status: a.responseStatus })),
+      hangout_link: e.hangoutLink,
+      location: e.location,
+      html_link: e.htmlLink,
+    }));
+    return { ok: true, count: events.length, data: events };
+  },
+};
+
+const gcal_create_event: ToolDef = {
+  name: 'gcal_create_event',
+  description:
+    'Create a Google Calendar event on the connected calendar. Required: summary, start (ISO), end (ISO). Optional: description, location, attendees (emails, comma-sep). Set `add_meet: true` to auto-provision a Google Meet link.',
+  parameters: {
+    type: 'object',
+    properties: {
+      summary: { type: 'string' },
+      start: { type: 'string', description: 'ISO 8601 datetime or all-day date (YYYY-MM-DD)' },
+      end: { type: 'string', description: 'ISO 8601 datetime or all-day date' },
+      description: { type: 'string' },
+      location: { type: 'string' },
+      attendees: { type: 'string', description: 'Comma-separated email list' },
+      add_meet: { type: 'boolean' },
+    },
+    required: ['summary', 'start', 'end'],
+  },
+  handler: async (args) => {
+    const { token, calendarId } = await gcalAccessToken();
+    const allDay = /^\d{4}-\d{2}-\d{2}$/.test(args.start);
+    const body: any = {
+      summary: args.summary,
+      description: args.description,
+      location: args.location,
+      start: allDay ? { date: args.start } : { dateTime: args.start },
+      end: allDay ? { date: args.end } : { dateTime: args.end },
+    };
+    if (args.attendees) {
+      body.attendees = String(args.attendees).split(',').map((e: string) => ({ email: e.trim() })).filter((a: any) => a.email);
+    }
+    let url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+    if (args.add_meet) {
+      body.conferenceData = {
+        createRequest: { requestId: `bm-${Date.now()}`, conferenceSolutionKey: { type: 'hangoutsMeet' } },
+      };
+      url += '?conferenceDataVersion=1';
+    }
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: (await r.text()).slice(0, 500) };
+    const data = (await r.json()) as any;
+    return {
+      ok: true,
+      data: { id: data.id, html_link: data.htmlLink, hangout_link: data.hangoutLink, start: data.start, end: data.end },
+    };
+  },
+};
+
+const gcal_delete_event: ToolDef = {
+  name: 'gcal_delete_event',
+  description: 'Delete a Google Calendar event by id. Pass the id from `gcal_list_events` or `gcal_create_event`.',
+  parameters: {
+    type: 'object',
+    properties: { id: { type: 'string' } },
+    required: ['id'],
+  },
+  handler: async (args) => {
+    const { token, calendarId } = await gcalAccessToken();
+    const r = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(args.id)}`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!r.ok && r.status !== 204 && r.status !== 410) {
+      return { ok: false, status: r.status, error: (await r.text()).slice(0, 500) };
+    }
+    return { ok: true, data: { id: args.id, deleted: true } };
+  },
+};
+
 export const BUILTIN_TOOLS: ToolDef[] = [
   notify,
   trigger_create,
@@ -2712,6 +3084,14 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   linkedin_send_invitation,
   linkedin_get_profile_unipile,
   linkedin_dm_via_apify,
+  rb2b_list_visitors,
+  hypereal_generate,
+  gmail_list_messages,
+  gmail_get_message,
+  gmail_send,
+  gcal_list_events,
+  gcal_create_event,
+  gcal_delete_event,
 ];
 
 export function allTools(): ToolDef[] {

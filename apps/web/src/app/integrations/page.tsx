@@ -90,6 +90,13 @@ const BRAND_PATHS: Record<IntegrationProvider, string> = {
   // RB2B — abstract person-on-orbit (visitor de-anonymization).
   rb2b:
     'M12 2a4 4 0 100 8 4 4 0 000-8zm0 10c-3.31 0-6 2.24-6 5v3h12v-3c0-2.76-2.69-5-6-5zm9-6h-3v2h-2v2h2v2h-2v-2h-2V8h2V6h2V4h3v2zm-2 4h2v2h-2v-2z',
+  // Hypereal — sparkle/starburst mark suggesting generative output.
+  hypereal:
+    'M12 2l2.09 6.26L20 9l-5.45 3.97L16.5 19 12 15.27 7.5 19l1.95-6.03L4 9l5.91-.74L12 2zm6 12l.9 2.7L21.5 17l-2.25 1.64.8 2.66L18 19.76l-2.05 1.54.8-2.66L14.5 17l2.6-.3L18 14zm-12 0l.9 2.7L9.5 17l-2.25 1.64.8 2.66L6 19.76l-2.05 1.54.8-2.66L2.5 17l2.6-.3L6 14z',
+  // Google Calendar — calendar grid silhouette. Generic icon, not the
+  // Google-trademarked logo.
+  google_calendar:
+    'M4 4h3V2h2v2h6V2h2v2h3a1 1 0 011 1v16a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1zm0 6v11h16V10H4zm3 2h4v4H7v-4z',
 };
 
 function BrandLogo({ provider, color }: { provider: IntegrationProvider; color: string }) {
@@ -173,7 +180,7 @@ const GROUPS: Group[] = [
       {
         provider: 'gmail',
         name: 'Gmail',
-        description: 'Send first-touch emails and read replies from an authorized inbox.',
+        description: 'Read inbox, triage threads, send replies. Full Gmail REST API access via OAuth — scope `gmail.modify` so agents can label/archive but never permanently delete. Feeds the `inbox-triage` skill.',
         oauth: true,
         brandColor: '#EA4335',
       },
@@ -204,6 +211,13 @@ const GROUPS: Group[] = [
   {
     label: 'Scheduling',
     providers: [
+      {
+        provider: 'google_calendar',
+        name: 'Google Calendar',
+        description: 'Read and manage events on your primary calendar — list upcoming meetings, create / update / delete events, check free-busy. OAuth scope `calendar` (read + write). Feeds the `meeting-digest` skill (next-day agenda + prep briefs).',
+        oauth: true,
+        brandColor: '#4285F4',
+      },
       {
         provider: 'calcom',
         name: 'Cal.com',
@@ -327,12 +341,25 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    label: 'AI content generation',
+    providers: [
+      {
+        provider: 'hypereal',
+        name: 'Hypereal',
+        description: 'Generate images, videos, and voiceovers via hypereal.cloud — one API for Seedance, Veo, Kling, WAN, and friends. Agents use this to auto-produce demo/promo clips for campaign pushes without a human in the loop. Docs: https://hypereal.cloud/docs',
+        oauth: false,
+        endpointField: true,
+        brandColor: '#7C3AED',
+      },
+    ],
+  },
+  {
     label: 'Visitor identification',
     providers: [
       {
         provider: 'rb2b',
         name: 'RB2B',
-        description: 'De-anonymize US-based website visitors. Paste your RB2B API key — agents pull person + company per session and write them to companies/ + contacts/ for the Website Visitor Agent to act on.',
+        description: 'De-anonymize US-based website visitors. Paste your RB2B API key — agents pull person + company per session via the `rb2b_list_visitors` tool and write them to companies/ + contacts/ for the Website Visitor Agent to act on. Feeds the `rb2b-visitor-sweep` skill.',
         oauth: false,
         brandColor: '#FF6B35',
       },

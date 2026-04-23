@@ -2,6 +2,43 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.74 — 2026-04-23
+
+### Added
+- **RB2B integration** (de-anonymize US site visitors). New
+  `rb2b_list_visitors` tool + `rb2b-visitor-sweep` skill: pulls
+  yesterday's identified sessions, scores them against `us/market/icp.md`,
+  drops HOT/WARM into `companies/` + `contacts/`, writes a daily
+  `signals/visitors/<date>.md`, and notifies. Works as a trigger:
+  `0 9 * * 1-5`.
+- **Hypereal integration** (AI content — image, video, voice). New
+  `hypereal_generate` tool wraps hypereal.cloud's unified API
+  (Seedance 2.0, Veo-3, Kling, WAN, ElevenLabs) so agents can
+  auto-produce demo/promo media without a human in the loop. Docs:
+  https://hypereal.cloud/docs.
+- **Gmail API** (full read + send, not just an OAuth stub). New tools:
+  `gmail_list_messages`, `gmail_get_message`, `gmail_send`. Scope is
+  `gmail.modify` (read + label + send, never permanent delete). New
+  `inbox-triage` skill: classifies unread into REPLY_TODAY / FYI /
+  SPAM and writes a daily digest — never auto-replies.
+- **Google Calendar API**. New tools: `gcal_list_events`,
+  `gcal_create_event` (with optional Meet auto-provisioning),
+  `gcal_delete_event`. Scope `calendar`. New `meeting-digest` skill:
+  end-of-day prep brief for tomorrow's external meetings, pulling
+  CRM deal-stage + recent Gmail threads with each attendee.
+
+### Changed
+- **Gmail credential shape widened** from single `token` to
+  `access_token` + `refresh_token` + `email`. Legacy `token` field
+  still recognised for backwards-compat with older saved creds.
+- **Resend logo** on the marketing homepage updated to the official
+  white PNG (rendered as monochrome silhouette in brand color on the
+  white tiles).
+- **Integrations page** (desktop): added Hypereal card under a new
+  "AI content generation" group, Google Calendar card next to
+  Cal.com under Scheduling, updated Gmail / RB2B descriptions to
+  point at the new skills.
+
 ## 0.4.73 — 2026-04-23
 
 ### Changed
