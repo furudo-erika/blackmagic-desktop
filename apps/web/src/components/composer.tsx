@@ -258,10 +258,10 @@ export function Composer({
           }
         }}
         placeholder={placeholder}
-        rows={2}
+        rows={1}
         disabled={disabled}
-        className="w-full resize-none bg-transparent border-0 px-5 py-4 text-[15px] text-ink dark:text-[#E6E0D8] placeholder:text-muted/70 dark:placeholder:text-[#6B625C] focus:outline-none"
-        style={{ minHeight: 80, maxHeight: 320 }}
+        className="w-full resize-none bg-transparent border-0 px-5 py-3 text-[15px] text-ink dark:text-[#E6E0D8] placeholder:text-muted/70 dark:placeholder:text-[#6B625C] focus:outline-none"
+        style={{ maxHeight: 320 }}
       />
 
       <div className="flex items-center justify-end gap-3 px-3 py-2 border-t border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F]">

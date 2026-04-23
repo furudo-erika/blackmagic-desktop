@@ -252,6 +252,7 @@ export function Sidebar() {
           liveSlugs={liveAgentSlugs}
         />
         <NavRow icon={Zap}             label="Triggers"  href="/triggers"  pathname={pathname} />
+        <HistorySidebarRow pathname={pathname} router={router} />
 
         <SectionLabel>Data</SectionLabel>
         <NavRow icon={Building2}       label="Companies" href="/companies" pathname={pathname} />
@@ -267,8 +268,6 @@ export function Sidebar() {
         <NavRow icon={Inbox}           label="Desk"         href="/outreach"     pathname={pathname} badge={pendingDraftCount} />
         <NavRow icon={Wrench}          label="Integrations" href="/integrations" pathname={pathname} />
         <SettingsSidebarRow pathname={pathname} />
-
-        <HistorySidebarRow pathname={pathname} router={router} />
 
         {/* Mechanism pages (Memory / Skills / Ontology / Files) removed
             from the top-level sidebar — agents use them internally and
@@ -807,15 +806,15 @@ function HistorySidebarRow({
   }
 
   return (
-    <div className="mt-2">
+    <div>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/60 dark:hover:bg-[#1F1B15]/60 text-[13px] text-ink dark:text-[#E6E0D8]"
-        title={open ? 'Collapse history' : 'Show recent threads'}
+        title={open ? 'Collapse chat history' : 'Show recent chat threads'}
       >
         <History className="w-3.5 h-3.5 shrink-0 text-muted dark:text-[#8C837C]" />
-        <span className="flex-1 text-left truncate">History</span>
+        <span className="flex-1 text-left truncate">Chat History</span>
         <ChevronDown
           className={'w-3 h-3 text-muted dark:text-[#8C837C] transition-transform ' + (open ? '' : '-rotate-90')}
         />

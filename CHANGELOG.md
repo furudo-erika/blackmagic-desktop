@@ -2,6 +2,24 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.13 — 2026-04-24
+
+### Changed
+- **Sidebar: "History" → "Chat History", moved under Triggers, collapsed
+  by default.** Was living at the bottom of the sidebar (below Settings)
+  which felt like a dumping ground. It belongs next to Triggers because
+  both are "operator log" rows — things-that-happened — not nav. The
+  new location groups the chat-thread list with the cron/webhook trigger
+  list right under the Agents section. Collapsed by default; click the
+  row to expand the 12 most recent threads.
+- **Composer auto-sizes from one row.** Used to reserve ~110px of empty
+  vertical space on every page that embeds the composer (Home, agent
+  pages, /chat) because the `minHeight: 80` + `rows={2}` + `py-4`
+  combination ignored the auto-grow effect's output. Now starts at
+  one row, grows up to 320px as you type, and the vertical padding
+  is tightened (`py-3`) so a single-line prompt no longer feels like
+  an airport waiting room.
+
 ## 0.5.12 — 2026-04-24
 
 ### Fixed
