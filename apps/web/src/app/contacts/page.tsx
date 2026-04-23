@@ -12,6 +12,7 @@ import {
   Panel,
   Button,
 } from '../../components/ui/primitives';
+import { SkeletonList } from '../../components/ui/skeleton';
 
 type Contact = { path: string; company: string; frontmatter: Record<string, unknown> };
 
@@ -75,9 +76,7 @@ export default function ContactsPage() {
         icon={Users}
       />
       <PageBody maxWidth="4xl">
-        {contacts.isLoading && (
-          <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>
-        )}
+        {contacts.isLoading && <SkeletonList count={3} />}
         {contacts.error && (
           <div className="text-sm text-flame">{(contacts.error as Error).message}</div>
         )}

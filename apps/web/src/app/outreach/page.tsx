@@ -12,6 +12,8 @@ import {
   EmptyState,
   Button,
 } from '../../components/ui/primitives';
+import { Composer } from '../../components/composer';
+import { toast } from '../../components/ui/toast';
 
 type DraftRow = {
   id: string;
@@ -51,24 +53,27 @@ export default function OutreachPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editBody, setEditBody] = useState('');
   const [editSubject, setEditSubject] = useState('');
-  const [flash, setFlash] = useState<{ path: string; text: string; kind: 'ok' | 'err' } | null>(null);
 
   const approve = useMutation({
     mutationFn: (d: DraftRow) => api.approveDraft(d.id),
-    onSuccess: (r, d) => {
+    onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['drafts'] });
-      setFlash({
-        path: d.path,
-        text: r.ok ? (r.messageId ? `sent · ${r.messageId}` : r.note ?? 'approved') : r.error ?? r.note ?? 'failed',
-        kind: r.ok ? 'ok' : 'err',
-      });
+      if (r.ok) {
+        toast.success(r.messageId ? `sent · ${r.messageId}` : r.note ?? 'approved');
+      } else {
+        toast.error(r.error ?? r.note ?? 'failed');
+      }
     },
-    onError: (err, d) => setFlash({ path: d.path, text: (err as Error).message, kind: 'err' }),
+    onError: (err) => toast.error((err as Error).message),
   });
 
   const reject = useMutation({
     mutationFn: (d: DraftRow) => api.rejectDraft(d.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['drafts'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['drafts'] });
+      toast.success('rejected');
+    },
+    onError: (err) => toast.error((err as Error).message),
   });
 
   const saveEdit = useMutation({
@@ -180,12 +185,17 @@ export default function OutreachPage() {
                   </div>
 
                   {isEditing ? (
-                    <textarea
-                      value={editBody}
-                      onChange={(e) => setEditBody(e.target.value)}
-                      rows={Math.min(20, Math.max(6, editBody.split('\n').length + 1))}
-                      className="mt-3 w-full p-2 rounded-md border border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] text-[12px] text-ink dark:text-[#E6E0D8] font-mono leading-relaxed"
-                    />
+                    <div className="mt-3">
+                      <Composer
+                        value={editBody}
+                        onChange={setEditBody}
+                        onSubmit={() => saveEdit.mutate(d)}
+                        agents={[]}
+                        submitLabel="Save"
+                        placeholder="Edit draft body…"
+                        showKeyboardHints={false}
+                      />
+                    </div>
                   ) : (
                     <pre className="mt-3 text-[12px] whitespace-pre-wrap text-ink/80 dark:text-[#E6E0D8]/80 leading-relaxed font-sans">
                       {d.body}
@@ -231,15 +241,6 @@ export default function OutreachPage() {
                           <Pencil className="w-3 h-3" /> Edit
                         </Button>
                       </>
-                    )}
-                    {flash?.path === d.path && (
-                      <span
-                        className={`ml-auto text-[11px] font-mono ${
-                          flash.kind === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-flame'
-                        }`}
-                      >
-                        {flash.text}
-                      </span>
                     )}
                   </div>
                 </Panel>

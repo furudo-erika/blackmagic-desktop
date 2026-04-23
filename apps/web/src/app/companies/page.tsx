@@ -18,6 +18,8 @@ import { Building2, Search, Sparkles, ExternalLink, Users, Briefcase, History } 
 import { api } from '../../lib/api';
 import { isValidDomain } from '../../lib/validators';
 import { Markdown } from '../../components/markdown';
+import { SkeletonList } from '../../components/ui/skeleton';
+import { toast } from '../../components/ui/toast';
 import {
   PageShell,
   PageHeader,
@@ -228,7 +230,6 @@ export default function CompaniesPage() {
   const [query, setQuery] = useState('');
   const [showEnrich, setShowEnrich] = useState(false);
   const [domain, setDomain] = useState('');
-  const [message, setMessage] = useState('');
   const [selected, setSelected] = useState<Company | null>(null);
 
   const companies = useQuery({
@@ -290,15 +291,15 @@ export default function CompaniesPage() {
       if (!domainValid(d)) throw new Error(`"${d}" is not a valid domain — use e.g. acme.com`);
       return api.runAgent('researcher', `Enrich ${d} and save to companies/.`);
     },
-    onMutate: (d) => setMessage(`enriching ${d}…`),
+    onMutate: (d) => toast.info(`enriching ${d}…`),
     onSuccess: () => {
-      setMessage('done');
+      toast.success('enrich started');
       setShowEnrich(false);
       setDomain('');
       qc.invalidateQueries({ queryKey: ['companies'] });
       qc.invalidateQueries({ queryKey: ['vault-tree'] });
     },
-    onError: (e: Error) => setMessage(`error: ${e.message}`),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const filtered = useMemo(() => {
@@ -368,16 +369,11 @@ export default function CompaniesPage() {
                       </span>
                     )}
                     <Button variant="ghost" onClick={() => setShowEnrich(false)}>Cancel</Button>
-                    {message && (
-                      <span className="text-[11px] text-muted dark:text-[#8C837C]">{message}</span>
-                    )}
                   </div>
                 </Panel>
               )}
 
-              {companies.isLoading && (
-                <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>
-              )}
+              {companies.isLoading && <SkeletonList count={3} />}
               {companies.error && (
                 <div className="text-sm text-flame">{(companies.error as Error).message}</div>
               )}

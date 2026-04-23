@@ -14,6 +14,7 @@ import { Providers } from '../app/providers';
 import { Sidebar } from './sidebar';
 import { LoginGate } from './login-gate';
 import { UpgradeBanner } from './upgrade-banner';
+import { ToastHost } from './ui/toast';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -40,6 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <main className="flex-1 overflow-hidden">{children}</main>
             </div>
           </div>
+          <ToastHost />
         </LoginGate>
       </Providers>
     </>

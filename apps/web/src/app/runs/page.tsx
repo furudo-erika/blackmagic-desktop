@@ -13,6 +13,7 @@ import {
   DetailDrawer,
   Button,
 } from '../../components/ui/primitives';
+import { SkeletonList } from '../../components/ui/skeleton';
 
 function timeAgo(iso: string | undefined): string {
   if (!iso) return '';
@@ -159,9 +160,7 @@ export default function RunsPage() {
           icon={History}
         />
         <div className="flex-1 overflow-y-auto px-6 py-6">
-          {runs.isLoading && (
-            <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>
-          )}
+          {runs.isLoading && <SkeletonList count={3} />}
           {!runs.isLoading && list.length === 0 && (
             <EmptyState
               icon={History}
