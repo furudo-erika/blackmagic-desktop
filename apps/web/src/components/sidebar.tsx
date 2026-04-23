@@ -48,10 +48,13 @@ import {
   Wrench,
   ChevronRight,
   Search as SearchIcon,
+  Target,
+  MessageCircle,
+  Eye,
+  UserPlus,
   type LucideIcon,
 } from 'lucide-react';
 import { api, type Project } from '../lib/api';
-import { AgentIcon, hasAgentTheme } from './agent-icon';
 
 // Icon string (from agent frontmatter `icon:`) → lucide component.
 // Mirrors the names seeded in daemon/src/vault.ts DEFAULT_AGENTS. Falls
@@ -69,6 +72,31 @@ const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   Send,
   Search: SearchIcon,
   Sparkles,
+  Target,
+  MessageCircle,
+  Eye,
+  UserPlus,
+};
+
+// Per-slug override when the frontmatter `icon:` is missing or wrong.
+// Ensures every seeded agent shows a distinct, thematic Lucide glyph
+// in the sidebar rather than defaulting to a generic Bot.
+const AGENT_SLUG_ICON: Record<string, LucideIcon> = {
+  'company-profiler':    Sparkles,
+  'researcher':          SearchIcon,
+  'sdr':                 Send,
+  'ae':                  Briefcase,
+  'website-visitor':     Globe,
+  'linkedin-outreach':   Linkedin,
+  'meeting-prep':        CalendarClock,
+  'lookalike-discovery': Copy,
+  'closed-lost-revival': RotateCcw,
+  'pipeline-ops':        Activity,
+  'geo-analyst':         Radar,
+  'outbound':            Target,
+  'brand-monitor':       Eye,
+  'content-studio':      Sparkles,
+  'x-account':           MessageCircle,
 };
 
 export function Sidebar() {
@@ -221,7 +249,7 @@ export function Sidebar() {
           agents={teamAgents.data ?? []}
           liveSlugs={liveAgentSlugs}
         />
-        <NavRow icon={Zap}             label="Scheduled" href="/triggers"  pathname={pathname} />
+        <NavRow icon={Zap}             label="Triggers"  href="/triggers"  pathname={pathname} />
 
         <SectionLabel>Data</SectionLabel>
         <NavRow icon={Building2}       label="Companies" href="/companies" pathname={pathname} />
@@ -304,10 +332,9 @@ function AgentsSidebarRow({
   const inside = pathname.startsWith('/agents');
   const search = useSearchParams();
   const activeSlug = search.get('slug') ?? '';
-  // Default collapsed so the roster doesn't bleed visually into the
-  // Data section below — opens automatically when you navigate into
-  // /agents, or on manual click.
-  const [open, setOpen] = useState<boolean>(inside);
+  // Agents are the product's first-class citizens — default expanded
+  // so a cold-start user sees the full roster at a glance.
+  const [open, setOpen] = useState<boolean>(true);
   useEffect(() => { if (inside) setOpen(true); }, [inside]);
   return (
     <div>
@@ -342,7 +369,12 @@ function AgentsSidebarRow({
             <li className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">no agents</li>
           )}
           {agents.map((a) => {
-            const FallbackIcon = AGENT_ICON_MAP[a.icon] ?? Bot;
+            // Prefer an explicit per-slug Lucide glyph, then the frontmatter
+            // icon: field, then a generic Bot. The previous mix of monogram
+            // tiles + Lucide icons looked inconsistent in a single list —
+            // every row now uses the same visual treatment.
+            const Icon =
+              AGENT_SLUG_ICON[a.slug] ?? AGENT_ICON_MAP[a.icon] ?? Bot;
             const active = inside && activeSlug === a.slug;
             const isLive = liveSlugs.has(a.slug.toLowerCase());
             return (
@@ -361,11 +393,7 @@ function AgentsSidebarRow({
                       : 'text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
                   }
                 >
-                  {hasAgentTheme(a.slug) ? (
-                    <AgentIcon slug={a.slug} name={a.name} size="sm" className="!w-4 !h-4" />
-                  ) : (
-                    <FallbackIcon className={'w-3 h-3 shrink-0 ' + (active ? 'text-flame' : 'text-muted dark:text-[#8C837C]')} />
-                  )}
+                  <Icon className={'w-3.5 h-3.5 shrink-0 ' + (active ? 'text-flame' : 'text-muted dark:text-[#8C837C]')} />
                   <span className="truncate flex-1">{a.name}</span>
                   {isLive && (
                     <span className="relative flex h-1.5 w-1.5 shrink-0">

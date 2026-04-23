@@ -9,6 +9,19 @@ All notable changes to BlackMagic AI. Dates in UTC.
   clipped the brew log after ~5 lines. Bumped to 760×620 and made
   it resizable (min 560×420) so the full `==> Upgrading / Backing /
   Moving / Purging` trace is visible without a Reveal-log detour.
+- **Sidebar Agents row back to default-expanded.** Reverted the 0.5.3
+  collapse-by-default — agents are first-class in this product and
+  should be visible on cold start. The earlier "mixed with dashboard"
+  complaint was about the Home page, not the sidebar.
+- **Sidebar "Scheduled" mislabeled.** Route is `/triggers` and the
+  underlying model is triggers (cron / webhook / file-watch). Renamed
+  the sidebar label to match.
+- **Agent icons inconsistent in the sidebar.** Half the rows rendered
+  as monogram tiles (CP, GA, LA…), the other half as Lucide glyphs,
+  and a few (Outbound, Brand Monitor, Content Studio, X Account)
+  fell through to a generic Bot icon because their frontmatter `icon:`
+  names weren't in the map. Now every row uses a distinct thematic
+  Lucide glyph via a per-slug override table.
 
 ## 0.5.4 — 2026-04-23
 
