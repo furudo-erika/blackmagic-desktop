@@ -26,7 +26,8 @@ export type IntegrationProvider =
   | 'ghost'
   | 'wordpress'
   | 'rb2b'
-  | 'google_calendar';
+  | 'google_calendar'
+  | 'x';
 
 export type Integration = {
   provider: IntegrationProvider;

@@ -32,14 +32,15 @@ export type IntegrationProvider =
   | 'ghost'
   | 'wordpress'
   | 'rb2b'
-  | 'google_calendar';
+  | 'google_calendar'
+  | 'x';
 
 export const PROVIDERS: IntegrationProvider[] = [
   'hubspot', 'attio', 'salesforce', 'pipedrive', 'gong', 'unipile', 'slack', 'gmail',
   'google_calendar',
   'feishu', 'metabase', 'supabase',
   'calcom', 'discord', 'telegram', 'notion', 'linear', 'github', 'stripe',
-  'apify', 'amazon_ses',
+  'x', 'amazon_ses',
   'gsc', 'google_analytics', 'ghost', 'wordpress', 'rb2b',
 ];
 
@@ -129,6 +130,16 @@ const ENV_MAPPING: Record<IntegrationProvider, Record<string, string>> = {
     access_token:  'GOOGLE_CALENDAR_ACCESS_TOKEN',
     refresh_token: 'GOOGLE_CALENDAR_REFRESH_TOKEN',
     calendar_id:   'GOOGLE_CALENDAR_ID',
+  },
+  // X (formerly Twitter) — v2 API with OAuth 2.0 user-context access
+  // token for posting tweets + reading mentions + searching recent
+  // tweets. User pastes the bundle from developer.x.com/en/portal.
+  // Required scopes: tweet.read tweet.write users.read.
+  x: {
+    bearer_token:  'X_BEARER_TOKEN',
+    access_token:  'X_ACCESS_TOKEN',
+    user_id:       'X_USER_ID',
+    handle:        'X_HANDLE',
   },
 };
 

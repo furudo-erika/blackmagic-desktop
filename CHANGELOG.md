@@ -2,6 +2,32 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.4.89 — 2026-04-23
+
+### Added
+- **X (Twitter) integration.** BYOK bearer token + OAuth 2.0 user
+  access token. New card under a fresh "Social" group in
+  Integrations. Daemon ships 4 new tools:
+  `x_post_tweet` (≤280 char guard + reply/quote modes),
+  `x_search_tweets` (v2 recent search, 7-day window),
+  `x_list_mentions` (since-id for incremental sweeps),
+  `x_user_timeline` (resolve handle → pull competitor tweets).
+- **X Account Agent (#15).** Mirrors the Apidog in-house Twitter
+  strategy: 4 content pillars, 1–2 originals + ≤5 replies/day,
+  drafts to `drafts/x-<date>-<slug>.md` by default (autopost opt-in
+  via `us/x/config.md`). Classifies every tweet it sees into
+  OPPORTUNITY / COMPLAINT / PRAISE / IGNORE. Watches competitors
+  via `x_user_timeline`. Self-schedules with `trigger_create`.
+- **X logo** on the blackmagic-web integrations grid.
+
+### Removed
+- **Apify card** from both the desktop Integrations page and the
+  marketing-site integrations grid. Apify scraping is no longer
+  BYOK — it goes through the platform-billed API (credit-fee
+  model), so forcing users to paste their own token was misleading.
+  The `apify` integration type is still recognised for legacy
+  installations but hidden from the UI.
+
 ## 0.4.88 — 2026-04-23
 
 ### Added

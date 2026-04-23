@@ -3635,6 +3635,188 @@ const enrich_score_route: ToolDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// X (Twitter) — v2 API with OAuth 2.0 user access token. Required scopes:
+// tweet.read tweet.write users.read. Credentials:
+//   bearer_token   — app-only auth, used for search + user lookup
+//   access_token   — user-context OAuth 2.0 token, required to post/reply
+//   user_id        — numeric id of the authenticated account (cached)
+//   handle         — display-only ("@apidogHQ")
+// ---------------------------------------------------------------------------
+async function xCreds(): Promise<{
+  bearer: string; access: string; userId?: string; handle?: string;
+}> {
+  const creds = await readIntegrationCreds('x');
+  if (!creds) throw new Error('No X connection. Connect in sidebar → Integrations → X (Twitter).');
+  const bearer = creds.bearer_token;
+  const access = creds.access_token;
+  if (!bearer || !access) {
+    throw new Error('X credentials missing bearer_token or access_token. Reconnect X.');
+  }
+  return { bearer, access, userId: creds.user_id, handle: creds.handle };
+}
+
+const x_post_tweet: ToolDef = {
+  name: 'x_post_tweet',
+  description:
+    'Post a tweet from the connected X account. Keep it ≤ 280 chars. Pass `reply_to_tweet_id` to reply, or `quote_tweet_id` to quote. Requires the access_token (OAuth 2.0 user context) — bearer-only auth cannot post.',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string' },
+      reply_to_tweet_id: { type: 'string' },
+      quote_tweet_id: { type: 'string' },
+    },
+    required: ['text'],
+  },
+  handler: async (args) => {
+    const { access } = await xCreds();
+    if (String(args.text).length > 280) {
+      return { ok: false, error: `Tweet too long: ${String(args.text).length} > 280` };
+    }
+    const body: any = { text: args.text };
+    if (args.reply_to_tweet_id) body.reply = { in_reply_to_tweet_id: args.reply_to_tweet_id };
+    if (args.quote_tweet_id) body.quote_tweet_id = args.quote_tweet_id;
+    const r = await fetch('https://api.x.com/2/tweets', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await r.text();
+    if (!r.ok) return { ok: false, status: r.status, error: text.slice(0, 500) };
+    try {
+      const data = JSON.parse(text);
+      return { ok: true, data: { id: data.data?.id, text: data.data?.text } };
+    } catch {
+      return { ok: false, error: 'X returned non-JSON', raw: text.slice(0, 500) };
+    }
+  },
+};
+
+const x_search_tweets: ToolDef = {
+  name: 'x_search_tweets',
+  description:
+    'Search X for recent tweets (last 7 days) matching a v2-syntax query — e.g. `apidog -is:retweet lang:en`, `from:getpostman apidog`, `(apidog OR postman) -is:reply`. Returns id / text / author / created_at / public_metrics per hit.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' },
+      max: { type: 'number', description: 'Max tweets (default 25, cap 100)' },
+    },
+    required: ['query'],
+  },
+  handler: async (args) => {
+    const { bearer } = await xCreds();
+    const max = Math.min(Math.max(Number(args.max ?? 25), 10), 100);
+    const params = new URLSearchParams({
+      query: args.query,
+      max_results: String(max),
+      'tweet.fields': 'created_at,public_metrics,author_id,conversation_id',
+      expansions: 'author_id',
+      'user.fields': 'username,name,verified',
+    });
+    const r = await fetch(`https://api.x.com/2/tweets/search/recent?${params}`, {
+      headers: { Authorization: `Bearer ${bearer}` },
+    });
+    if (!r.ok) return { ok: false, status: r.status, error: (await r.text()).slice(0, 500) };
+    const data = (await r.json()) as any;
+    const users = new Map<string, any>(
+      (data.includes?.users ?? []).map((u: any) => [u.id, u]),
+    );
+    const tweets = (data.data ?? []).map((t: any) => ({
+      id: t.id,
+      text: t.text,
+      created_at: t.created_at,
+      author: users.get(t.author_id),
+      metrics: t.public_metrics,
+      conversation_id: t.conversation_id,
+    }));
+    return { ok: true, count: tweets.length, data: tweets };
+  },
+};
+
+const x_list_mentions: ToolDef = {
+  name: 'x_list_mentions',
+  description:
+    'List recent tweets mentioning the connected account (@handle). Pass `since_id` to get only mentions newer than a given tweet id. Returns id / text / author / created_at / metrics.',
+  parameters: {
+    type: 'object',
+    properties: {
+      since_id: { type: 'string' },
+      max: { type: 'number', description: 'Max mentions (default 50, cap 100)' },
+    },
+    required: [],
+  },
+  handler: async (args) => {
+    const { bearer, userId } = await xCreds();
+    if (!userId) return { ok: false, error: 'X credentials missing user_id. Reconnect.' };
+    const max = Math.min(Math.max(Number(args.max ?? 50), 5), 100);
+    const params = new URLSearchParams({
+      max_results: String(max),
+      'tweet.fields': 'created_at,public_metrics,author_id,conversation_id,in_reply_to_user_id',
+      expansions: 'author_id',
+      'user.fields': 'username,name,verified',
+    });
+    if (args.since_id) params.set('since_id', args.since_id);
+    const r = await fetch(
+      `https://api.x.com/2/users/${encodeURIComponent(userId)}/mentions?${params}`,
+      { headers: { Authorization: `Bearer ${bearer}` } },
+    );
+    if (!r.ok) return { ok: false, status: r.status, error: (await r.text()).slice(0, 500) };
+    const data = (await r.json()) as any;
+    const users = new Map<string, any>(
+      (data.includes?.users ?? []).map((u: any) => [u.id, u]),
+    );
+    const mentions = (data.data ?? []).map((t: any) => ({
+      id: t.id,
+      text: t.text,
+      created_at: t.created_at,
+      author: users.get(t.author_id),
+      metrics: t.public_metrics,
+      conversation_id: t.conversation_id,
+    }));
+    return { ok: true, count: mentions.length, data: mentions };
+  },
+};
+
+const x_user_timeline: ToolDef = {
+  name: 'x_user_timeline',
+  description:
+    'Pull recent tweets from a specific X user (by @handle). Use for competitor monitoring — e.g. what did @getpostman tweet in the last 24h.',
+  parameters: {
+    type: 'object',
+    properties: {
+      handle: { type: 'string', description: '@handle, with or without leading @' },
+      max: { type: 'number', description: 'Max tweets (default 10, cap 100)' },
+    },
+    required: ['handle'],
+  },
+  handler: async (args) => {
+    const { bearer } = await xCreds();
+    const handle = String(args.handle).replace(/^@/, '');
+    const max = Math.min(Math.max(Number(args.max ?? 10), 5), 100);
+    const u = await fetch(`https://api.x.com/2/users/by/username/${encodeURIComponent(handle)}`, {
+      headers: { Authorization: `Bearer ${bearer}` },
+    });
+    if (!u.ok) return { ok: false, status: u.status, error: (await u.text()).slice(0, 500) };
+    const udata = (await u.json()) as any;
+    const uid = udata.data?.id;
+    if (!uid) return { ok: false, error: `Unknown handle: @${handle}` };
+    const params = new URLSearchParams({
+      max_results: String(max),
+      'tweet.fields': 'created_at,public_metrics',
+      exclude: 'retweets,replies',
+    });
+    const r = await fetch(
+      `https://api.x.com/2/users/${uid}/tweets?${params}`,
+      { headers: { Authorization: `Bearer ${bearer}` } },
+    );
+    if (!r.ok) return { ok: false, status: r.status, error: (await r.text()).slice(0, 500) };
+    const data = (await r.json()) as any;
+    return { ok: true, count: (data.data ?? []).length, data: data.data ?? [], user: udata.data };
+  },
+};
+
 export const BUILTIN_TOOLS: ToolDef[] = [
   notify,
   trigger_create,
@@ -3724,6 +3906,10 @@ export const BUILTIN_TOOLS: ToolDef[] = [
   gcal_list_events,
   gcal_create_event,
   gcal_delete_event,
+  x_post_tweet,
+  x_search_tweets,
+  x_list_mentions,
+  x_user_timeline,
 ];
 
 export function allTools(): ToolDef[] {

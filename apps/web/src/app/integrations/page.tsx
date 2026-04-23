@@ -96,6 +96,9 @@ const BRAND_PATHS: Record<IntegrationProvider, string> = {
   // Google-trademarked logo.
   google_calendar:
     'M4 4h3V2h2v2h6V2h2v2h3a1 1 0 011 1v16a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1zm0 6v11h16V10H4zm3 2h4v4H7v-4z',
+  // X — official post-rebrand mark (sharp 𝕏 from Simple Icons).
+  x:
+    'M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z',
 };
 
 function BrandLogo({ provider, color }: { provider: IntegrationProvider; color: string }) {
@@ -208,6 +211,18 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    label: 'Social',
+    providers: [
+      {
+        provider: 'x',
+        name: 'X (Twitter)',
+        description: 'Post tweets, read mentions, search recent tweets, monitor competitor accounts. Paste the bearer token + OAuth 2.0 user access token from developer.x.com — scopes `tweet.read tweet.write users.read`. Feeds the X Account Agent (drafts tweets, flags reply opportunities).',
+        oauth: false,
+        brandColor: '#000000',
+      },
+    ],
+  },
+  {
     label: 'Scheduling',
     providers: [
       {
@@ -266,18 +281,6 @@ const GROUPS: Group[] = [
         description: 'Read customers, subscriptions, and invoices. Trigger refunds via a restricted key.',
         oauth: false,
         brandColor: '#635BFF',
-      },
-    ],
-  },
-  {
-    label: 'Scraping',
-    providers: [
-      {
-        provider: 'apify',
-        name: 'Apify',
-        description: 'Run actors for Google/Reddit/X scraping. Outreach pipelines pull leads through Apify instead of hitting each site directly.',
-        oauth: false,
-        brandColor: '#00B04F',
       },
     ],
   },
@@ -553,7 +556,7 @@ function IntegrationCard({
           <textarea
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            rows={def.provider === 'amazon_ses' || def.provider === 'gsc' || def.provider === 'google_analytics' ? 8 : 3}
+            rows={def.provider === 'amazon_ses' || def.provider === 'gsc' || def.provider === 'google_analytics' || def.provider === 'x' ? 8 : 3}
             placeholder={
               def.provider === 'amazon_ses'
                 ? '{\n  "access_key_id": "AKIA…",\n  "secret_access_key": "…",\n  "region": "us-east-1",\n  "from": "Lynn <lynn@inc.apidog.com>"\n}'
@@ -561,13 +564,13 @@ function IntegrationCard({
                   ? '{\n  "service_account_json": "<paste the whole JSON key file>",\n  "site_url": "sc-domain:example.com"\n}'
                   : def.provider === 'google_analytics'
                     ? '{\n  "service_account_json": "<paste the whole JSON key file>",\n  "property_id": "123456789"\n}'
-                    : def.provider === 'ghost'
-                    ? 'GHOST_ADMIN_API_KEY format: <id>:<secret>'
-                    : def.provider === 'wordpress'
-                      ? 'wpuser:xxxx xxxx xxxx xxxx xxxx xxxx'
-                      : def.provider === 'apify'
-                        ? 'apify_api_…'
-                        : 'Paste API token'
+                    : def.provider === 'x'
+                      ? '{\n  "bearer_token": "AAAA…",\n  "access_token": "<OAuth 2.0 user access token>",\n  "user_id": "123456789",\n  "handle": "apidogHQ"\n}'
+                      : def.provider === 'ghost'
+                        ? 'GHOST_ADMIN_API_KEY format: <id>:<secret>'
+                        : def.provider === 'wordpress'
+                          ? 'wpuser:xxxx xxxx xxxx xxxx xxxx xxxx'
+                          : 'Paste API token'
             }
             className="resize-none bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-3 py-2 text-xs font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
           />
