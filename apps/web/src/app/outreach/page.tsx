@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Send, Mail, Pencil, Check, X } from 'lucide-react';
+import { Send, Mail, Pencil, Check, X, Search } from 'lucide-react';
 import {
   PageShell,
   PageHeader,
@@ -100,7 +100,30 @@ export default function OutreachPage() {
     },
   });
 
-  const items = drafts.data ?? [];
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'sent' | 'approved' | 'rejected'>('all');
+
+  const all = drafts.data ?? [];
+  const items = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return all.filter((d) => {
+      if (statusFilter !== 'all' && d.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        d.to.toLowerCase().includes(q) ||
+        (d.subject ?? '').toLowerCase().includes(q) ||
+        d.body.toLowerCase().includes(q) ||
+        d.channel.toLowerCase().includes(q) ||
+        (d.tool ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [all, query, statusFilter]);
+
+  const counts = useMemo(() => {
+    const c = { all: all.length, pending: 0, sent: 0, approved: 0, rejected: 0 } as Record<string, number>;
+    for (const d of all) c[d.status] = (c[d.status] ?? 0) + 1;
+    return c;
+  }, [all]);
 
   return (
     <PageShell>
@@ -140,12 +163,52 @@ export default function OutreachPage() {
         {drafts.isLoading && <div className="text-sm text-muted dark:text-[#8C837C]">loading…</div>}
         {drafts.error && <div className="text-sm text-flame">{(drafts.error as Error).message}</div>}
 
-        {!drafts.isLoading && !drafts.error && items.length === 0 && (
+        {/* Search + status filter. Skipped when there are zero drafts
+            so the empty-state isn't crowded by controls that can't
+            filter anything. */}
+        {all.length > 0 && (
+          <div className="mb-3 flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted dark:text-[#8C837C] pointer-events-none" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search to, subject, body, channel, tool…"
+                className="w-full h-8 pl-8 pr-2 rounded-md border border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] text-[12px] text-ink dark:text-[#E6E0D8] placeholder:text-muted dark:placeholder:text-[#6B625C]"
+              />
+            </div>
+            <div className="flex items-center gap-1 text-[11px] font-mono">
+              {(['all', 'pending', 'sent', 'approved', 'rejected'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatusFilter(s)}
+                  className={
+                    'px-2 py-1 rounded-md border transition-colors ' +
+                    (statusFilter === s
+                      ? 'border-flame text-flame bg-flame/10'
+                      : 'border-line dark:border-[#2A241D] text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]')
+                  }
+                >
+                  {s} {counts[s] ?? 0}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!drafts.isLoading && !drafts.error && all.length === 0 && (
           <EmptyState
             icon={Mail}
             title="No drafts yet."
             hint="Ask the chat agent to draft an email or LinkedIn DM, or enroll a contact in a sequence. Drafts land here for approve/reject."
           />
+        )}
+        {!drafts.isLoading && !drafts.error && all.length > 0 && items.length === 0 && (
+          <div className="text-sm text-muted dark:text-[#8C837C] px-1">
+            No drafts match. Clear the filter or search to see all {all.length}.
+          </div>
         )}
 
         {items.length > 0 && (

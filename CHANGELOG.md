@@ -2,6 +2,24 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.24 — 2026-04-24
+
+### Added
+- **Search + status filter on /outreach.** Drafts piled up
+  fast once auto-send was wired; the raw list was unusable
+  past a few dozen. The page now has a search box (matches
+  against to/subject/body/channel/tool) and one-click pills
+  for `all / pending / sent / approved / rejected` with live
+  counts.
+
+### Fixed
+- **Toasts no longer hang around forever.** The auto-dismiss
+  timer was keyed on the inline `onDismiss` prop, which is a
+  fresh reference every render — a sibling toast push or any
+  parent re-render inside the 4-second window restarted the
+  timer, leaving surviving pills on screen indefinitely. The
+  timer mounts once now and actually fires.
+
 ## 0.5.23 — 2026-04-24
 
 ### Changed

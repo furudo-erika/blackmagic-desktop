@@ -8,7 +8,7 @@
  * Mounted once in AppShell; pages don't need a provider.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { create } from 'zustand';
 import { Check, X, AlertTriangle } from 'lucide-react';
 
@@ -52,10 +52,17 @@ export function ToastHost() {
 }
 
 function ToastPill({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) {
+  // Pin onDismiss through a ref + empty-dep effect. Otherwise the inline
+  // `() => dismiss(t.id)` prop from ToastHost is a fresh reference on
+  // every render, which resets the auto-dismiss timer — a new toast
+  // push or a surrounding re-render inside the 4s window keeps the
+  // surviving pills alive forever.
+  const dismissRef = useRef(onDismiss);
+  dismissRef.current = onDismiss;
   useEffect(() => {
-    const h = setTimeout(onDismiss, 4000);
+    const h = setTimeout(() => dismissRef.current(), 4000);
     return () => clearTimeout(h);
-  }, [onDismiss]);
+  }, []);
   const Icon = item.kind === 'success' ? Check : item.kind === 'error' ? AlertTriangle : Check;
   const color =
     item.kind === 'success'
