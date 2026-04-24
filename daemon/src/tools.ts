@@ -292,9 +292,16 @@ ${args.body}
 `;
     await writeContextFile(relPath, content);
 
-    // Resolve auto-send: explicit args.auto > global setting > pending.
+    // Resolve auto-send. Either signal is enough: the global toggle at
+    // /outreach means "send everything", and explicit `auto: true` from a
+    // skill bypasses the gate independently. Agents routinely pass
+    // `auto: false` in their draft_create calls (inherited from older
+    // "approval-gated" prompt boilerplate); that used to hard-override
+    // the global toggle and silently leave drafts pending even with
+    // auto-send ON. Now `auto: false` only means "I don't want to force
+    // send" — it no longer suppresses the user's own toggle.
     let auto = args.auto === true;
-    if (args.auto !== true && args.auto !== false) {
+    if (!auto) {
       try {
         const fs = await import('node:fs/promises');
         const pathMod = await import('node:path');

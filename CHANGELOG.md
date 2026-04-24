@@ -2,6 +2,18 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.22 — 2026-04-24
+
+### Fixed
+- **Global auto-send toggle actually auto-sends.** Agents
+  routinely pass `auto: false` to `draft_create` (inherited
+  from "approval-gated" prompt boilerplate). The old resolver
+  treated the explicit arg as a hard override, silently
+  pinning drafts to `pending` even when the user had
+  `/outreach` → auto-send ON. Either signal is now enough:
+  global toggle OR `auto: true` — explicit `false` no longer
+  suppresses the user's own setting.
+
 ## 0.5.21 — 2026-04-24
 
 ### Fixed
