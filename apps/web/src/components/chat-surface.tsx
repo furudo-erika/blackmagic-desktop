@@ -21,7 +21,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Send, Bot, Check, Loader2, AlertCircle, Copy as CopyIcon, Sparkles,
-  // Per-agent icons — matches the slugs seeded in daemon/src/vault.ts.
+  // Per-agent icons — matches the slugs seeded in daemon/src/context.ts.
   Search, Briefcase, Globe, Linkedin, CalendarClock, Copy as CopyTwin, RotateCcw,
   Activity, Radar, type LucideIcon,
 } from 'lucide-react';
@@ -92,7 +92,7 @@ function extractToolParts(data: any): { primary?: string; tail?: string } {
 }
 
 // Map an agent's frontmatter `icon:` name to the real lucide component.
-// Mirrors daemon/src/vault.ts DEFAULT_AGENTS where each agent ships an
+// Mirrors daemon/src/context.ts DEFAULT_AGENTS where each agent ships an
 // icon name like `Radar` / `Globe` / `Linkedin` — this is the renderer
 // side of that contract.
 const AGENT_ICONS: Record<string, LucideIcon> = {
@@ -246,7 +246,7 @@ export function ChatSurface({
   const agentOptions = useQuery({
     queryKey: ['chat-agent-options'],
     queryFn: async () => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
       );
@@ -288,7 +288,7 @@ export function ChatSurface({
   });
 
   // When the caller didn't pass explicit scenarios but an agent is active,
-  // pull that agent's starter_prompts from its vault file and surface them
+  // pull that agent's starter_prompts from its context file and surface them
   // as click-to-run scenario cards. Falls back to a single "Run X end-to-
   // end" starter so every agent has at least one obvious move.
   const derivedScenarios: ChatScenario[] = (() => {
@@ -776,10 +776,10 @@ function MessageFooter({ content }: { content: string }) {
 
 // ---------------------------------------------------------------------------
 // Onboarding banner — promotes the Company Profiler above the agent gallery
-// with a one-click "Run now" CTA. Dismissed state persists per-vault in
+// with a one-click "Run now" CTA. Dismissed state persists per-context in
 // localStorage so it doesn't badger the user after they've profiled once.
 // Renders only when:
-//   - a `pin: first` agent exists in the vault (Company Profiler by
+//   - a `pin: first` agent exists in the context (Company Profiler by
 //     convention seeded by the daemon)
 //   - the user hasn't dismissed the banner
 //   - the banner hasn't been dismissed by "Run now" completing before
@@ -807,7 +807,7 @@ function ProfilerOnboardingBanner({
   const Icon = AGENT_ICONS[pinned.icon] ?? Sparkles;
   const prompt =
     pinned.starterPrompts?.[0] ||
-    `You are the ${pinned.name}. Profile my company end-to-end — crawl the domain + docs, infer the ICP, competitors, voice, and populate the \`us/\` tree. This is the first thing to run on a fresh vault; every other agent reads from \`us/\` so this kicks everything off.`;
+    `You are the ${pinned.name}. Profile my company end-to-end — crawl the domain + docs, infer the ICP, competitors, voice, and populate the \`us/\` tree. This is the first thing to run on a fresh context; every other agent reads from \`us/\` so this kicks everything off.`;
   return (
     <div className="relative bg-gradient-to-br from-flame/10 to-flame/5 border border-flame/40 rounded-xl p-5 flex items-start gap-4">
       <div className="w-10 h-10 rounded-lg bg-flame/20 flex items-center justify-center shrink-0">

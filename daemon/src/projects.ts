@@ -1,8 +1,8 @@
-// Projects registry. Lives at <homeVault>/.bm/projects.json. Lists all known
-// project vaults and which one is currently active.
+// Projects registry. Lives at <homeContext>/.bm/projects.json. Lists all known
+// project contexts and which one is currently active.
 //
-// The "home vault" is always the default ~/BlackMagic folder — it holds the
-// registry even when the active vault points elsewhere. This keeps the
+// The "home context" is always the default ~/BlackMagic folder — it holds the
+// registry even when the active context points elsewhere. This keeps the
 // registry location stable across switches.
 
 import fs from 'node:fs/promises';
@@ -10,7 +10,7 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import matter from 'gray-matter';
-import { homeVault, setVaultRoot, getVaultRoot } from './paths.js';
+import { homeContext, setContextRoot, getContextRoot } from './paths.js';
 import { seedVercelDemo, seedVercelRuntime } from './us-demo.js';
 
 export interface Project {
@@ -29,7 +29,7 @@ export interface ProjectsRegistry {
 }
 
 function registryPath(): string {
-  return path.join(homeVault(), '.bm', 'projects.json');
+  return path.join(homeContext(), '.bm', 'projects.json');
 }
 
 function slugify(s: string): string {
@@ -59,13 +59,13 @@ async function writeRegistry(reg: ProjectsRegistry): Promise<void> {
 }
 
 // Called once at daemon startup. Reads (or seeds) the registry and sets the
-// active vault root. Returns the current registry.
+// active context root. Returns the current registry.
 export async function initProjectsRegistry(): Promise<ProjectsRegistry> {
   let reg = await readRegistry();
 
   if (!reg || reg.projects.length === 0) {
     // Fresh install: bootstrap a Vercel demo project instead of an
-    // empty "Default" vault. First-run users see the app populated
+    // empty "Default" context. First-run users see the app populated
     // with a realistic company profile + past agent runs, drafts,
     // and chat threads — the product looks alive immediately instead
     // of greeting them with a wall of zeros. Users can add their own
@@ -75,10 +75,10 @@ export async function initProjectsRegistry(): Promise<ProjectsRegistry> {
     const vercelProject: Project = { id: 'vercel', name: 'Vercel', path: vercelPath };
     reg = { active: vercelProject.id, projects: [vercelProject] };
     await writeRegistry(reg);
-    // Seed demo content under the new vault root. ensureVault() in
-    // vault.ts handles agent/skeleton seeding on its own pass; the
+    // Seed demo content under the new context root. ensureContext() in
+    // context.ts handles agent/skeleton seeding on its own pass; the
     // us/ pack + runtime runs/drafts/chats are owned by us-demo.
-    setVaultRoot(vercelPath);
+    setContextRoot(vercelPath);
     try { await seedVercelDemo(vercelPath); } catch {}
     try { await seedVercelRuntime(vercelPath); } catch {}
   }
@@ -92,7 +92,7 @@ export async function initProjectsRegistry(): Promise<ProjectsRegistry> {
     await writeRegistry(reg);
   }
 
-  setVaultRoot(active.path);
+  setContextRoot(active.path);
   return reg;
 }
 
@@ -104,8 +104,8 @@ export async function getRegistry(): Promise<ProjectsRegistry> {
 
 // Per-project cache for the logo_url parsed from <project>/us/company.md.
 // A 60s TTL keeps the list endpoint snappy — the frontmatter only changes
-// once per enrichment run and this file sits outside the active vault so
-// we can't rely on the vault watcher.
+// once per enrichment run and this file sits outside the active context so
+// we can't rely on the context watcher.
 const logoCache = new Map<string, { logo?: string; expires: number }>();
 const LOGO_TTL_MS = 60_000;
 
@@ -172,15 +172,15 @@ function uniqueId(reg: ProjectsRegistry, base: string): string {
   return id;
 }
 
-// Set a project active. Mutates the live VAULT_ROOT so subsequent requests
-// hit the new vault. Returns the registry.
+// Set a project active. Mutates the live CONTEXT_ROOT so subsequent requests
+// hit the new context. Returns the registry.
 export async function activateProject(id: string): Promise<ProjectsRegistry> {
   const reg = await getRegistry();
   const match = reg.projects.find((p) => p.id === id);
   if (!match) throw new Error(`unknown project: ${id}`);
   reg.active = id;
   await writeRegistry(reg);
-  setVaultRoot(match.path);
+  setContextRoot(match.path);
   return reg;
 }
 
@@ -202,8 +202,8 @@ export async function deleteProject(id: string): Promise<ProjectsRegistry> {
 
 // Quick utility so callers can surface the active project without re-reading
 // the registry.
-export function activeVaultPath(): string {
-  return getVaultRoot();
+export function activeContextPath(): string {
+  return getContextRoot();
 }
 
 // Sync check (used in rare places where we don't want await).

@@ -188,7 +188,7 @@ export default function OnboardingBootstrapPage() {
                   </pre>
                 )}
                 <div className="mt-3 flex items-center gap-2">
-                  <Link href="/vault?path=us%2Fcompany.md">
+                  <Link href="/context?path=us%2Fcompany.md">
                     <Button variant="primary" size="sm">
                       Review us/company.md <ArrowRight className="w-3 h-3" />
                     </Button>

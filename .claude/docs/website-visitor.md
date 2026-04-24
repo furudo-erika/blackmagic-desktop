@@ -2,7 +2,7 @@
 
 **Deanonymization pipeline.** Website visitor → qualified lead → draft.
 
-- Definition: `daemon/src/vault.ts` ≈ lines 620–657
+- Definition: `daemon/src/context.ts` ≈ lines 620–657
 - Model: `gpt-5.3-codex` · Temperature: 0.25 · Icon: `Globe`
 
 ## Purpose
@@ -21,7 +21,7 @@ enrich_company, enrich_contact,
 draft_create, enroll_contact_in_sequence
 ```
 
-## Vault I/O
+## Context I/O
 
 - Reads: `signals/visitors/<date>.json`, `us/icp.md`
 - Writes: `companies/<slug>.md`, `contacts/<company>/<name>.md`,

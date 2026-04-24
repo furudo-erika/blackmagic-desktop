@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * /org — vault structure as an expandable tree.
+ * /org — context structure as an expandable tree.
  *
  * paperclip's OrgChart shows agent reporting lines; our equivalent is the
- * shape of the vault itself. Every top-level directory becomes a root node
+ * shape of the context itself. Every top-level directory becomes a root node
  * with file counts; children are directories and .md files.
  *
  * Keeps the "everything is a file" story obvious and gives a compact
@@ -173,7 +173,7 @@ function TreeNode({
     // leaf file
     return (
       <Link
-        href={`/vault?path=${encodeURIComponent(node.path)}`}
+        href={`/context?path=${encodeURIComponent(node.path)}`}
         className="flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-cream-light dark:hover:bg-[#17140F] text-ink/90 dark:text-[#E6E0D8]/90 transition-colors"
         style={rowPad}
       >
@@ -244,7 +244,7 @@ function TreeNode({
 /* ---------- Page ---------- */
 
 export default function OrgPage() {
-  const tree = useQuery({ queryKey: ['vault-tree'], queryFn: api.vaultTree, staleTime: 30_000 });
+  const tree = useQuery({ queryKey: ['context-tree'], queryFn: api.contextTree, staleTime: 30_000 });
 
   // Expand top-level roots by default.
   const defaultExpanded = useMemo(() => {
@@ -280,7 +280,7 @@ export default function OrgPage() {
     <PageShell>
       <PageHeader
         title="Org tree"
-        subtitle="The shape of your vault. Everything the agent reads, writes, or indexes lives under one of these folders."
+        subtitle="The shape of your context. Everything the agent reads, writes, or indexes lives under one of these folders."
         icon={Network}
         trailing={
           <span className="text-[11px] font-mono text-muted dark:text-[#8C837C]">
@@ -299,7 +299,7 @@ export default function OrgPage() {
           {!tree.isLoading && roots.length === 0 && (
             <EmptyState
               icon={Network}
-              title="Empty vault."
+              title="Empty context."
               hint="Ask the chat to do something — companies, contacts, and deals will show up here as the agent writes them."
             />
           )}

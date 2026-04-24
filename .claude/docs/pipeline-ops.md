@@ -2,7 +2,7 @@
 
 **Weekly pipeline health.** Flags stalled deals + one recovery action each.
 
-- Definition: `daemon/src/vault.ts` ≈ lines 785–811
+- Definition: `daemon/src/context.ts` ≈ lines 785–811
 - Model: `gpt-5.3-codex` · Temperature: 0.2 · Icon: `Activity`
 
 ## Purpose
@@ -20,9 +20,9 @@ read_file, write_file, edit_file, list_dir, grep, draft_create
 ```
 
 No external tools — all signals the agent needs are already in the
-vault.
+context.
 
-## Vault I/O
+## Context I/O
 
 - Reads: `deals/open/*.md`, `sequences/*`, `drafts/*`
 - Writes: `signals/pipeline-health/<date>.md`
@@ -30,7 +30,7 @@ vault.
 
 ## Trigger
 
-- **`gtm-weekly-pipeline-health`** (`daemon/src/vault.ts` ≈ line 2227)
+- **`gtm-weekly-pipeline-health`** (`daemon/src/context.ts` ≈ line 2227)
   — cron `0 8 * * 1` (Mondays 08:00). Note this trigger fires the
   `revops-pipeline-health` playbook rather than the agent directly; the
   playbook ultimately calls this agent.

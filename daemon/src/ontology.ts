@@ -1,4 +1,4 @@
-// Build a graph of the vault:
+// Build a graph of the context:
 //   nodes  = each .md file with frontmatter (labeled by `kind`)
 //   edges  = derived from frontmatter fields that reference other files:
 //            - contacts/<co>/*.md `company: acme.com`  → companies/acme-com.md
@@ -11,8 +11,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { getVaultRoot } from './paths.js';
-import { walkTree, slugFromDomain } from './vault.js';
+import { getContextRoot } from './paths.js';
+import { walkTree, slugFromDomain } from './context.js';
 
 export interface OntoNode {
   id: string;
@@ -58,7 +58,7 @@ export async function buildOntology(): Promise<{ nodes: OntoNode[]; edges: OntoE
   const fmByPath = new Map<string, Record<string, any>>();
 
   for (const f of files) {
-    const abs = path.join(getVaultRoot(), f.path);
+    const abs = path.join(getContextRoot(), f.path);
     let raw = '';
     try {
       raw = await fs.readFile(abs, 'utf-8');

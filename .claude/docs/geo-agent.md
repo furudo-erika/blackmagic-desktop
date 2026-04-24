@@ -6,7 +6,7 @@ measure that every day, and show change over time.
 
 ## Who does what
 
-- **daemon** (`daemon/src/geo.ts`) — three upstream clients, vault-local
+- **daemon** (`daemon/src/geo.ts`) — three upstream clients, context-local
   storage, aggregation into reports. Knows nothing about upstream API keys.
   Only needs a `ck_` to auth against the proxy.
 - **blackmagic-web** (`src/app/api/agent-tools/[name]/route.ts`) — holds
@@ -14,7 +14,7 @@ measure that every day, and show change over time.
   handlers: `geo_chatgpt`, `geo_pplx`, `geo_ai_overview`. Charges credits on
   2xx upstream responses.
 - **apps/web `/geo`** (`apps/web/src/app/geo/page.tsx`) — dashboard.
-- **geo-analyst agent** (preset in `daemon/src/vault.ts`) — reads the stored
+- **geo-analyst agent** (preset in `daemon/src/context.ts`) — reads the stored
   runs, writes markdown reports into `signals/geo/weekly/` and alerts into
   `signals/geo/alerts/`.
 
@@ -45,7 +45,7 @@ Charged = retail × 1.1 → 8¢ / 2¢ / 2¢ per call. A 500-prompt × 3-model da
 sweep = 500 × (8+2+2) = 6000¢ = $60/day worst case. Daily user cap
 (`DEFAULT_DAILY_CAP_CENTS = 5000`) will block before that.
 
-## Storage (vault-local)
+## Storage (context-local)
 
 ```
 signals/geo/
@@ -121,7 +121,7 @@ absolutes are secondary.
   types), and the `BrandsEditor` form. Migration of existing
   `config.json` on users' machines is not automatic — consider a one-shot
   shim if you break shape.
-- **Agent prompt** — lives in `daemon/src/vault.ts` under
+- **Agent prompt** — lives in `daemon/src/context.ts` under
   `PRESET_AGENTS['geo-analyst.md']`. The tool list in its frontmatter gates
   which tools the agent can call; keep it in sync with `BUILTIN_TOOLS`
   entries.

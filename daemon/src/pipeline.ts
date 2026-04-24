@@ -1,25 +1,25 @@
 // E2E lead pipeline — deterministic scoring + rules-based routing, wired to
-// both the local md vault and every connected CRM.
+// both the local md context and every connected CRM.
 //
 // Shape of the pipeline: `enrich → score → route → sync`.
 //   • enrich: delegated to existing tools (enrich_company, apollo_*, etc.)
 //   • score:  reads us/market/icp.md frontmatter rubric, applies weighted
 //             criteria to a company/contact record, writes icp_score +
-//             icp_reasons to the vault file. No LLM in the loop — same
+//             icp_reasons to the context file. No LLM in the loop — same
 //             inputs produce the same score on every run.
 //   • route:  reads us/team/routing.md (owners table + rule stack), picks
 //             the first matching owner, writes assignee frontmatter to the
-//             vault file. Falls back to the default owner if no rule fires.
+//             context file. Falls back to the default owner if no rule fires.
 //   • sync:   pushes the final record to every CRM the user has connected
 //             (HubSpot, Attio, Salesforce, Pipedrive). Missing creds skip
-//             that target silently — the vault write is always authoritative.
+//             that target silently — the context write is always authoritative.
 //
 // Everything here is provider-agnostic. Tool handlers in tools.ts call into
 // these functions; the same functions back the /api/pipeline/run HTTP route
 // so UI buttons can trigger E2E without a chat turn.
 
 import matter from 'gray-matter';
-import { readVaultFile, writeVaultFile } from './vault.js';
+import { readContextFile, writeContextFile } from './context.js';
 
 export interface CompanyLike {
   domain: string;
@@ -156,7 +156,7 @@ export function evalWhen(when: Record<string, unknown>, record: Record<string, u
 
 export async function loadRubric(): Promise<Rubric> {
   try {
-    const f = await readVaultFile('us/market/icp.md');
+    const f = await readContextFile('us/market/icp.md');
     const fm = f.frontmatter ?? {};
     const rawRules = Array.isArray((fm as any).rubric) ? (fm as any).rubric : [];
     const rules: RubricRule[] = rawRules
@@ -237,7 +237,7 @@ export interface RoutingConfig {
 
 export async function loadRouting(): Promise<RoutingConfig> {
   try {
-    const f = await readVaultFile('us/team/routing.md');
+    const f = await readContextFile('us/team/routing.md');
     const fm = (f.frontmatter ?? {}) as any;
     const defaultOwner = fm.default?.owner ?? null;
     const rawRules = Array.isArray(fm.rules) ? fm.rules : [];
@@ -293,7 +293,7 @@ export function applyRouting(record: Record<string, unknown>, routing: RoutingCo
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Vault write — stamps frontmatter onto companies/<slug>.md (or contacts/…).
+// Context write — stamps frontmatter onto companies/<slug>.md (or contacts/…).
 // If the file doesn't exist yet we create it with a minimal stub, because the
 // normal flow is "enrich_company wrote nothing" → we still want a record.
 // ───────────────────────────────────────────────────────────────────────────
@@ -302,14 +302,14 @@ export function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'unnamed';
 }
 
-export async function stampVault(
+export async function stampContext(
   path: string,
   patch: Record<string, unknown>,
   bodyAppend?: string,
 ): Promise<void> {
   let current = '';
   try {
-    const f = await readVaultFile(path);
+    const f = await readContextFile(path);
     current = f.content ?? '';
   } catch {
     current = '';
@@ -318,5 +318,5 @@ export async function stampVault(
   const data = { ...(parsed.data as Record<string, unknown>), ...patch };
   const body = bodyAppend ? ((parsed.content ?? '').trimEnd() + '\n\n' + bodyAppend + '\n') : (parsed.content ?? '');
   const next = matter.stringify(body, data);
-  await writeVaultFile(path, next);
+  await writeContextFile(path, next);
 }

@@ -174,7 +174,7 @@ function AgentsInner() {
   const allAgents = useQuery({
     queryKey: ['agents-meta'],
     queryFn: async (): Promise<AgentMeta[]> => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
       );
@@ -460,7 +460,7 @@ function AgentsInner() {
                 {outputPaths.map((p) => (
                   <li key={p}>
                     <Link
-                      href={`/vault?path=${encodeURIComponent(p)}`}
+                      href={`/context?path=${encodeURIComponent(p)}`}
                       className="inline-flex items-center gap-1.5 text-[12px] font-mono text-flame hover:underline"
                     >
                       <FileOutput className="w-3 h-3" />

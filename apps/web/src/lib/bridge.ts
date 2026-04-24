@@ -6,7 +6,7 @@ declare global {
     bmBridge?: {
       daemonPort: number;
       daemonToken: string;
-      vaultPath: string;
+      contextPath: string;
       platform: string;
       appVersion?: string;
       openExternal?: (url: string) => void;
@@ -30,19 +30,19 @@ declare global {
 
 export function getBridge() {
   if (typeof window === 'undefined') {
-    return { daemonPort: 0, daemonToken: '', vaultPath: '', platform: 'web' };
+    return { daemonPort: 0, daemonToken: '', contextPath: '', platform: 'web' };
   }
   if (window.bmBridge && window.bmBridge.daemonPort) return window.bmBridge;
 
   const port = Number(localStorage.getItem('bm_daemon_port') || '0');
   const token = localStorage.getItem('bm_daemon_token') || '';
-  const vaultPath = localStorage.getItem('bm_vault_path') || '';
-  return { daemonPort: port, daemonToken: token, vaultPath, platform: 'web' };
+  const contextPath = localStorage.getItem('bm_context_path') || '';
+  return { daemonPort: port, daemonToken: token, contextPath, platform: 'web' };
 }
 
-export function setBridge(port: number, token: string, vaultPath = '') {
+export function setBridge(port: number, token: string, contextPath = '') {
   if (typeof window === 'undefined') return;
   localStorage.setItem('bm_daemon_port', String(port));
   localStorage.setItem('bm_daemon_token', token);
-  if (vaultPath) localStorage.setItem('bm_vault_path', vaultPath);
+  if (contextPath) localStorage.setItem('bm_context_path', contextPath);
 }

@@ -5,7 +5,7 @@
  * Names are deliberately descriptive, not mascot-style. Black Magic is
  * the agent platform; personas belong to adjacent products.
  *
- * Each agent maps 1:1 to a system-prompt file in the user's vault at
+ * Each agent maps 1:1 to a system-prompt file in the user's context at
  * ~/BlackMagic/agents/<slug>.md. The daemon reads those at run time.
  * A playbook names an agent via frontmatter `agent: <slug>`.
  */

@@ -2,12 +2,12 @@
 //
 // Replaces the Peec AI integration. Runs a pool of seed prompts daily across
 // ChatGPT, Perplexity, and (optionally) Google AI Overview via SerpAPI. Stores
-// raw responses + extracted citations under signals/geo/ in the vault, so the
+// raw responses + extracted citations under signals/geo/ in the context, so the
 // geo-analyst agent (and the /geo dashboard) can compute Share of Voice,
 // citation rank, cited-domain reports, and gap-source analysis without any
 // external reporting service.
 //
-// Files in vault:
+// Files in context:
 //   signals/geo/config.json          — brand + competitor definitions
 //   signals/geo/prompts.json         — seed prompt pool
 //   signals/geo/runs/<date>/<model>/<slug>.json
@@ -20,7 +20,7 @@
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
-import { getVaultRoot, type Config } from './paths.js';
+import { getContextRoot, type Config } from './paths.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,10 +90,10 @@ export interface GeoRunRecord {
 }
 
 // ---------------------------------------------------------------------------
-// Vault paths + file helpers
+// Context paths + file helpers
 // ---------------------------------------------------------------------------
 
-function geoRoot() { return path.join(getVaultRoot(), 'signals', 'geo'); }
+function geoRoot() { return path.join(getContextRoot(), 'signals', 'geo'); }
 function configPath() { return path.join(geoRoot(), 'config.json'); }
 function promptsPath() { return path.join(geoRoot(), 'prompts.json'); }
 function runsRoot() { return path.join(geoRoot(), 'runs'); }
@@ -431,7 +431,7 @@ export async function writeRun(rec: GeoRunRecord): Promise<string> {
   await fs.mkdir(dir, { recursive: true });
   const file = path.join(dir, `${slugify(rec.prompt_id)}.json`);
   await writeJson(file, rec);
-  return path.relative(getVaultRoot(), file);
+  return path.relative(getContextRoot(), file);
 }
 
 export interface DailyRunSummary {

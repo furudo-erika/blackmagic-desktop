@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
 import { BUILTIN_TOOLS, toolsAsOpenAI, toolsByName, type ToolDef, type ToolCtx } from './tools.js';
-import { getVaultRoot, type Config } from './paths.js';
+import { getContextRoot, type Config } from './paths.js';
 import { summarizeRunPreview } from './run-preview.js';
 
 // Price table — must match doc/BILLING.md
@@ -27,7 +27,7 @@ export interface AgentSpec {
 }
 
 export async function loadAgent(name: string): Promise<AgentSpec> {
-  const p = path.join(getVaultRoot(), 'agents', `${name}.md`);
+  const p = path.join(getContextRoot(), 'agents', `${name}.md`);
   const raw = await fs.readFile(p, 'utf-8');
   const m = matter(raw);
   const fm = m.data as any;
@@ -42,14 +42,14 @@ export async function loadAgent(name: string): Promise<AgentSpec> {
 }
 
 // Universal output-channel protocol, injected into every agent's system
-// prompt. The chat surface is what the user actually sees — the vault
+// prompt. The chat surface is what the user actually sees — the context
 // filesystem is the side-effect, not the output. Agents have historically
 // ended runs with "wrote to signals/X.md" and left the user to go find
 // the file. This block forces the inverse: render the full deliverable
 // inline in the chat reply; file paths are a footer, not the main event.
 const OUTPUT_PROTOCOL = `## Output protocol (non-negotiable)
 
-The chat surface is the primary output channel — the vault filesystem
+The chat surface is the primary output channel — the context filesystem
 is a side-effect. When your work produces a deliverable (signal,
 draft, report, brief, digest, classification table, asset bundle,
 etc.):
@@ -75,7 +75,7 @@ file-path footer.`;
 
 export async function loadClaudeMd(): Promise<string> {
   try {
-    return await fs.readFile(path.join(getVaultRoot(), 'CLAUDE.md'), 'utf-8');
+    return await fs.readFile(path.join(getContextRoot(), 'CLAUDE.md'), 'utf-8');
   } catch {
     return '';
   }
@@ -112,7 +112,7 @@ export interface RunOptions {
   /** Optional prior conversation (user + assistant turns). Prepended before `task`. */
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
   threadId?: string;
-  /** Vault path of the entity this run was scoped to (companies/X.md, etc).
+  /** Context path of the entity this run was scoped to (companies/X.md, etc).
    *  Stamped into meta.json so the UI can filter live-card + history per
    *  entity in the Multica-style detail page. */
   entityRef?: string;
@@ -152,7 +152,7 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
 
   // Prepare run dir
   const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${agent}`;
-  const runDir = path.join(getVaultRoot(), 'runs', runId);
+  const runDir = path.join(getContextRoot(), 'runs', runId);
   await fs.mkdir(runDir, { recursive: true });
 
   const systemPrompt =

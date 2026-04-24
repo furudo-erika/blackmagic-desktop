@@ -52,12 +52,12 @@ On each call the daemon composes the system prompt as:
 
 | Tool | Purpose | Dangerous? |
 |---|---|---|
-| `read_file(path)` | Read a vault file | No |
-| `write_file(path, content)` | Create/overwrite a vault file | Medium |
+| `read_file(path)` | Read a context file | No |
+| `write_file(path, content)` | Create/overwrite a context file | Medium |
 | `edit_file(path, old, new)` | Targeted edit | Medium |
-| `rename_file(old_path, new_path)` | Move within vault | Medium |
-| `list_dir(path)` | List vault contents | No |
-| `grep(pattern, path?)` | ripgrep inside vault | No |
+| `rename_file(old_path, new_path)` | Move within context | Medium |
+| `list_dir(path)` | List context contents | No |
+| `grep(pattern, path?)` | ripgrep inside context | No |
 | `web_fetch(url)` | GET + readability extract | No |
 | `web_search(query)` | Perplexity Sonar | No (paid) |
 | `pdl_enrich(domain)` | PeopleDataLabs company enrich | No (paid) |
@@ -111,7 +111,7 @@ On `response.completed`, daemon:
 
 ## Concurrency
 
-- One run per agent per vault at a time (lockfile in `runs/<ts>/.lock`).
+- One run per agent per context at a time (lockfile in `runs/<ts>/.lock`).
 - Global max-concurrent runs default 3.
 - Chat messages from the UI are their own runs with agent=`chat`.
 

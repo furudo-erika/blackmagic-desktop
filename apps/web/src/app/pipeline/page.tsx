@@ -4,7 +4,7 @@
 // The heavy lifting is in the daemon (`pipeline.ts` + `enrich_score_route`
 // tool); this page is a thin client that shows the current rubric, lets the
 // user paste a domain + optional overrides, and renders the per-target
-// results (vault + each connected CRM).
+// results (context + each connected CRM).
 //
 // Why this page exists: scoring and routing used to be prompt-driven — the
 // LLM was asked to "stamp an icp_score based on us/market/icp.md". That's

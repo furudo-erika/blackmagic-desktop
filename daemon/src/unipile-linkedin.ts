@@ -20,7 +20,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { getVaultRoot } from './paths.js';
+import { getContextRoot } from './paths.js';
 
 interface UnipileCreds {
   token: string;
@@ -29,7 +29,7 @@ interface UnipileCreds {
 
 async function readUnipileCreds(): Promise<UnipileCreds | null> {
   try {
-    const raw = await fs.readFile(path.join(getVaultRoot(), '.bm', 'integrations.json'), 'utf-8');
+    const raw = await fs.readFile(path.join(getContextRoot(), '.bm', 'integrations.json'), 'utf-8');
     const data = JSON.parse(raw);
     const rec = data?.unipile;
     if (!rec || rec.status !== 'connected') return null;

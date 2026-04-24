@@ -72,8 +72,8 @@ function buildAppMenu() {
       role: 'help',
       submenu: [
         {
-          label: 'Open vault folder',
-          click: () => shell.openPath(process.env.BM_VAULT_PATH || path.join(os.homedir(), 'BlackMagic')),
+          label: 'Open context folder',
+          click: () => shell.openPath(process.env.BM_CONTEXT_PATH || path.join(os.homedir(), 'BlackMagic')),
         },
       ],
     },
@@ -81,8 +81,8 @@ function buildAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-const VAULT_PATH = process.env.BM_VAULT_PATH || path.join(os.homedir(), 'BlackMagic');
-const DISCOVERY_PATH = path.join(VAULT_PATH, '.bm', 'daemon.json');
+const CONTEXT_PATH = process.env.BM_CONTEXT_PATH || path.join(os.homedir(), 'BlackMagic');
+const DISCOVERY_PATH = path.join(CONTEXT_PATH, '.bm', 'daemon.json');
 
 let daemonProcess = null;
 
@@ -166,7 +166,7 @@ async function createWindow() {
       additionalArguments: [
         `--bm-daemon-port=${discovery.port}`,
         `--bm-daemon-token=${discovery.token}`,
-        `--bm-vault-path=${VAULT_PATH}`,
+        `--bm-context-path=${CONTEXT_PATH}`,
         `--bm-app-version=${app.getVersion()}`,
       ],
     },

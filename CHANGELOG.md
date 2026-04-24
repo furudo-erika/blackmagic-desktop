@@ -2,6 +2,23 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.19 — 2026-04-24
+
+### Changed
+- **"Vault" is now "Context" — everywhere.** The on-disk
+  markdown store, the sidebar route, the config key
+  (`vault_path` → `context_path`), the env var
+  (`BM_VAULT_PATH` → `BM_CONTEXT_PATH`), the daemon module,
+  every helper (`getVaultRoot` → `getContextRoot`,
+  `ensureInsideVault` → `ensureInsideContext`, …), every
+  React Query key, every UI label. 611 occurrences across
+  79 files flipped in one pass. The term was confusing —
+  new users read "Vault" as encrypted secrets storage; it
+  was always just the context the agents read and write
+  against. Now it says what it is.
+- **Route rename.** `/vault` → `/context`. Bookmarks pointing
+  at `/vault` no longer resolve — update them.
+
 ## 0.5.18 — 2026-04-24
 
 ### Added

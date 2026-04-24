@@ -20,7 +20,7 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import matter from 'gray-matter';
-import { getVaultRoot } from './paths.js';
+import { getContextRoot } from './paths.js';
 
 export interface MissingIntegration {
   kind: 'integration';
@@ -91,7 +91,7 @@ const INTEGRATION_LABELS: Record<string, string> = {
 
 async function loadIntegrations(): Promise<Record<string, any>> {
   try {
-    const raw = await fs.readFile(path.join(getVaultRoot(), '.bm', 'integrations.json'), 'utf-8');
+    const raw = await fs.readFile(path.join(getContextRoot(), '.bm', 'integrations.json'), 'utf-8');
     return JSON.parse(raw);
   } catch { return {}; }
 }
@@ -102,7 +102,7 @@ function isConnected(store: Record<string, any>, provider: string): boolean {
 }
 
 async function fileExistsAndFilled(rel: string): Promise<{ exists: boolean; isSeed: boolean }> {
-  const full = path.join(getVaultRoot(), rel);
+  const full = path.join(getContextRoot(), rel);
   try {
     const stat = await fs.stat(full);
     if (!stat.isFile()) return { exists: false, isSeed: false };
@@ -146,7 +146,7 @@ export interface ResourceDef { path: string; kind: 'agent' | 'skill' }
 export async function resolveResource(kind: 'agent' | 'skill', slug: string): Promise<string | null> {
   const dirs = kind === 'agent' ? ['agents'] : ['playbooks', 'skills'];
   for (const dir of dirs) {
-    const p = path.join(getVaultRoot(), dir, `${slug}.md`);
+    const p = path.join(getContextRoot(), dir, `${slug}.md`);
     if (fsSync.existsSync(p)) return p;
   }
   return null;

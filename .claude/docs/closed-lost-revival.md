@@ -2,7 +2,7 @@
 
 **Re-engage dead deals when a trigger reappears.**
 
-- Definition: `daemon/src/vault.ts` ≈ lines 752–783
+- Definition: `daemon/src/context.ts` ≈ lines 752–783
 - Model: `gpt-5.3-codex` · Temperature: 0.35 · Icon: `RotateCcw`
 
 ## Purpose
@@ -24,7 +24,7 @@ No enrichment on this agent by design — it's working from existing
 closed-lost files which already have enrichment from when they were
 open. Stale firmographics aren't the blocker; a new trigger is.
 
-## Vault I/O
+## Context I/O
 
 - Reads: `deals/closed-lost/*.md`, `signals/*`
 - Writes: appends a "Revival (ts)" note to the deal file, writes

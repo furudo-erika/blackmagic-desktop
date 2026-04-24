@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-// Seed the Vercel demo vault (~/BlackMagic-vercel) with realistic
+// Seed the Vercel demo context (~/BlackMagic-vercel) with realistic
 // runtime data: past runs, pending drafts, chat threads. Without this
 // the Home page shows a wall of zeros on a fresh install, which looks
 // broken even though the product is fine. Idempotent — re-running
 // overwrites the same seed files in place.
 //
-// Usage: node scripts/seed-vercel-demo-runtime.mjs [vaultPath]
+// Usage: node scripts/seed-vercel-demo-runtime.mjs [contextPath]
 //        defaults to ~/BlackMagic-vercel
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 
-const VAULT = process.argv[2] || path.join(os.homedir(), 'BlackMagic-vercel');
+const CONTEXT = process.argv[2] || path.join(os.homedir(), 'BlackMagic-vercel');
 
 function iso(d) { return d.toISOString(); }
 function runIdFor(d, slug) {
@@ -91,7 +91,7 @@ const NOW = Date.now();
 function pickTemplate(i) { return RUN_TEMPLATES[i % RUN_TEMPLATES.length]; }
 
 async function seedRuns() {
-  const runsDir = path.join(VAULT, 'runs');
+  const runsDir = path.join(CONTEXT, 'runs');
   await fs.mkdir(runsDir, { recursive: true });
 
   const plans = [];
@@ -147,7 +147,7 @@ async function seedRuns() {
 }
 
 async function seedDrafts() {
-  const dir = path.join(VAULT, 'drafts');
+  const dir = path.join(CONTEXT, 'drafts');
   await fs.mkdir(dir, { recursive: true });
   const drafts = [
     {
@@ -195,7 +195,7 @@ async function seedDrafts() {
 }
 
 async function seedChats() {
-  const dir = path.join(VAULT, 'chats');
+  const dir = path.join(CONTEXT, 'chats');
   await fs.mkdir(dir, { recursive: true });
   const threads = [
     {
@@ -246,11 +246,11 @@ async function seedChats() {
 }
 
 async function main() {
-  console.log(`Seeding demo runtime data into ${VAULT}`);
+  console.log(`Seeding demo runtime data into ${CONTEXT}`);
   try {
-    await fs.access(VAULT);
+    await fs.access(CONTEXT);
   } catch {
-    console.error(`✗ vault does not exist: ${VAULT}`);
+    console.error(`✗ context does not exist: ${CONTEXT}`);
     process.exit(1);
   }
   await seedRuns();

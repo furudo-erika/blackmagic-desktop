@@ -4,7 +4,7 @@
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
-import { getVaultRoot } from './paths.js';
+import { getContextRoot } from './paths.js';
 
 export type IntegrationProvider =
   | 'hubspot'
@@ -53,8 +53,8 @@ export interface IntegrationRecord {
 
 type Store = Partial<Record<IntegrationProvider, IntegrationRecord>>;
 
-const FILE = () => path.join(getVaultRoot(), '.bm', 'integrations.json');
-const ENV_FILE = () => path.join(getVaultRoot(), '.env');
+const FILE = () => path.join(getContextRoot(), '.bm', 'integrations.json');
+const ENV_FILE = () => path.join(getContextRoot(), '.env');
 
 async function load(): Promise<Store> {
   try {
@@ -65,7 +65,7 @@ async function load(): Promise<Store> {
 }
 
 // Per-provider mapping from credential field → environment variable.
-// Skills + scripts inside the vault `load_dotenv()` and reach for these
+// Skills + scripts inside the context `load_dotenv()` and reach for these
 // names. Only BYOK (bring-your-own-key) integrations are mirrored here —
 // LLM credits live in `config.toml` and never touch `.env`, so skills
 // can't accidentally use the user's `ck_` token to bypass billing.

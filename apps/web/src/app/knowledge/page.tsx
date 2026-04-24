@@ -19,19 +19,19 @@ function KnowledgeIndex() {
           <KnowledgeCard
             title="Company profile"
             body="Who you are, what you sell, who you sell it to. The one file every agent reads first."
-            href="/vault?path=us%2Fcompany.md"
+            href="/context?path=us%2Fcompany.md"
             cta="Edit →"
           />
           <KnowledgeCard
             title="Brand voice"
             body="Tone, banned words, sentence-length preferences. Consumed by every drafting agent."
-            href="/vault?path=us%2Fbrand%2Fvoice.md"
+            href="/context?path=us%2Fbrand%2Fvoice.md"
             cta="Edit →"
           />
           <KnowledgeCard
             title="Product"
             body="Positioning, features, pricing. Referenced when an agent talks about what you do."
-            href="/vault?path=us%2Fproduct"
+            href="/context?path=us%2Fproduct"
             cta="Browse files →"
           />
         </div>

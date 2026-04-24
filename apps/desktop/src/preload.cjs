@@ -14,7 +14,7 @@ function arg(name) {
 contextBridge.exposeInMainWorld('bmBridge', {
   daemonPort: Number(arg('bm-daemon-port')) || 0,
   daemonToken: arg('bm-daemon-token'),
-  vaultPath: arg('bm-vault-path'),
+  contextPath: arg('bm-context-path'),
   platform: process.platform,
   appVersion: arg('bm-app-version'),
   openExternal: (url) => ipcRenderer.invoke('bm:open-external', String(url)),

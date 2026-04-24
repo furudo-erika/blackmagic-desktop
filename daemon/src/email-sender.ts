@@ -5,7 +5,7 @@
 //      request with AWS SigV4. Preferred: it's the least-privilege BYOK
 //      path (single `ses:SendEmail` IAM action) and the user owns their
 //      own domain.
-//   2. Resend (config.resend_api_key) — legacy fallback for older vaults.
+//   2. Resend (config.resend_api_key) — legacy fallback for older contexts.
 //   3. Error — neither connected; caller decides what to do (the draft
 //      stays `approved` + surface the error for the UI).
 //
@@ -16,7 +16,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import https from 'node:https';
 import pathMod from 'node:path';
-import { getVaultRoot } from './paths.js';
+import { getContextRoot } from './paths.js';
 
 // Lightweight HTTPS POST via Node's native `https` — used instead of
 // fetch() for the AWS SES call because Electron's Chromium network
@@ -68,7 +68,7 @@ function naiveMarkdownToHtml(md: string): string {
 
 async function loadIntegrations(): Promise<any> {
   try {
-    const raw = await fs.readFile(pathMod.join(getVaultRoot(), '.bm', 'integrations.json'), 'utf-8');
+    const raw = await fs.readFile(pathMod.join(getContextRoot(), '.bm', 'integrations.json'), 'utf-8');
     return JSON.parse(raw);
   } catch {
     return {};

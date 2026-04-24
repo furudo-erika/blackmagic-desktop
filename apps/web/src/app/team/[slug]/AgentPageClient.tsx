@@ -69,7 +69,7 @@ function AgentPageBody({ agent }: { agent: AgentDef }) {
   const playbooks = useQuery({
     queryKey: ['playbooks', agent.slug],
     queryFn: async (): Promise<Playbook[]> => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) =>
           f.type === 'file' &&
@@ -160,7 +160,7 @@ function AgentPageBody({ agent }: { agent: AgentDef }) {
           {playbooks.data && playbooks.data.length === 0 && (
             <div className="text-[12px] text-muted dark:text-[#8C837C] leading-relaxed">
               No skills yet for this agent. Add one under{' '}
-              <span className="font-mono">playbooks/</span> in the vault, or just chat
+              <span className="font-mono">playbooks/</span> in the context, or just chat
               with the agent on the left.
             </div>
           )}

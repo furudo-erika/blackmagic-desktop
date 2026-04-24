@@ -1,7 +1,7 @@
 // Codex CLI adapter.
 //
 // Instead of driving the Responses API loop ourselves, we shell out to the
-// official `codex` binary. It already knows how to: read the vault,
+// official `codex` binary. It already knows how to: read the context,
 // plan long tasks, edit files, respect CLAUDE.md, stream reasoning to
 // stdout, and stop cleanly. We just hand it a task and capture its output.
 //
@@ -13,7 +13,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { getVaultRoot, type Config } from './paths.js';
+import { getContextRoot, type Config } from './paths.js';
 
 export interface CodexResult {
   stdout: string;
@@ -29,7 +29,7 @@ export class CodexNotInstalled extends Error {
 }
 
 async function ensureCodexConfig(config: Config): Promise<string> {
-  const home = path.join(getVaultRoot(), '.bm', 'codex');
+  const home = path.join(getContextRoot(), '.bm', 'codex');
   await fs.mkdir(home, { recursive: true });
   const cfg = [
     `model = "${config.default_model}"`,
@@ -85,7 +85,7 @@ export async function runCodex(
 
   const args = [
     'exec',
-    '-C', getVaultRoot(),
+    '-C', getContextRoot(),
     '--skip-git-repo-check',
     '--full-auto',
     '--json',         // JSONL events to stdout — the daemon streams them out

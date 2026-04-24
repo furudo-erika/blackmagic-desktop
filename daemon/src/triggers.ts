@@ -3,7 +3,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import matter from 'gray-matter';
 import cron from 'node-cron';
-import { getVaultRoot, type Config } from './paths.js';
+import { getContextRoot, type Config } from './paths.js';
 import { runAgent } from './agent.js';
 import { runPlaybook } from './playbooks.js';
 
@@ -31,7 +31,7 @@ const SHELL_TIMEOUT_MS = 30 * 60 * 1000;
 const OUTPUT_CAP_BYTES = 50 * 1024;
 
 async function listTriggers(): Promise<TriggerSpec[]> {
-  const dir = path.join(getVaultRoot(), 'triggers');
+  const dir = path.join(getContextRoot(), 'triggers');
   try {
     const entries = await fs.readdir(dir);
     const specs: TriggerSpec[] = [];
@@ -72,7 +72,7 @@ async function listTriggers(): Promise<TriggerSpec[]> {
 
 /**
  * Run a shell command and capture stdout/stderr into a run log md file under
- * `<vault>/runs/`. Returns the exit code and the relative path to the log so
+ * `<context>/runs/`. Returns the exit code and the relative path to the log so
  * callers (the UI, webhook, cron) can point users at it.
  *
  * Design notes:
@@ -96,16 +96,16 @@ async function runShellTrigger(spec: TriggerSpec): Promise<{
 }> {
   if (!spec.shell) throw new Error(`shell trigger missing shell: ${spec.name}`);
 
-  const vaultRoot = getVaultRoot();
-  const runsDir = path.join(vaultRoot, 'runs');
+  const contextRoot = getContextRoot();
+  const runsDir = path.join(contextRoot, 'runs');
   await fs.mkdir(runsDir, { recursive: true });
 
   const startedAt = new Date();
   const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
   const logRel = path.posix.join('runs', `shell-${spec.name}-${stamp}.md`);
-  const logAbs = path.join(vaultRoot, logRel);
+  const logAbs = path.join(contextRoot, logRel);
 
-  const cwd = spec.cwd && path.isAbsolute(spec.cwd) ? spec.cwd : vaultRoot;
+  const cwd = spec.cwd && path.isAbsolute(spec.cwd) ? spec.cwd : contextRoot;
   // The daemon runs inside the Electron app, which launches with a minimal
   // PATH (no /opt/homebrew/bin, no /usr/local/bin, no user shell rc). That
   // breaks any trigger that shells out to `python3` or `node` installed via
@@ -263,7 +263,7 @@ export async function triggerList() {
 // this so users see "last run: 3h ago · exit 0" without having to click Fire
 // now in the current session (runs persist across daemon restarts).
 export async function lastShellRuns(): Promise<Record<string, { log: string; exit: number | null; finishedAt: string | null }>> {
-  const runsDir = path.join(getVaultRoot(), 'runs');
+  const runsDir = path.join(getContextRoot(), 'runs');
   const out: Record<string, { log: string; exit: number | null; finishedAt: string | null; _mtime: number }> = {};
   let entries: string[] = [];
   try {

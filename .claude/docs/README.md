@@ -1,17 +1,17 @@
 # `.claude/docs` — per-agent dev notes
 
 Quick-reference docs so future sessions can land on any agent without
-re-reading `daemon/src/vault.ts`. One file per agent, format:
+re-reading `daemon/src/context.ts`. One file per agent, format:
 
 - Slug, name, model, temperature, icon
 - Purpose (1–2 sentences)
 - Tools allowed
-- Vault inputs / outputs
+- Context inputs / outputs
 - Trigger (cron if any)
 - Config / env dependencies
 - Quirks + gotchas a future dev needs to know
 
-All agents are defined in `daemon/src/vault.ts` under `DEFAULT_AGENTS`
+All agents are defined in `daemon/src/context.ts` under `DEFAULT_AGENTS`
 (≈ lines 533–921). None live outside that map. The web sidebar metadata
 is in `apps/web/src/config/agents.ts` — it's display-only, not a second
 definition.
@@ -33,12 +33,12 @@ definition.
 
 ## When adding a new agent
 
-1. Add markdown body to `DEFAULT_AGENTS` in `daemon/src/vault.ts` with
+1. Add markdown body to `DEFAULT_AGENTS` in `daemon/src/context.ts` with
    frontmatter (`kind`, `slug`, `name`, `icon`, `model`, `tools`, `temperature`).
 2. Allow-list every tool the agent can call in the frontmatter `tools:`
    field — the runtime filters `BUILTIN_TOOLS` by this list.
 3. Add the agent's icon to `SIDEBAR_AGENT_ICONS` in
    `apps/web/src/components/sidebar.tsx` if it should show in the Team nav.
 4. Drop a `<slug>.md` doc in this directory — even if brief.
-5. Optionally add a preset trigger at the bottom of `vault.ts`
+5. Optionally add a preset trigger at the bottom of `context.ts`
    (`PRESET_TRIGGERS` / `DEFAULT_TRIGGERS`) referencing `agent: <slug>`.

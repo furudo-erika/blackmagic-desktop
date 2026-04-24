@@ -5,11 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { walkSequencesOnce } from './sequence-cron.js';
 import { loadPlaybook } from './playbooks.js';
-import { getVaultRoot, setVaultRoot, type Config } from './paths.js';
+import { getContextRoot, setContextRoot, type Config } from './paths.js';
 import type { Enrollment, Sequence, Touch } from './sequences.js';
 
 const CONFIG: Config = {
-  vault_path: '/tmp/blackmagic-sequence-tests',
+  context_path: '/tmp/blackmagic-sequence-tests',
   default_model: 'gpt-5.3-codex',
   zenn_base_url: 'https://example.invalid/api/v1',
 };
@@ -181,11 +181,11 @@ test('walkSequencesOnce marks the enrollment complete after the last successful 
 });
 
 test('loadPlaybook resolves the legacy outbound-draft alias', async (t) => {
-  const previousVault = getVaultRoot();
-  const tempVault = await fs.mkdtemp(path.join(os.tmpdir(), 'bm-playbook-alias-'));
-  await fs.mkdir(path.join(tempVault, 'playbooks'), { recursive: true });
+  const previousContext = getContextRoot();
+  const tempContext = await fs.mkdtemp(path.join(os.tmpdir(), 'bm-playbook-alias-'));
+  await fs.mkdir(path.join(tempContext, 'playbooks'), { recursive: true });
   await fs.writeFile(
-    path.join(tempVault, 'playbooks', 'draft-outbound.md'),
+    path.join(tempContext, 'playbooks', 'draft-outbound.md'),
     `---
 kind: playbook
 name: draft-outbound
@@ -198,10 +198,10 @@ Draft the email.
     'utf-8',
   );
 
-  setVaultRoot(tempVault);
+  setContextRoot(tempContext);
   t.after(async () => {
-    setVaultRoot(previousVault);
-    await fs.rm(tempVault, { recursive: true, force: true });
+    setContextRoot(previousContext);
+    await fs.rm(tempContext, { recursive: true, force: true });
   });
 
   const spec = await loadPlaybook('outbound-draft');

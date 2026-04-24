@@ -48,7 +48,7 @@ function serialize(frontmatter: Record<string, unknown>, body: string): string {
   return lines.join('\n') + body;
 }
 
-function VaultContent() {
+function ContextContent() {
   const params = useSearchParams();
   const router = useRouter();
   const qc = useQueryClient();
@@ -57,17 +57,17 @@ function VaultContent() {
   const [editing, setEditing] = useState(false);
   const [draftBody, setDraftBody] = useState('');
 
-  const tree = useQuery({ queryKey: ['vault-tree'], queryFn: api.vaultTree, staleTime: 5_000 });
+  const tree = useQuery({ queryKey: ['context-tree'], queryFn: api.contextTree, staleTime: 5_000 });
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, staleTime: 60_000 });
 
   const file = useQuery({
-    queryKey: ['vault-file', selected],
+    queryKey: ['context-file', selected],
     queryFn: () => (selected ? api.readFile(selected) : Promise.resolve(null)),
     enabled: !!selected,
   });
 
   const backlinks = useQuery({
-    queryKey: ['vault-backlinks', selected],
+    queryKey: ['context-backlinks', selected],
     queryFn: () => (selected ? api.backlinks(selected) : Promise.resolve({ backlinks: [] })),
     enabled: !!selected,
     staleTime: 10_000,
@@ -106,17 +106,17 @@ function VaultContent() {
     const full = serialize(file.data.frontmatter, draftBody);
     await api.writeFile(selected, full);
     setEditing(false);
-    qc.invalidateQueries({ queryKey: ['vault-file', selected] });
-    qc.invalidateQueries({ queryKey: ['vault-tree'] });
+    qc.invalidateQueries({ queryKey: ['context-file', selected] });
+    qc.invalidateQueries({ queryKey: ['context-tree'] });
   }
 
   return (
     <div className="h-full flex flex-col bg-cream dark:bg-[#0F0D0A]">
       <header className="px-6 py-4 border-b border-line dark:border-[#2A241D] flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg font-semibold text-ink dark:text-[#F5F1EA]">Vault</h1>
+          <h1 className="text-lg font-semibold text-ink dark:text-[#F5F1EA]">Context</h1>
           <p className="text-xs text-muted dark:text-[#8C837C]">
-            Everything on disk at <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1.5 py-0.5 rounded">{health.data?.vaultPath ?? '…'}</code>
+            Everything on disk at <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1.5 py-0.5 rounded">{health.data?.contextPath ?? '…'}</code>
           </p>
         </div>
         <div className="relative w-64">
@@ -153,7 +153,7 @@ function VaultContent() {
                       <li key={e.path}>
                         <button
                           type="button"
-                          onClick={() => router.push(`/vault?path=${encodeURIComponent(e.path)}`)}
+                          onClick={() => router.push(`/context?path=${encodeURIComponent(e.path)}`)}
                           className={
                             'w-full text-left px-5 py-1.5 text-sm font-mono truncate hover:bg-cream-light dark:hover:bg-[#17140F] ' +
                             (active
@@ -172,7 +172,7 @@ function VaultContent() {
           })}
           {folders.length === 0 && (
             <div className="p-6 text-xs text-muted dark:text-[#8C837C]">
-              Empty vault. Ask Chat to do something and files will appear here.
+              Empty context. Ask Chat to do something and files will appear here.
             </div>
           )}
         </aside>
@@ -265,7 +265,7 @@ function VaultContent() {
                 <div className="mt-2">
                   {/* Plain full-height textarea, not Composer — Composer's
                       max-height (320px, tuned for chat prompts) was
-                      clipping real vault files to 8-10 lines. This one
+                      clipping real context files to 8-10 lines. This one
                       grows to fit the viewport and scrolls internally. */}
                   <textarea
                     value={draftBody}
@@ -300,7 +300,7 @@ function VaultContent() {
                       <li key={p}>
                         <button
                           type="button"
-                          onClick={() => router.push(`/vault?path=${encodeURIComponent(p)}`)}
+                          onClick={() => router.push(`/context?path=${encodeURIComponent(p)}`)}
                           className="w-full text-left px-4 py-2 text-[13px] font-mono text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA] hover:bg-cream-light dark:hover:bg-[#17140F]"
                         >
                           {p}
@@ -318,10 +318,10 @@ function VaultContent() {
   );
 }
 
-export default function VaultPage() {
+export default function ContextPage() {
   return (
     <Suspense fallback={<div className="p-6 text-sm text-muted dark:text-[#8C837C]">loading…</div>}>
-      <VaultContent />
+      <ContextContent />
     </Suspense>
   );
 }

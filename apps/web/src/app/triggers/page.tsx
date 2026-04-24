@@ -46,7 +46,7 @@ export default function TriggersPage() {
   const triggers = useQuery({
     queryKey: ['triggers'],
     queryFn: async (): Promise<Trigger[]> => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('triggers/') && f.path.endsWith('.md'),
       );
@@ -280,7 +280,7 @@ export default function TriggersPage() {
                         if (!log) return null;
                         return (
                           <a
-                            href={`/vault?path=${encodeURIComponent(log)}`}
+                            href={`/context?path=${encodeURIComponent(log)}`}
                             className="text-[11px] text-muted dark:text-[#8C837C] hover:text-flame underline underline-offset-2"
                             title={finishedAt ? `finished ${finishedAt}` : undefined}
                           >

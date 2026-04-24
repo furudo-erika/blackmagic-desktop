@@ -3,7 +3,7 @@
 /**
  * /memory — notes the agents read at the start of every run.
  *
- * Persists to `MEMORY.md` at the vault root via the existing
+ * Persists to `MEMORY.md` at the context root via the existing
  * `readFile` / `writeFile` daemon endpoints. Whatever you type here
  * gets injected into agent context (alongside `us/CLAUDE.md`) — think
  * of it as the per-project sticky note.
@@ -83,7 +83,7 @@ export default function MemoryPage() {
           showKeyboardHints={false}
         />
         <p className="mt-3 text-[11px] text-muted dark:text-[#8C837C]">
-          Stored at <code className="font-mono">{MEMORY_PATH}</code> in your vault — version-control it
+          Stored at <code className="font-mono">{MEMORY_PATH}</code> in your context — version-control it
           alongside the rest of your project.
         </p>
       </PageBody>

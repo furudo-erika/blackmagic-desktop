@@ -10,7 +10,7 @@ import { api, type OntologyNode, type OntologyEdge } from '../../lib/api';
 // Three.js renders nodes as glowing spheres (icosahedrons for "MOC" /
 // hub nodes), edges as faint lines, with a continuous force simulation
 // in JS. Hover dims everything except the 1-hop neighborhood; click
-// opens the file in the Vault editor.
+// opens the file in the Context editor.
 
 const COLOR_HEX: Record<string, number> = {
   company:    0xE8523A,
@@ -320,7 +320,7 @@ export default function OntologyPage() {
       const id = pick(e.clientX, e.clientY);
       if (id) {
         const n = graph.nodes.find((x) => x.id === id);
-        if (n) router.push(`/vault?path=${encodeURIComponent(n.path)}`);
+        if (n) router.push(`/context?path=${encodeURIComponent(n.path)}`);
       }
     });
 
@@ -400,7 +400,7 @@ export default function OntologyPage() {
         {q.isLoading && <div className="absolute inset-0 flex items-center justify-center text-sm text-muted dark:text-[#8C837C]">loading…</div>}
         {!q.isLoading && graph.nodes.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-muted dark:text-[#8C837C]">
-            Vault is empty. Ask Chat to enrich a company to see the first node.
+            Context is empty. Ask Chat to enrich a company to see the first node.
           </div>
         )}
         {hoverId && (() => {
@@ -416,7 +416,7 @@ export default function OntologyPage() {
               <div className="mt-1 text-sm font-semibold text-ink dark:text-[#F5F1EA] truncate">{n.label}</div>
               <div className="text-[11px] text-muted dark:text-[#8C837C] font-mono truncate">{n.path}</div>
               <div className="mt-2 text-[11px] text-muted dark:text-[#8C837C]">{deg} connection{deg === 1 ? '' : 's'}</div>
-              <div className="mt-2 text-[11px] text-flame">Click to open in vault →</div>
+              <div className="mt-2 text-[11px] text-flame">Click to open in context →</div>
             </div>
           );
         })()}

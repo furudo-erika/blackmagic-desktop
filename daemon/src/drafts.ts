@@ -1,8 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { getVaultRoot } from './paths.js';
-import { writeVaultFile } from './vault.js';
+import { getContextRoot } from './paths.js';
+import { writeContextFile } from './context.js';
 import { McpRegistry } from './mcp.js';
 import { sendEmailViaBestProvider } from './email-sender.js';
 
@@ -25,7 +25,7 @@ function normalizeCreatedAt(value: unknown): string | undefined {
 }
 
 export async function listDrafts(): Promise<Draft[]> {
-  const dir = path.join(getVaultRoot(), 'drafts');
+  const dir = path.join(getContextRoot(), 'drafts');
   try {
     const entries = await fs.readdir(dir);
     const out: Draft[] = [];
@@ -63,29 +63,29 @@ export async function readDraft(id: string): Promise<Draft | null> {
 }
 
 export async function setDraftStatus(id: string, status: Draft['status']) {
-  const dir = path.join(getVaultRoot(), 'drafts');
+  const dir = path.join(getContextRoot(), 'drafts');
   const fp = path.join(dir, `${id}.md`);
   const raw = await fs.readFile(fp, 'utf-8');
   const m = matter(raw);
   const next = matter.stringify(m.content, { ...m.data, status });
-  await writeVaultFile(`drafts/${id}.md`, next);
+  await writeContextFile(`drafts/${id}.md`, next);
 }
 
 async function readRawFrontmatter(id: string): Promise<Record<string, unknown> | null> {
   try {
-    const fp = path.join(getVaultRoot(), 'drafts', `${id}.md`);
+    const fp = path.join(getContextRoot(), 'drafts', `${id}.md`);
     const raw = await fs.readFile(fp, 'utf-8');
     return (matter(raw).data ?? {}) as Record<string, unknown>;
   } catch { return null; }
 }
 
 async function setDraftFrontmatter(id: string, patch: Record<string, unknown>) {
-  const dir = path.join(getVaultRoot(), 'drafts');
+  const dir = path.join(getContextRoot(), 'drafts');
   const fp = path.join(dir, `${id}.md`);
   const raw = await fs.readFile(fp, 'utf-8');
   const m = matter(raw);
   const next = matter.stringify(m.content, { ...m.data, ...patch });
-  await writeVaultFile(`drafts/${id}.md`, next);
+  await writeContextFile(`drafts/${id}.md`, next);
 }
 
 function extractMessageId(result: any): string | undefined {

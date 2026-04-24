@@ -4,12 +4,12 @@
  * Sidebar — Multica-inspired slim flat nav.
  *
  * 0.4.23: Restored the section-headered structure from the original
- * pre-flattening design (WORK / VAULT / SYSTEM), while keeping the
+ * pre-flattening design (WORK / CONTEXT / SYSTEM), while keeping the
  * Multica-style row styling introduced in 0.4.20. Section labels are
  * plain uppercase tracking-widest mono text — not clickable, no
  * chevrons, just visual anchors. Rationale: the 0.4.21 flat 6-row
  * list hid Companies/Contacts/Deals/Playbooks/Triggers/Runs behind
- * generic "Vault" + "Automations" rows, so finding "what's running"
+ * generic "Context" + "Automations" rows, so finding "what's running"
  * or "the acme contact" took two clicks and a scan. Direct rows
  * scanned by section header is faster for recurring tasks.
  */
@@ -60,7 +60,7 @@ import {
 import { api, type Project } from '../lib/api';
 
 // Icon string (from agent frontmatter `icon:`) → lucide component.
-// Mirrors the names seeded in daemon/src/vault.ts DEFAULT_AGENTS. Falls
+// Mirrors the names seeded in daemon/src/context.ts DEFAULT_AGENTS. Falls
 // back to Bot for any unmapped icon.
 const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   Bot,
@@ -155,14 +155,14 @@ export function Sidebar() {
     [runs.data],
   );
 
-  // Team section — read agents/*.md from the vault so the list matches
+  // Team section — read agents/*.md from the context so the list matches
   // the actual agents seeded in the project (Company Profiler pinned
   // first, then alpha). Hidden while loading so we don't flash a stale
   // list during project switches.
   const teamAgents = useQuery({
     queryKey: ['sidebar-agents'],
     queryFn: async () => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
       );
@@ -236,7 +236,7 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Section-headered nav. Labels (WORK/VAULT/SYSTEM) are plain text,
+      {/* Section-headered nav. Labels (WORK/CONTEXT/SYSTEM) are plain text,
           not buttons — they group the rows underneath visually without
           introducing an extra click. */}
       <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-3 pt-1">
@@ -276,7 +276,7 @@ export function Sidebar() {
         {/* Mechanism pages (Memory / Skills / Ontology / Files) removed
             from the top-level sidebar — agents use them internally and
             most users never need to open them. Still reachable by
-            direct URL (/memory, /skills, /ontology, /vault) and via
+            direct URL (/memory, /skills, /ontology, /context) and via
             ⌘K command palette. */}
       </nav>
 
@@ -375,7 +375,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 // Expandable Agents row — header routes to /agents (which redirects
 // to your last-picked agent), chevron reveals every agent in the
-// vault. Click any sub-row to open a full-screen chat with that
+// context. Click any sub-row to open a full-screen chat with that
 // agent. Auto-expands when you're inside /agents/*.
 function AgentsSidebarRow({
   pathname,
@@ -673,17 +673,17 @@ function CommandPalette({
       { label: 'Drafts', href: '/outreach', hint: 'review pending outbound' },
       { label: 'Dashboard', href: '/dashboard', hint: 'runs + cost + activity' },
       { label: 'Runs', href: '/runs', hint: 'agent run history' },
-      { label: 'Companies', href: '/companies', hint: 'Vault — companies' },
-      { label: 'Contacts', href: '/contacts', hint: 'Vault — contacts' },
-      { label: 'Deals', href: '/deals', hint: 'Vault — deals' },
-      { label: 'Files', href: '/vault', hint: 'Vault — raw files' },
+      { label: 'Companies', href: '/companies', hint: 'Context — companies' },
+      { label: 'Contacts', href: '/contacts', hint: 'Context — contacts' },
+      { label: 'Deals', href: '/deals', hint: 'Context — deals' },
+      { label: 'Files', href: '/context', hint: 'Context — raw files' },
       { label: 'Agents', href: '/agents', hint: 'all agents in this project' },
       { label: 'Triggers', href: '/triggers', hint: 'automations — scheduled' },
-      { label: 'Ontology', href: '/ontology', hint: 'vault graph' },
+      { label: 'Ontology', href: '/ontology', hint: 'context graph' },
       { label: 'GEO', href: '/geo', hint: 'dashboard — GEO tab' },
       { label: 'Pipeline', href: '/pipeline', hint: 'enrich → score → route → CRM sync' },
       { label: 'Integrations', href: '/integrations', hint: 'connect third-party tools' },
-      { label: 'Settings', href: '/settings', hint: 'vault path, model, keys' },
+      { label: 'Settings', href: '/settings', hint: 'context path, model, keys' },
     ],
     [],
   );

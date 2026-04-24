@@ -3,7 +3,7 @@
 // [[path/to/note]]            -> markdown link with display = last segment
 // [[path/to/note|Alt text]]   -> markdown link with display = "Alt text"
 //
-// Targets are resolved against the vault root. Unknown targets are preserved
+// Targets are resolved against the context root. Unknown targets are preserved
 // as-is so the user can still see what was meant.
 
 import fs from 'node:fs';
@@ -19,19 +19,19 @@ function normalizeTarget(target: string): string {
   return t;
 }
 
-/** Convert wikilinks into regular markdown links relative to the vault root.
+/** Convert wikilinks into regular markdown links relative to the context root.
  *  Unresolved targets (no file on disk) are kept as `[[target]]` literal. */
-export function resolveWikilinks(content: string, vaultRoot: string): string {
+export function resolveWikilinks(content: string, contextRoot: string): string {
   return content.replace(WIKILINK_RE, (whole, target: string, alt?: string) => {
     const rel = normalizeTarget(target);
-    const abs = path.resolve(vaultRoot, rel);
-    const inVault = abs.startsWith(path.resolve(vaultRoot));
-    if (!inVault) return whole;
+    const abs = path.resolve(contextRoot, rel);
+    const inContext = abs.startsWith(path.resolve(contextRoot));
+    if (!inContext) return whole;
     let exists = false;
     try { exists = fs.statSync(abs).isFile(); } catch {}
     const display = (alt ?? path.basename(target).replace(/\.md$/, '')).trim();
     if (!exists) return whole;
-    return `[${display}](/vault?path=${encodeURIComponent(rel)})`;
+    return `[${display}](/context?path=${encodeURIComponent(rel)})`;
   });
 }
 
@@ -45,9 +45,9 @@ export function extractBacklinks(content: string): string[] {
   return out;
 }
 
-/** Scan the vault and return paths of md files containing a wikilink to
+/** Scan the context and return paths of md files containing a wikilink to
  *  `targetPath` (which may or may not include .md). */
-export async function findBacklinks(vaultRoot: string, targetPath: string): Promise<string[]> {
+export async function findBacklinks(contextRoot: string, targetPath: string): Promise<string[]> {
   const bare = targetPath.replace(/\.md$/, '');
   const withExt = bare + '.md';
   const basename = path.basename(bare);
@@ -63,7 +63,7 @@ export async function findBacklinks(vaultRoot: string, targetPath: string): Prom
       const abs = path.join(dir, e.name);
       if (e.isDirectory()) { await walk(abs); continue; }
       if (!e.isFile() || !/\.md$/i.test(e.name)) continue;
-      const rel = path.relative(vaultRoot, abs);
+      const rel = path.relative(contextRoot, abs);
       if (rel === withExt) continue; // skip self
       let text = '';
       try { text = await fsp.readFile(abs, 'utf-8'); } catch { continue; }
@@ -77,6 +77,6 @@ export async function findBacklinks(vaultRoot: string, targetPath: string): Prom
     }
   }
 
-  await walk(vaultRoot);
+  await walk(contextRoot);
   return hits.sort();
 }

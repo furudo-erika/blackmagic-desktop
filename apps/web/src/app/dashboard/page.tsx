@@ -9,7 +9,7 @@
  * A "runtime" here is one of:
  *   - local desktop (this machine, talking to the local daemon)
  *   - cloud proxy  (api.blackmagic.engineering — billed calls)
- *   - each configured project vault (since each has its own runs/ dir)
+ *   - each configured project context (since each has its own runs/ dir)
  *
  * Everything renders with pure SVG for the charts to avoid adding recharts
  * as a dependency — same style as the existing /geo page.

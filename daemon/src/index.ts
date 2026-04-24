@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { loadConfig, getVaultRoot, homeVault } from './paths.js';
+import { loadConfig, getContextRoot, homeContext } from './paths.js';
 import {
   initProjectsRegistry,
   getRegistry,
@@ -16,7 +16,7 @@ import {
   activateProject,
   deleteProject,
 } from './projects.js';
-import { ensureVault, readVaultFile, writeVaultFile, walkTree, installPresetTriggers } from './vault.js';
+import { ensureContext, readContextFile, writeContextFile, walkTree, installPresetTriggers } from './context.js';
 import { findBacklinks } from './wikilinks.js';
 import { BUILTIN_TOOLS, allTools, toolsByName } from './tools.js';
 import {
@@ -75,7 +75,7 @@ const pendingOAuthStates = new Map<string, number>();
 
 function oauthStatesPath() {
   return path.join(
-    process.env.BM_VAULT_PATH ?? path.join(require('node:os').homedir(), 'BlackMagic'),
+    process.env.BM_CONTEXT_PATH ?? path.join(require('node:os').homedir(), 'BlackMagic'),
     '.bm',
     'oauth-states.json',
   );
@@ -207,7 +207,7 @@ async function loadRunConversation(meta: any, prompt: string, finalMd: string): 
   const threadId = typeof meta?.threadId === 'string' && meta.threadId ? meta.threadId : undefined;
   if (threadId) {
     try {
-      const chatRaw = await fs.readFile(path.join(getVaultRoot(), 'chats', `${threadId}.json`), 'utf-8');
+      const chatRaw = await fs.readFile(path.join(getContextRoot(), 'chats', `${threadId}.json`), 'utf-8');
       const chat = JSON.parse(chatRaw) as { messages?: ChatMessage[] };
       if (Array.isArray(chat.messages)) {
         const messages = chat.messages.filter(
@@ -229,14 +229,14 @@ async function loadRunConversation(meta: any, prompt: string, finalMd: string): 
 }
 
 async function main() {
-  // Initialise project registry first so getVaultRoot() reflects the active
+  // Initialise project registry first so getContextRoot() reflects the active
   // project before anything else reads it.
   await initProjectsRegistry();
   const config = loadConfig();
-  await ensureVault();
+  await ensureContext();
   await geo.ensureGeoSkeleton();
   await loadOAuthStates();
-  // Re-emit <vault>/.env from the current integrations.json so users
+  // Re-emit <context>/.env from the current integrations.json so users
   // who paste BYOK keys before this version pick up the mirror without
   // having to re-save anything.
   await regenerateEnvMirror().catch((err) =>
@@ -314,7 +314,7 @@ async function main() {
         400,
       );
     }
-    const cfgDir = path.join(getVaultRoot(), '.bm');
+    const cfgDir = path.join(getContextRoot(), '.bm');
     await fs.mkdir(cfgDir, { recursive: true });
     const cfgPath = path.join(cfgDir, 'config.toml');
     let existing = '';
@@ -386,7 +386,7 @@ async function main() {
       // Injected by main.cjs at spawn time from app.getVersion(). In dev
       // (no Electron wrapper) falls back to the daemon's own package.json.
       version: process.env.BM_APP_VERSION || '0.0.0-dev',
-      vaultPath: getVaultRoot(),
+      contextPath: getContextRoot(),
       model: config.default_model,
       zennConfigured: Boolean(config.zenn_api_key),
       engine: codexReady ? 'codex-cli' : 'builtin',
@@ -400,7 +400,7 @@ async function main() {
     if (!key.startsWith('ck_') || key.length < 10) {
       return c.json({ error: 'invalid api key format' }, 400);
     }
-    const cfgDir = path.join(getVaultRoot(), '.bm');
+    const cfgDir = path.join(getContextRoot(), '.bm');
     await fs.mkdir(cfgDir, { recursive: true });
     const cfgPath = path.join(cfgDir, 'config.toml');
     let existing = '';
@@ -412,12 +412,11 @@ async function main() {
     return c.json({ ok: true });
   });
 
-  // Update per-integration API keys (apify, enrichlayer). Writes into
+  // Update per-integration API keys (apify, hubspot, …). Writes into
   // ~/BlackMagic/.bm/config.toml so the daemon picks them up on reload and
   // surfaces them via ctx.config to the builtin tools.
   const INTEGRATION_KEYS = [
     'apify_api_key',
-    'enrichlayer_api_key',
     'hubspot_api_key',
     'apollo_api_key',
     'attio_api_key',
@@ -441,7 +440,6 @@ async function main() {
   app.get('/api/config/integration-keys', (c) =>
     c.json({
       apify_api_key: Boolean(config.apify_api_key),
-      enrichlayer_api_key: Boolean(config.enrichlayer_api_key),
       hubspot_api_key: Boolean(config.hubspot_api_key),
       apollo_api_key: Boolean(config.apollo_api_key),
       attio_api_key: Boolean(config.attio_api_key),
@@ -464,7 +462,7 @@ async function main() {
   );
   app.post('/api/config/integration-keys', async (c) => {
     const body = await c.req.json<Partial<Record<IntegrationKey, string>>>();
-    const cfgDir = path.join(getVaultRoot(), '.bm');
+    const cfgDir = path.join(getContextRoot(), '.bm');
     await fs.mkdir(cfgDir, { recursive: true });
     const cfgPath = path.join(cfgDir, 'config.toml');
     let existing = '';
@@ -548,7 +546,7 @@ async function main() {
     return c.json(await geo.sovTrendWithPrior({ brand_id: q.brand_id, start_date: q.start_date, end_date: q.end_date, model: q.model as geo.GeoModel }));
   });
 
-  // Activity feed + entity assignment. Every vault entity (company /
+  // Activity feed + entity assignment. Every context entity (company /
   // contact / deal) can carry an `assignee` frontmatter field and an
   // append-only `signals/activity/<entity-path>.jsonl` log of comments,
   // status changes, agent runs, etc.
@@ -600,7 +598,7 @@ async function main() {
     // or reassigning to a member does not.
     if (result.assignee.type === 'agent' && result.assignee.id &&
         (result.previous.type !== 'agent' || result.previous.id !== result.assignee.id)) {
-      const task = `You were just assigned to ${body.path}. Read that file (and related context in the vault), then execute your loop end-to-end.`;
+      const task = `You were just assigned to ${body.path}. Read that file (and related context in the context), then execute your loop end-to-end.`;
       runAgent({ agent: result.assignee.id, task, config, entityRef: body.path }).catch((err) => {
         console.error(`[activity] assignment-triggered run for ${result.assignee.id} failed:`, err?.message || err);
       });
@@ -681,16 +679,16 @@ async function main() {
   // Onboarding state: considered complete once CLAUDE.md has been
   // user-customised (default seed marker is absent).
   app.get('/api/onboarding', async (c) => {
-    const claudePath = path.join(getVaultRoot(), 'CLAUDE.md');
+    const claudePath = path.join(getContextRoot(), 'CLAUDE.md');
     let claude = '';
     try { claude = await fs.readFile(claudePath, 'utf-8'); } catch {}
     const isDefault = claude.includes('_One paragraph: what you sell, to whom._');
-    const hasSelfCompany = await fs.access(path.join(getVaultRoot(), 'me.md')).then(() => true).catch(() => false);
+    const hasSelfCompany = await fs.access(path.join(getContextRoot(), 'me.md')).then(() => true).catch(() => false);
     return c.json({ needsOnboarding: isDefault && !hasSelfCompany, claudeDefault: isDefault, hasSelfCompany });
   });
 
   app.post('/api/onboarding/demo', async (c) => {
-    const { written } = await seedVercelDemo(getVaultRoot());
+    const { written } = await seedVercelDemo(getContextRoot());
     return c.json({ ok: true, written, demo: 'vercel' });
   });
 
@@ -731,7 +729,7 @@ async function main() {
       '- About us: `me.md`',
       '',
     ].join('\n');
-    await fs.writeFile(path.join(getVaultRoot(), 'CLAUDE.md'), claude, 'utf-8');
+    await fs.writeFile(path.join(getContextRoot(), 'CLAUDE.md'), claude, 'utf-8');
     return c.json({ ok: true });
   });
 
@@ -867,7 +865,7 @@ async function main() {
   // the draft `pending`. UI exposes this as a single switch on /outreach.
   app.get('/api/drafts/settings', async (c) => {
     try {
-      const raw = await fs.readFile(path.join(getVaultRoot(), '.bm', 'drafts-settings.json'), 'utf-8');
+      const raw = await fs.readFile(path.join(getContextRoot(), '.bm', 'drafts-settings.json'), 'utf-8');
       return c.json(JSON.parse(raw));
     } catch {
       return c.json({ auto_send: false });
@@ -876,9 +874,9 @@ async function main() {
   app.put('/api/drafts/settings', async (c) => {
     const body = await c.req.json<{ auto_send?: boolean }>();
     const next = { auto_send: body.auto_send === true };
-    await fs.mkdir(path.join(getVaultRoot(), '.bm'), { recursive: true });
+    await fs.mkdir(path.join(getContextRoot(), '.bm'), { recursive: true });
     await fs.writeFile(
-      path.join(getVaultRoot(), '.bm', 'drafts-settings.json'),
+      path.join(getContextRoot(), '.bm', 'drafts-settings.json'),
       JSON.stringify(next, null, 2) + '\n',
       'utf-8',
     );
@@ -909,30 +907,30 @@ async function main() {
     }
   });
 
-  app.get('/api/vault/tree', async (c) => {
+  app.get('/api/context/tree', async (c) => {
     const tree = await walkTree('.');
     return c.json({ tree });
   });
 
-  app.get('/api/vault/file', async (c) => {
+  app.get('/api/context/file', async (c) => {
     const p = c.req.query('path');
     if (!p) return c.json({ error: 'path required' }, 400);
     try {
-      const out = await readVaultFile(p);
+      const out = await readContextFile(p);
       return c.json(out);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 404);
     }
   });
 
-  app.get('/api/vault/backlinks', async (c) => {
+  app.get('/api/context/backlinks', async (c) => {
     const p = c.req.query('path');
     if (!p) return c.json({ error: 'path required' }, 400);
-    const backlinks = await findBacklinks(getVaultRoot(), p);
+    const backlinks = await findBacklinks(getContextRoot(), p);
     return c.json({ backlinks });
   });
 
-  app.put('/api/vault/file', async (c) => {
+  app.put('/api/context/file', async (c) => {
     const body = await c.req.json<{ path: string; content: string }>();
     // Stamp a `human_edited_at` marker into the frontmatter of any
     // companies/contacts/deals profile saved via the editor UI. This
@@ -941,18 +939,18 @@ async function main() {
     // researcher overwrites their notes (QA BUG-03). Non-profile files
     // and .json are left alone.
     const content = stampHumanEditIfProfile(body.path, body.content);
-    await writeVaultFile(body.path, content);
+    await writeContextFile(body.path, content);
     return c.json({ ok: true });
   });
 
-  // Lists timestamped backups the vault has stashed for a given path
+  // Lists timestamped backups the context has stashed for a given path
   // before agent-driven overwrites. Used by the Companies detail drawer
   // to offer a restore path (QA BUG-03).
-  app.get('/api/vault/backups', async (c) => {
+  app.get('/api/context/backups', async (c) => {
     const p = c.req.query('path');
     if (!p) return c.json({ error: 'path required' }, 400);
     try {
-      const root = getVaultRoot();
+      const root = getContextRoot();
       const backupsDir = path.join(root, '.bm', 'backups');
       const prefix = p.replace(/\\/g, '/').replace(/\//g, '__');
       let entries: string[];
@@ -1010,7 +1008,7 @@ async function main() {
   });
 
   app.get('/api/agent/runs', async (c) => {
-    const runsDir = path.join(getVaultRoot(), 'runs');
+    const runsDir = path.join(getContextRoot(), 'runs');
     try {
       const entries = await fs.readdir(runsDir, { withFileTypes: true });
       const runs = await Promise.all(
@@ -1027,7 +1025,7 @@ async function main() {
 
   app.get('/api/agent/runs/:id', async (c) => {
     const id = c.req.param('id');
-    const runDir = path.join(getVaultRoot(), 'runs', id);
+    const runDir = path.join(getContextRoot(), 'runs', id);
     try {
       const [meta, prompt, finalMd, toolCalls] = await Promise.all([
         fs.readFile(path.join(runDir, 'meta.json'), 'utf-8').then(JSON.parse).catch(() => null),
@@ -1056,7 +1054,7 @@ async function main() {
   // to clear the running badge.
   app.post('/api/agent/runs/:id/stop', async (c) => {
     const id = c.req.param('id');
-    const runDir = path.join(getVaultRoot(), 'runs', id);
+    const runDir = path.join(getContextRoot(), 'runs', id);
     try {
       await fs.access(runDir);
     } catch {
@@ -1116,7 +1114,7 @@ async function main() {
     // incrementally.  Billing happens server-side in /api/v1/responses.
     if (codexReady) {
       const runId = `codex-${Date.now()}`;
-      const runDir = path.join(getVaultRoot(), 'runs', runId);
+      const runDir = path.join(getContextRoot(), 'runs', runId);
       await fs.mkdir(runDir, { recursive: true });
 
       const encoder = new TextEncoder();
@@ -1231,7 +1229,7 @@ async function main() {
               'utf-8',
             );
             if (body.threadId) {
-              const tp = path.join(getVaultRoot(), 'chats', `${body.threadId}.json`);
+              const tp = path.join(getContextRoot(), 'chats', `${body.threadId}.json`);
               await fs.mkdir(path.dirname(tp), { recursive: true });
               await fs.writeFile(
                 tp,
@@ -1287,7 +1285,7 @@ async function main() {
             },
           });
           if (body.threadId) {
-            const threadPath = path.join(getVaultRoot(), 'chats', `${body.threadId}.json`);
+            const threadPath = path.join(getContextRoot(), 'chats', `${body.threadId}.json`);
             await fs.mkdir(path.dirname(threadPath), { recursive: true });
             await fs.writeFile(
               threadPath,
@@ -1329,7 +1327,7 @@ async function main() {
 
   // List + read chat threads.
   app.get('/api/chats', async (c) => {
-    const dir = path.join(getVaultRoot(), 'chats');
+    const dir = path.join(getContextRoot(), 'chats');
     try {
       const entries = await fs.readdir(dir);
       const threads = await Promise.all(
@@ -1359,7 +1357,7 @@ async function main() {
     }
   });
   app.get('/api/chats/:id', async (c) => {
-    const p = path.join(getVaultRoot(), 'chats', `${c.req.param('id')}.json`);
+    const p = path.join(getContextRoot(), 'chats', `${c.req.param('id')}.json`);
     try {
       return c.json(JSON.parse(await fs.readFile(p, 'utf-8')));
     } catch {
@@ -1372,7 +1370,7 @@ async function main() {
     const id = c.req.param('id');
     if (!/^[a-zA-Z0-9\-_.]+$/.test(id)) return c.json({ error: 'invalid id' }, 400);
     const body = await c.req.json<{ starred?: boolean }>().catch(() => ({} as any));
-    const p = path.join(getVaultRoot(), 'chats', `${id}.json`);
+    const p = path.join(getContextRoot(), 'chats', `${id}.json`);
     try {
       const j = JSON.parse(await fs.readFile(p, 'utf-8'));
       if (typeof body.starred === 'boolean') j.starred = body.starred;
@@ -1387,7 +1385,7 @@ async function main() {
     const id = c.req.param('id');
     // Basic path-safety — id should be a flat filename, no slashes / dots.
     if (!/^[A-Za-z0-9_-]+$/.test(id)) return c.json({ error: 'bad id' }, 400);
-    const p = path.join(getVaultRoot(), 'chats', `${id}.json`);
+    const p = path.join(getContextRoot(), 'chats', `${id}.json`);
     try {
       await fs.unlink(p);
       return c.json({ ok: true });
@@ -1396,10 +1394,10 @@ async function main() {
     }
   });
 
-  // ---- Projects (multi-vault) -----------------------------------------
-  // The registry at <homeVault>/.bm/projects.json is the source of truth.
-  // Activating flips VAULT_ROOT in-memory; all path-joining uses
-  // getVaultRoot() so subsequent requests land in the new vault without a
+  // ---- Projects (multi-context) -----------------------------------------
+  // The registry at <homeContext>/.bm/projects.json is the source of truth.
+  // Activating flips CONTEXT_ROOT in-memory; all path-joining uses
+  // getContextRoot() so subsequent requests land in the new context without a
   // daemon restart. Long-running crons re-read the root on each tick.
   app.get('/api/projects', async (c) => {
     try {
@@ -1431,8 +1429,8 @@ async function main() {
       const body = await c.req.json<{ id?: string }>();
       if (!body.id) return c.json({ error: 'id is required' }, 400);
       const reg = await activateProject(body.id);
-      // Re-seed the newly-active vault so expected folders exist.
-      await ensureVault().catch(() => {});
+      // Re-seed the newly-active context so expected folders exist.
+      await ensureContext().catch(() => {});
       return c.json(reg);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
@@ -1492,7 +1490,7 @@ async function main() {
       const tool = toolsByName().get('enrich_score_route');
       if (!tool) return c.json({ error: 'enrich_score_route tool not registered' }, 500);
       const config = loadConfig();
-      const result = await tool.handler(body, { config, runDir: path.join(getVaultRoot(), '.bm', 'runs', 'pipeline') });
+      const result = await tool.handler(body, { config, runDir: path.join(getContextRoot(), '.bm', 'runs', 'pipeline') });
       return c.json(result);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
@@ -1520,10 +1518,10 @@ async function main() {
   serve({ fetch: app.fetch, hostname: '127.0.0.1', port });
 
   // Write discovery file — Electron main reads this to pass port + token to
-  // the renderer. Kept at the home vault (NOT the active project's vault) so
+  // the renderer. Kept at the home context (NOT the active project's context) so
   // Electron has a stable location to look even after the user switches
   // projects.
-  const discoveryPath = path.join(homeVault(), '.bm', 'daemon.json');
+  const discoveryPath = path.join(homeContext(), '.bm', 'daemon.json');
   await fs.mkdir(path.dirname(discoveryPath), { recursive: true });
   await fs.writeFile(
     discoveryPath,
@@ -1532,7 +1530,7 @@ async function main() {
   );
 
   console.log(`[daemon] http://127.0.0.1:${port}  token=${LOCAL_TOKEN.slice(0, 6)}…`);
-  console.log(`[daemon] vault ${getVaultRoot()}`);
+  console.log(`[daemon] context ${getContextRoot()}`);
   console.log(`[daemon] model ${config.default_model}  zenn=${config.zenn_api_key ? 'set' : 'MISSING'}`);
 
   await loadCronTriggers(config).catch((err) => console.error('[triggers] load failed:', err));

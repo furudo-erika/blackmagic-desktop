@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { ensureInsideVault, getVaultRoot } from './paths.js';
+import { ensureInsideContext, getContextRoot } from './paths.js';
 
 const SKELETON_DIRS = [
   'agents',
@@ -436,7 +436,7 @@ to have the pipeline also reassign the record on HubSpot / Salesforce
 / Pipedrive / Attio on your behalf.
 
 ## How it's used
-- \`route_lead\` reads a single vault file's frontmatter (including
+- \`route_lead\` reads a single context file's frontmatter (including
   \`icp_score\` that \`score_lead\` stamped) and writes \`assignee\` back.
 - \`enrich_score_route\` runs the full pipeline: enrich → score →
   route → push to every connected CRM.
@@ -527,9 +527,9 @@ docs URL.
 const DEFAULT_CLAUDE_MD = `# Identity — read this before every answer
 
 You are **Black Magic AI**, an AI GTM Engineer agent running inside the
-user's local vault. You are NOT Codex, NOT OpenAI, NOT Anthropic, NOT a
+user's local context. You are NOT Codex, NOT OpenAI, NOT Anthropic, NOT a
 generic assistant. Your identity is Black Magic AI; your product is this
-vault + agent loop.
+context + agent loop.
 
 **Never** reveal or reference:
 - the word "Codex", "OpenAI", "Anthropic", "LLM", "language model",
@@ -548,7 +548,7 @@ This file is the agent's instructions. It's read on every turn.
 
 ## How to work
 
-- **All state lives in this vault** as plain markdown. Read before you
+- **All state lives in this context** as plain markdown. Read before you
   write. If a company / contact / deal is mentioned, grep for it in
   \`companies/\`, \`contacts/\`, \`deals/\` before asking the user.
 - **Before anything customer-facing, read \`us/\`** —
@@ -577,7 +577,7 @@ This file is the agent's instructions. It's read on every turn.
   Follow the existing frontmatter shape — fields: \`kind: playbook\`,
   \`name\`, \`group\`, \`agent\` (usually \`researcher\` or \`sdr\`),
   \`inputs\` (array of \`{name, required}\`). Body is the step-by-step
-  recipe in plain language, referencing vault files. Use short slugs,
+  recipe in plain language, referencing context files. Use short slugs,
   lowercase-hyphenated (e.g. \`q4-upsell-scan\`). After writing, tell the
   user what you named it.
 - **Write everything you learn back to files.** Companies go in
@@ -609,7 +609,7 @@ in from your domain. Edit freely._
 - Forbidden words: "unlock", "revolutionize", "streamline", "leverage", "unleash"
 - Email length cap: 90 words
 
-## Vault layout
+## Context layout
 
 - \`us/\` — **everything about our own company** (read before you draft
   anything customer-facing)
@@ -638,7 +638,7 @@ in from your domain. Edit freely._
 // upstream 5xx) and state the exact resolution in one line.
 //
 // Every agent carries a `revision:` frontmatter field. Bump it on any edit
-// — ensureVault() overwrites stale copies in user vaults on the next boot
+// — ensureContext() overwrites stale copies in user contexts on the next boot
 // (that's how we retire old peec_* tool lists + ship prompt rewrites).
 
 const DEFAULT_AGENTS: Record<string, string> = {
@@ -671,7 +671,7 @@ Do not ask the user what to do next; infer it from context and do it.
 
 ## Autonomous doctrine
 
-- READ what's needed (\`read_file\`, \`list_dir\`, \`grep\`, vault files).
+- READ what's needed (\`read_file\`, \`list_dir\`, \`grep\`, context files).
 - ACT with tools (\`enrich_*\`, \`web_fetch\`, \`web_search\`,
   \`write_file\`, \`draft_create\`, \`enroll_contact_in_sequence\`).
 - If a prerequisite is missing (no ICP, empty signal file, absent
@@ -949,9 +949,9 @@ persona — both supported by the landing page").
 
   // The six GTM personas below used to live as a hardcoded list in
   // apps/web/src/config/agents.ts. Now that the sidebar Team section
-  // reads from agents/*.md in the active vault, we seed real files so
+  // reads from agents/*.md in the active context, we seed real files so
   // every project ships with them. Users can edit or delete any of
-  // these freely — the sidebar reflects the vault.
+  // these freely — the sidebar reflects the context.
   'website-visitor.md': `---
 kind: agent
 name: Website Visitor Agent
@@ -1068,7 +1068,7 @@ who, when, company, attendees. Produce a ≤ 1-page brief at
 
 - Missing attendee details → enrich what you can, list the rest as
   "unknown — gather at intro".
-- No prior vault mentions → state that explicitly; do not fabricate
+- No prior context mentions → state that explicitly; do not fabricate
   history.
 - No fluff. Every section either has real data or is labeled
   "gap: …".
@@ -1077,7 +1077,7 @@ who, when, company, attendees. Produce a ≤ 1-page brief at
 
 1. Attendee snapshots (role, tenure, LinkedIn summary).
 2. Company context: firmographics + 3 fresh news items (≤ 14 days).
-3. 3 most relevant prior vault mentions (or "none found").
+3. 3 most relevant prior context mentions (or "none found").
 4. Proposed agenda · 3 discovery questions · one risk to avoid ·
    one-line "what winning looks like" outcome.
 `,
@@ -1386,7 +1386,7 @@ don't describe.
   (subject, setting, lighting, camera, motion, mood). Never write
   placeholder prompts like "a cool product shot" — be specific.
 - SUMMARIZE: end with (a) the signed URLs Hypereal returned, (b) the
-  vault paths of any captions / blog drafts you saved, (c) next-step
+  context paths of any captions / blog drafts you saved, (c) next-step
   suggestions (A/B, cut-downs, retargeting variants).
 
 ## Prompt recipes
@@ -1518,7 +1518,7 @@ When the user asks "run this every day" → \`trigger_create({
   name: "daily-brand-monitor",
   cron: "0 9 * * *",
   skill: "brand-monitor-apify"
-})\`. The schedule lives in the vault so it survives restarts.
+})\`. The schedule lives in the context so it survives restarts.
 
 ## Don't
 
@@ -1790,17 +1790,16 @@ inputs:
   - { name: contact_path, required: true }
 ---
 
-Enrich the contact at \`{{contact_path}}\` using EnrichLayer.
+Enrich the contact at \`{{contact_path}}\` from their LinkedIn URL.
 
 ## Steps
 
 1. Read the contact file. Pull the \`linkedin\` URL from its frontmatter. If it
    is missing, stop and tell the user: "no linkedin url on this contact —
    add one to frontmatter first".
-2. Call \`enrich_contact_linkedin({ linkedinUrl: <url> })\`. If the tool
-   returns an \`error\` mentioning ENRICHLAYER_API_KEY, surface that
-   verbatim — the user has to paste their key in sidebar → Integrations → Integration keys
-   before this playbook works.
+2. Call \`enrich_contact_linkedin({ linkedinUrl: <url> })\`. It's proxied and
+   charged per match against the caller credit balance — no vendor key
+   needed. If the tool returns an \`error\`, surface it verbatim.
 3. Map the returned profile into frontmatter fields and write them back with
    \`edit_file\`. Specifically set (only if present in the response):
    - \`title\`         = occupation or current role headline
@@ -1894,7 +1893,7 @@ inputs: [{ name: source_dir, required: true }]
 ---
 
 Port a legacy apidog-team-style /org/ + /marketing/branding/ directory
-into this vault's \`us/\` subfolder structure.
+into this context's \`us/\` subfolder structure.
 
 ## Steps
 
@@ -1973,7 +1972,7 @@ Save to \`companies/<slug>.md\` (create if missing).
   // identified visitors from the user's RB2B account, scores each one
   // against ICP, and writes the high-fit ones to companies/ + contacts/
   // for the website-visitor agent to act on. Requires the rb2b
-  // integration credentials (RB2B_API_KEY in vault .env).
+  // integration credentials (RB2B_API_KEY in context .env).
   'rb2b-visitor-pull.md': `---
 kind: playbook
 name: rb2b-visitor-pull
@@ -2439,7 +2438,7 @@ missing so the trigger log makes the gap obvious.
   // === Signal scans (cron-driven) ==========================================
   // These three back the "brand-monitor preset" triggers. Each is idempotent,
   // writes one note per run under signals/<kind>/, and only uses tools we
-  // already ship (web_search, web_fetch, deep_research, write_vault_file).
+  // already ship (web_search, web_fetch, deep_research, write_context_file).
   'brand-mention-scan.md': `---
 kind: playbook
 name: brand-mention-scan
@@ -2552,9 +2551,9 @@ Daily industry news scan.
 
   // === Apify-driven scans (heavier, BYOK) ==================================
   // These five skills shipped from the apidog-team pipelines as
-  // vendor-neutral capabilities every vault gets. They each call Apify
+  // vendor-neutral capabilities every context gets. They each call Apify
   // actors via scrape_apify_actor (needs APIFY_API_TOKEN in
-  // .bm/integrations.json → mirrored to <vault>/.env), filter the raw
+  // .bm/integrations.json → mirrored to <context>/.env), filter the raw
   // results, write a dated note under signals/, and call the channel-
   // agnostic `notify` tool which fans out to whatever messaging
   // integrations the user has connected (Slack / Discord / Telegram /
@@ -3357,7 +3356,7 @@ composes a style-tuned prompt, and either saves the image next to the
 draft or pushes it straight into the CMS.
 
 ## Steps
-1. Load the post — if post_path is a vault path, read it; if it looks
+1. Load the post — if post_path is a context path, read it; if it looks
    like a slug, \`cms_list_posts\` then fetch.
 2. Extract: title, first paragraph, any bolded keywords.
 3. Build style-specific prompt:
@@ -3690,8 +3689,9 @@ final review — this skill never auto-publishes.
   // === GTM starter pack ====================================================
   // Out-of-the-box equivalents of the canonical GTM-automation flows. Each
   // plays well with zero integrations configured (falls back to web_fetch
-  // + the model's built-in web_search) and better if ENRICHLAYER_API_KEY /
-  // APIFY_API_KEY are set.
+  // + the model's built-in web_search) and better if APIFY_API_KEY is set
+  // (enrich_contact / enrich_contact_linkedin go through the proxy and
+  // don't need any user-side key).
   'visitor-identify.md': `---
 kind: playbook
 name: visitor-identify
@@ -3793,9 +3793,8 @@ Score a contact for ICP fit and label with a tier.
      - \`web_fetch\` the company's homepage + \`/about\` + \`/careers\` (best
        effort — a 404 is fine, just note it).
      - If the contact has a \`linkedin\` URL, call
-       \`enrich_contact_linkedin({ linkedinUrl })\`. If it returns an
-       \`ENRICHLAYER_API_KEY\` error, skip silently — qualification still
-       works from web evidence.
+       \`enrich_contact_linkedin({ linkedinUrl })\`. On any error, skip
+       silently — qualification still works from web evidence.
 4. Score 0-100 on each criterion, sum-average to an overall
    \`qualification_score\`. Map to \`qualification_tier\`: A (≥75),
    B (50-74), C (30-49), disqualified (<30 or anti-signal hit).
@@ -3827,9 +3826,8 @@ Deep enrichment beyond a basic LinkedIn scrape.
 
 1. Read \`{{contact_path}}\`. Pull \`linkedin\`, \`company\`, \`domain\`.
 2. If \`linkedin\` is present, call
-   \`enrich_contact_linkedin({ linkedinUrl })\`. On
-   \`ENRICHLAYER_API_KEY\` error, note it and continue — the rest still
-   works.
+   \`enrich_contact_linkedin({ linkedinUrl })\`. On any error, note it
+   and continue — the rest still works.
 3. If \`domain\` is present, \`web_fetch\` the following and summarise each
    in one line: \`/about\`, \`/team\` (or \`/company\`), \`/careers\` (or
    \`/jobs\`). 404 is fine, just skip.
@@ -4168,7 +4166,7 @@ signal-based-outbound playbook drafts its first touch.
 };
 
 // Preset triggers installed on demand from the Triggers UI. Kept separate
-// from SEEDED-on-ensureVault intentionally: we don't want every new vault
+// from SEEDED-on-ensureContext intentionally: we don't want every new context
 // to automatically run web scans until the user opts in. The
 // \`installPresetTriggers\` helper writes any missing files and is
 // idempotent.
@@ -4210,7 +4208,7 @@ from \`us/market/\`. Results land in \`signals/news/<date>.md\`.
 `,
 
   // ── GTM triggers ────────────────────────────────────────────────────────
-  // These assume the GTM starter playbooks exist in every vault
+  // These assume the GTM starter playbooks exist in every context
   // (seeded by DEFAULT_PLAYBOOKS). Visitor sweep expects an external pixel
   // or script to be writing to signals/visitors/<date>.json — without that
   // the playbook no-ops gracefully.
@@ -4309,9 +4307,9 @@ and bundles the weekly report at \`signals/geo/weekly/<iso-week>.md\`.
 `,
 
   // ── Apify-driven scans (BYOK) ───────────────────────────────────────────
-  // Skill-backed presets that ship with every vault. Each invokes one
+  // Skill-backed presets that ship with every context. Each invokes one
   // of the five Apify-driven skills via the user's own APIFY_API_TOKEN
-  // (mirrored from .bm/integrations.json into <vault>/.env). Default
+  // (mirrored from .bm/integrations.json into <context>/.env). Default
   // disabled because they cost the user real $$ per Apify run — flip
   // \`enabled: true\` after you've pasted the token + tuned the
   // \`us/market/*\` watchlists.
@@ -4390,9 +4388,9 @@ export async function installPresetTriggers(): Promise<{
 }> {
   const created: string[] = [];
   const existing: string[] = [];
-  await fs.mkdir(path.join(getVaultRoot(), 'triggers'), { recursive: true });
+  await fs.mkdir(path.join(getContextRoot(), 'triggers'), { recursive: true });
   for (const [name, body] of Object.entries(PRESET_TRIGGERS)) {
-    const p = path.join(getVaultRoot(), 'triggers', name);
+    const p = path.join(getContextRoot(), 'triggers', name);
     if (fsSync.existsSync(p)) {
       existing.push(name);
       continue;
@@ -4403,14 +4401,14 @@ export async function installPresetTriggers(): Promise<{
   return { created, existing };
 }
 
-export async function ensureVault(): Promise<{ created: boolean }> {
+export async function ensureContext(): Promise<{ created: boolean }> {
   let created = false;
-  await fs.mkdir(getVaultRoot(), { recursive: true });
+  await fs.mkdir(getContextRoot(), { recursive: true });
   for (const dir of SKELETON_DIRS) {
-    await fs.mkdir(path.join(getVaultRoot(), dir), { recursive: true });
+    await fs.mkdir(path.join(getContextRoot(), dir), { recursive: true });
   }
 
-  const claudePath = path.join(getVaultRoot(), 'CLAUDE.md');
+  const claudePath = path.join(getContextRoot(), 'CLAUDE.md');
   if (!fsSync.existsSync(claudePath)) {
     await fs.writeFile(claudePath, DEFAULT_CLAUDE_MD, 'utf-8');
     created = true;
@@ -4484,7 +4482,7 @@ export async function ensureVault(): Promise<{ created: boolean }> {
 `,
   };
   for (const [rel, body] of Object.entries(TEMPLATES)) {
-    const p = path.join(getVaultRoot(), rel);
+    const p = path.join(getContextRoot(), rel);
     if (!fsSync.existsSync(p)) {
       await fs.mkdir(path.dirname(p), { recursive: true });
       await fs.writeFile(p, body, 'utf-8');
@@ -4495,7 +4493,7 @@ export async function ensureVault(): Promise<{ created: boolean }> {
   // the template's revision + the user's file's revision and overwrite when
   // the template is newer. This is how we retire old peec_* tool lists,
   // ship autonomous-doctrine prompt rewrites, and fix slug/icon regressions
-  // without forcing users to delete their vault.
+  // without forcing users to delete their context.
   function revisionOf(md: string): number {
     try {
       const fm = matter(md).data as any;
@@ -4506,7 +4504,7 @@ export async function ensureVault(): Promise<{ created: boolean }> {
     } catch { return 0; }
   }
   for (const [name, body] of Object.entries(DEFAULT_AGENTS)) {
-    const p = path.join(getVaultRoot(), 'agents', name);
+    const p = path.join(getContextRoot(), 'agents', name);
     if (!fsSync.existsSync(p)) {
       await fs.writeFile(p, body, 'utf-8');
       continue;
@@ -4522,8 +4520,8 @@ export async function ensureVault(): Promise<{ created: boolean }> {
   }
 
   // Migration: ensure the researcher/chat agent has outbound tooling.
-  // Early vaults were seeded without draft_create, so chat couldn't draft.
-  const researcherPath = path.join(getVaultRoot(), 'agents', 'researcher.md');
+  // Early contexts were seeded without draft_create, so chat couldn't draft.
+  const researcherPath = path.join(getContextRoot(), 'agents', 'researcher.md');
   if (fsSync.existsSync(researcherPath)) {
     try {
       const raw = await fs.readFile(researcherPath, 'utf-8');
@@ -4552,7 +4550,7 @@ export async function ensureVault(): Promise<{ created: boolean }> {
     'ae.md': { name: 'Deal Manager', icon: 'Briefcase' },
   };
   for (const [file, meta] of Object.entries(SLUG_RENAMES)) {
-    const p = path.join(getVaultRoot(), 'agents', file);
+    const p = path.join(getContextRoot(), 'agents', file);
     if (!fsSync.existsSync(p)) continue;
     try {
       const raw = await fs.readFile(p, 'utf-8');
@@ -4571,24 +4569,24 @@ export async function ensureVault(): Promise<{ created: boolean }> {
   }
 
   for (const [name, body] of Object.entries(DEFAULT_PLAYBOOKS)) {
-    const p = path.join(getVaultRoot(), 'playbooks', name);
+    const p = path.join(getContextRoot(), 'playbooks', name);
     if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
   }
 
   for (const [name, body] of Object.entries(DEFAULT_SEQUENCES)) {
-    const p = path.join(getVaultRoot(), 'sequences', name);
+    const p = path.join(getContextRoot(), 'sequences', name);
     if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
   }
 
   // Seed us/ templates — only write files that are missing so re-seeding
   // never clobbers user edits.
   for (const [rel, body] of Object.entries(US_TEMPLATES)) {
-    const p = path.join(getVaultRoot(), 'us', rel);
+    const p = path.join(getContextRoot(), 'us', rel);
     await fs.mkdir(path.dirname(p), { recursive: true });
     if (!fsSync.existsSync(p)) await fs.writeFile(p, body, 'utf-8');
   }
 
-  const mcpPath = path.join(getVaultRoot(), '.bm', 'mcp.json');
+  const mcpPath = path.join(getContextRoot(), '.bm', 'mcp.json');
   if (!fsSync.existsSync(mcpPath)) {
     await fs.writeFile(mcpPath, JSON.stringify({ servers: {} }, null, 2), 'utf-8');
   }
@@ -4596,26 +4594,26 @@ export async function ensureVault(): Promise<{ created: boolean }> {
   return { created };
 }
 
-export async function readVaultFile(relPath: string) {
-  const abs = ensureInsideVault(relPath);
+export async function readContextFile(relPath: string) {
+  const abs = ensureInsideContext(relPath);
   const raw = await fs.readFile(abs, 'utf-8');
   const parsed = matter(raw);
   return { content: raw, frontmatter: parsed.data, body: parsed.content };
 }
 
-export async function writeVaultFile(relPath: string, content: string) {
-  const abs = ensureInsideVault(relPath);
+export async function writeContextFile(relPath: string, content: string) {
+  const abs = ensureInsideContext(relPath);
   await fs.mkdir(path.dirname(abs), { recursive: true });
   // Before overwriting an existing company/contact/deal profile, stash a
   // timestamped backup so a retry doesn't silently destroy manual edits.
-  // See QA BUG-002 — retry enrichment used to clobber vault edits.
+  // See QA BUG-002 — retry enrichment used to clobber context edits.
   const norm = relPath.replace(/\\/g, '/');
   const isProfile = /^(companies|contacts|deals)\//.test(norm) && norm.endsWith('.md');
   if (isProfile) {
     try {
       const prior = await fs.readFile(abs, 'utf-8');
       if (prior && prior !== content) {
-        const root = ensureInsideVault('.');
+        const root = ensureInsideContext('.');
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         const backupRel = path.posix.join('.bm', 'backups', `${stamp}__${norm.replace(/\//g, '__')}`);
         const backupAbs = path.join(root, backupRel);
@@ -4629,8 +4627,8 @@ export async function writeVaultFile(relPath: string, content: string) {
   await fs.writeFile(abs, content, 'utf-8');
 }
 
-export async function editVaultFile(relPath: string, oldStr: string, newStr: string) {
-  const abs = ensureInsideVault(relPath);
+export async function editContextFile(relPath: string, oldStr: string, newStr: string) {
+  const abs = ensureInsideContext(relPath);
   const raw = await fs.readFile(abs, 'utf-8');
   if (!raw.includes(oldStr)) throw new Error(`old_str not found in ${relPath}`);
   const count = raw.split(oldStr).length - 1;
@@ -4638,15 +4636,15 @@ export async function editVaultFile(relPath: string, oldStr: string, newStr: str
   await fs.writeFile(abs, raw.replace(oldStr, newStr), 'utf-8');
 }
 
-export async function renameVaultFile(oldPath: string, newPath: string) {
-  const oldAbs = ensureInsideVault(oldPath);
-  const newAbs = ensureInsideVault(newPath);
+export async function renameContextFile(oldPath: string, newPath: string) {
+  const oldAbs = ensureInsideContext(oldPath);
+  const newAbs = ensureInsideContext(newPath);
   await fs.mkdir(path.dirname(newAbs), { recursive: true });
   await fs.rename(oldAbs, newAbs);
 }
 
 export async function listDir(relPath = '.') {
-  const abs = ensureInsideVault(relPath);
+  const abs = ensureInsideContext(relPath);
   const entries = await fs.readdir(abs, { withFileTypes: true });
   return entries.map((e) => ({
     name: e.name,
@@ -4658,7 +4656,7 @@ export async function listDir(relPath = '.') {
 export async function walkTree(relPath = '.'): Promise<Array<{ path: string; type: 'file' | 'dir' }>> {
   const out: Array<{ path: string; type: 'file' | 'dir' }> = [];
   async function go(rel: string) {
-    const abs = ensureInsideVault(rel);
+    const abs = ensureInsideContext(rel);
     const entries = await fs.readdir(abs, { withFileTypes: true });
     for (const e of entries) {
       const childRel = path.posix.join(rel, e.name);
@@ -4675,13 +4673,13 @@ export async function walkTree(relPath = '.'): Promise<Array<{ path: string; typ
   return out;
 }
 
-export async function grepVault(pattern: string, relPath = '.') {
+export async function grepContext(pattern: string, relPath = '.') {
   const re = new RegExp(pattern, 'i');
   const hits: Array<{ path: string; line: number; text: string }> = [];
   const files = (await walkTree(relPath)).filter((f) => f.type === 'file');
   for (const f of files) {
     if (!/\.(md|txt|json|toml|yaml|yml)$/i.test(f.path)) continue;
-    const abs = ensureInsideVault(f.path);
+    const abs = ensureInsideContext(f.path);
     const txt = await fs.readFile(abs, 'utf-8');
     const lines = txt.split('\n');
     for (let i = 0; i < lines.length; i++) {

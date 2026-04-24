@@ -15,7 +15,7 @@ Downloads:
    open "/Applications/Black Magic.app"
    ```
 
-3. Sign in (pastes your `ck_` key into `~/BlackMagic/.bm/config.toml`). The daemon starts automatically on a local port and seeds the vault.
+3. Sign in (pastes your `ck_` key into `~/BlackMagic/.bm/config.toml`). The daemon starts automatically on a local port and seeds the context.
 
 ## Windows
 
@@ -23,11 +23,11 @@ Downloads:
 2. Windows SmartScreen may warn — click *More info* → *Run anyway* (unsigned build).
 3. The installer places the app in `%LocalAppData%\Programs\Black Magic` and drops a Start-menu shortcut.
 
-## Vault location
+## Context location
 
 Default: `~/BlackMagic` (macOS/Linux) or `%USERPROFILE%\BlackMagic` (Windows).
 
-To use a different location, set `BM_VAULT_PATH` before launching, or edit `~/BlackMagic/.bm/config.toml` after the first run and relaunch.
+To use a different location, set `BM_CONTEXT_PATH` before launching, or edit `~/BlackMagic/.bm/config.toml` after the first run and relaunch.
 
 ## Env overrides
 
@@ -51,4 +51,4 @@ To use a different location, set `BM_VAULT_PATH` before launching, or edit `~/Bl
 
 **`zenn 402`** — credits exhausted. Top up at https://blackmagic.engineering/dashboard/billing.
 
-**UI shows "daemon not connected"** — wait a few seconds on first launch (vault seeding + port binding). Restart the app if it persists.
+**UI shows "daemon not connected"** — wait a few seconds on first launch (context seeding + port binding). Restart the app if it persists.

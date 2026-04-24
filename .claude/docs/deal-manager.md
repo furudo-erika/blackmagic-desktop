@@ -2,7 +2,7 @@
 
 **AE agent.** Runs the `deals/` folder.
 
-- Definition: `daemon/src/vault.ts` ≈ lines 594–613
+- Definition: `daemon/src/context.ts` ≈ lines 594–613
 - Model: `gpt-5.3-codex` · Temperature: 0.3 · Icon: `Briefcase`
 
 ## Purpose
@@ -17,7 +17,7 @@ Pure local heuristics — no external calls.
 read_file, write_file, edit_file, list_dir, grep
 ```
 
-## Vault I/O
+## Context I/O
 
 - Reads + edits `deals/open/*.md`, `deals/closed-won/*.md`,
   `deals/closed-lost/*.md`
@@ -34,7 +34,7 @@ None direct. Playbooks: `won-analyze`, `lost-pull-history`,
 ## Dependencies
 
 None. Entirely offline — the AE's job is to reason about what's already
-in the vault, not fetch new data.
+in the context, not fetch new data.
 
 ## Quirks
 

@@ -157,7 +157,7 @@ export default function HistoryPage() {
 
           <p className="mt-4 text-[11px] text-muted dark:text-[#8C837C]">
             Threads live in <code className="font-mono">chats/</code> inside
-            your vault. Starred threads pin to the top; stars are stored as{' '}
+            your context. Starred threads pin to the top; stars are stored as{' '}
             <code className="font-mono">starred: true</code> on the thread JSON.
           </p>
 

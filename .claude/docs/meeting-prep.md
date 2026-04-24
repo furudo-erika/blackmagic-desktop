@@ -2,14 +2,14 @@
 
 **≤1-page pre-meeting brief.**
 
-- Definition: `daemon/src/vault.ts` ≈ lines 693–725
+- Definition: `daemon/src/context.ts` ≈ lines 693–725
 - Model: `gpt-5.3-codex` · Temperature: 0.2 · Icon: `CalendarClock`
 
 ## Purpose
 
 Given attendees + a company, produces a dense one-page brief: attendee
 backgrounds (LinkedIn, role, tenure), recent company news (14-day
-window), prior vault mentions, a proposed agenda, 3–5 discovery
+window), prior context mentions, a proposed agenda, 3–5 discovery
 questions, 2–3 risks, and a single-sentence success criterion.
 
 ## Tools allowed
@@ -23,7 +23,7 @@ enrich_company, enrich_contact
 No `draft_create` — the brief itself is the output, not an outbound
 message. No edit tools — briefs are written once, fresh each time.
 
-## Vault I/O
+## Context I/O
 
 - Reads: `companies/<slug>.md`, `contacts/<company>/*`, `deals/*/`,
   `signals/*`

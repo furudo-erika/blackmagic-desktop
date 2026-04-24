@@ -104,13 +104,13 @@ function DrawerSection({ icon: Icon, label, count, allHref, empty, children }: {
 
 function CompanyDetail({ company, onClose }: { company: Company; onClose: () => void }) {
   const file = useQuery({
-    queryKey: ['vault-file', company.path],
+    queryKey: ['context-file', company.path],
     queryFn: () => api.readFile(company.path),
   });
-  const tree = useQuery({ queryKey: ['vault-tree'], queryFn: api.vaultTree, staleTime: 30_000 });
+  const tree = useQuery({ queryKey: ['context-tree'], queryFn: api.contextTree, staleTime: 30_000 });
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.listRuns, staleTime: 30_000 });
   const backups = useQuery({
-    queryKey: ['vault-backups', company.path],
+    queryKey: ['context-backups', company.path],
     queryFn: () => api.listBackups(company.path),
     staleTime: 30_000,
   });
@@ -163,7 +163,7 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
           <ul className="space-y-0.5">
             {contactList.slice(0, 8).map((c) => (
               <li key={c.path}>
-                <Link href={`/vault?path=${encodeURIComponent(c.path)}`} className="block text-[12px] font-mono text-muted dark:text-[#8C837C] hover:text-flame truncate">
+                <Link href={`/context?path=${encodeURIComponent(c.path)}`} className="block text-[12px] font-mono text-muted dark:text-[#8C837C] hover:text-flame truncate">
                   {c.path.replace('contacts/', '').replace(/\.md$/, '')}
                 </Link>
               </li>
@@ -174,7 +174,7 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
           <ul className="space-y-0.5">
             {dealList.map((d) => (
               <li key={d.path}>
-                <Link href={`/vault?path=${encodeURIComponent(d.path)}`} className="block text-[12px] font-mono text-muted dark:text-[#8C837C] hover:text-flame truncate">
+                <Link href={`/context?path=${encodeURIComponent(d.path)}`} className="block text-[12px] font-mono text-muted dark:text-[#8C837C] hover:text-flame truncate">
                   {d.path.replace(/^deals\//, '').replace(/\.md$/, '')}
                 </Link>
               </li>
@@ -198,13 +198,13 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
             </div>
             <p className="text-[11px] text-muted dark:text-[#8C837C] mb-2">
               Snapshots saved under <code className="font-mono">.bm/backups/</code> before each
-              agent overwrite. Open one in the vault to restore or diff.
+              agent overwrite. Open one in the context to restore or diff.
             </p>
             <ul className="space-y-0.5">
               {backups.data!.backups.slice(0, 5).map((b) => (
                 <li key={b.path}>
                   <Link
-                    href={`/vault?path=${encodeURIComponent(b.path)}`}
+                    href={`/context?path=${encodeURIComponent(b.path)}`}
                     className="block text-[11px] font-mono text-muted dark:text-[#8C837C] hover:text-flame truncate"
                   >
                     {b.name}
@@ -215,8 +215,8 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
           </section>
         )}
         <section className="pt-2 border-t border-line dark:border-[#2A241D]">
-          <Link href={`/vault?path=${encodeURIComponent(company.path)}`} className="inline-flex items-center gap-1 text-[12px] text-muted dark:text-[#8C837C] hover:text-flame">
-            <ExternalLink className="w-3 h-3" /> Open in vault editor
+          <Link href={`/context?path=${encodeURIComponent(company.path)}`} className="inline-flex items-center gap-1 text-[12px] text-muted dark:text-[#8C837C] hover:text-flame">
+            <ExternalLink className="w-3 h-3" /> Open in context editor
           </Link>
         </section>
       </div>
@@ -236,7 +236,7 @@ export default function CompaniesPage() {
   const companies = useQuery({
     queryKey: ['companies'],
     queryFn: async (): Promise<Company[]> => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('companies/') && f.path.endsWith('.md'),
       );
@@ -273,8 +273,8 @@ export default function CompaniesPage() {
     },
   });
 
-  // For contact counts, we read vault tree once
-  const tree = useQuery({ queryKey: ['vault-tree'], queryFn: api.vaultTree, staleTime: 30_000 });
+  // For contact counts, we read context tree once
+  const tree = useQuery({ queryKey: ['context-tree'], queryFn: api.contextTree, staleTime: 30_000 });
   const contactsByCompany = useMemo(() => {
     const map = new Map<string, number>();
     for (const f of tree.data?.tree ?? []) {
@@ -299,7 +299,7 @@ export default function CompaniesPage() {
       setShowEnrich(false);
       setDomain('');
       qc.invalidateQueries({ queryKey: ['companies'] });
-      qc.invalidateQueries({ queryKey: ['vault-tree'] });
+      qc.invalidateQueries({ queryKey: ['context-tree'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

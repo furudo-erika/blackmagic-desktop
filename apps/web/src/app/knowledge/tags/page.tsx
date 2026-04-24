@@ -10,12 +10,12 @@ import { KnowledgeTabs } from '../../../components/knowledge-tabs';
 // Walks every companies/contacts/deals .md frontmatter and rolls up
 // the `tags:` list. Read-only for now — to add a tag, edit the entity.
 export default function TagsPage() {
-  const tree = useQuery({ queryKey: ['vault-tree'], queryFn: api.vaultTree });
+  const tree = useQuery({ queryKey: ['context-tree'], queryFn: api.contextTree });
 
   const tags = useQuery({
     queryKey: ['knowledge-tags'],
     queryFn: async () => {
-      const t = await api.vaultTree();
+      const t = await api.contextTree();
       const files = t.tree.filter((f) =>
         f.type === 'file' &&
         f.path.endsWith('.md') &&

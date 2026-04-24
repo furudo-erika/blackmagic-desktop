@@ -1,8 +1,8 @@
-# Vault Layout & Frontmatter Conventions
+# Context Layout & Frontmatter Conventions
 
 ## Root
 
-`~/BlackMagic/` by default. Override with `BM_VAULT_PATH` or `.bm/config.toml → vault_path`.
+`~/BlackMagic/` by default. Override with `BM_CONTEXT_PATH` or `.bm/config.toml → context_path`.
 
 ```
 ~/BlackMagic/

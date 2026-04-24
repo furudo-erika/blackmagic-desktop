@@ -1,6 +1,6 @@
 // Starter-prompt generator. Each agent has a list of template strings
 // with `{slot}` placeholders. At request time we read the active
-// vault's us/ files, extract slot values, and fill the templates.
+// context's us/ files, extract slot values, and fill the templates.
 // Starters whose slots can't be filled are dropped rather than shown
 // with unfilled placeholders.
 //
@@ -13,7 +13,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { getVaultRoot } from './paths.js';
+import { getContextRoot } from './paths.js';
 
 // ---- slot vocabulary -----------------------------------------------
 // Stable across templates. Templates reference `{company}`, `{competitor_a}`,
@@ -23,7 +23,7 @@ export type Slots = Record<string, string | undefined>;
 
 async function readMatter(rel: string): Promise<{ fm: Record<string, unknown>; body: string } | null> {
   try {
-    const raw = await fs.readFile(path.join(getVaultRoot(), rel), 'utf-8');
+    const raw = await fs.readFile(path.join(getContextRoot(), rel), 'utf-8');
     const parsed = matter(raw);
     return { fm: (parsed.data ?? {}) as Record<string, unknown>, body: parsed.content ?? '' };
   } catch {
@@ -58,10 +58,10 @@ function tableFirstColumn(body: string): string[] {
   return rows;
 }
 
-// Domain-keyed hardcoded fallbacks for when the vault's us/ is still
+// Domain-keyed hardcoded fallbacks for when the context's us/ is still
 // a skeleton (competitors.md empty, top.md empty, etc.). Not meant to
 // be exhaustive — just enough that the demo Vercel project shows
-// realistic starters on day one even if ensureVault clobbered the
+// realistic starters on day one even if ensureContext clobbered the
 // seeded market/customers content.
 const DOMAIN_FALLBACKS: Record<string, Partial<Slots>> = {
   'vercel.com': {
@@ -149,7 +149,7 @@ export async function extractSlots(): Promise<Slots> {
   }
 
   // Domain-keyed fallbacks fill whatever's still undefined. Never
-  // overrides a value actually present in the vault.
+  // overrides a value actually present in the context.
   if (domain && DOMAIN_FALLBACKS[domain]) {
     for (const [k, v] of Object.entries(DOMAIN_FALLBACKS[domain]!)) {
       if (slots[k] === undefined && v !== undefined) slots[k] = v;
@@ -170,8 +170,8 @@ export async function extractSlots(): Promise<Slots> {
 // shuffle works even when some templates drop for missing slots.
 
 export const AGENT_STARTERS: Record<string, string[]> = {
-  // Generalist chat agent — reads/writes vault, enriches, drafts, enrolls.
-  // Starters lean toward vault housekeeping + cross-cutting research no
+  // Generalist chat agent — reads/writes context, enriches, drafts, enrolls.
+  // Starters lean toward context housekeeping + cross-cutting research no
   // other specialist agent owns end-to-end.
   'researcher': [
     'Enrich every company in companies/ that is missing a firmographic profile — write icp_score and a one-paragraph why-they-fit.',

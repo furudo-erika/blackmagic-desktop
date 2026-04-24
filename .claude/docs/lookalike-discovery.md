@@ -2,7 +2,7 @@
 
 **Closed-won → 20–50 twins.**
 
-- Definition: `daemon/src/vault.ts` ≈ lines 727–750
+- Definition: `daemon/src/context.ts` ≈ lines 727–750
 - Model: `gpt-5.3-codex` · Temperature: 0.3 · Icon: `Copy`
 
 ## Purpose
@@ -19,7 +19,7 @@ read_file, write_file, list_dir, grep,
 web_fetch, web_search, enrich_company
 ```
 
-## Vault I/O
+## Context I/O
 
 - Reads: `deals/closed-won/*.md`, `us/icp.md`
 - Writes: `companies/<slug>.md` (one per lookalike match)
@@ -36,7 +36,7 @@ None. Invoked by the `won-lookalikes` playbook.
 ## Quirks
 
 - **Hard cap: 50 matches**. If the seed is broad the agent stops at 50
-  rather than flood the vault.
+  rather than flood the context.
 - **Early-stop rule**: if ICP score drops below 50 for three consecutive
   candidates, the agent exits. This prevents burning enrichment credits
   down the long tail.

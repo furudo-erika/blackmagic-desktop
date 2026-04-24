@@ -73,7 +73,7 @@ export default function HomePage() {
   const agentList = useQuery({
     queryKey: ['home-agent-options'],
     queryFn: async () => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'),
       );

@@ -2,7 +2,7 @@
 
 **Daily LinkedIn signal loop.**
 
-- Definition: `daemon/src/vault.ts` ≈ lines 659–691
+- Definition: `daemon/src/context.ts` ≈ lines 659–691
 - Model: `gpt-5.3-codex` · Temperature: 0.3 · Icon: `Linkedin`
 
 ## Purpose
@@ -20,7 +20,7 @@ enrich_company, enrich_contact, enrich_contact_linkedin,
 draft_create, enroll_contact_in_sequence
 ```
 
-## Vault I/O
+## Context I/O
 
 - Reads: `signals/linkedin/<date>.md` (scraped by upstream job)
 - Writes: `contacts/<company>/<name>.md`, `drafts/<ts>-*.md`,
@@ -30,7 +30,7 @@ draft_create, enroll_contact_in_sequence
 
 ## Trigger
 
-`linkedin-daily-outreach` (`daemon/src/vault.ts` ≈ line 2245)
+`linkedin-daily-outreach` (`daemon/src/context.ts` ≈ line 2245)
 — cron `0 9 * * 1-5` (weekdays 09:00).
 
 ## Dependencies

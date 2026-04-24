@@ -4,14 +4,13 @@ import path from 'node:path';
 import toml from 'toml';
 
 export interface Config {
-  vault_path: string;
+  context_path: string;
   default_model: string;
   zenn_base_url: string;
   zenn_api_key?: string;
   billing_url?: string;
   daemon_port?: number;
   apify_api_key?: string;
-  enrichlayer_api_key?: string;
   hubspot_api_key?: string;
   apollo_api_key?: string;
   attio_api_key?: string;
@@ -44,33 +43,33 @@ export interface Config {
   linkedin_cookie?: string;
 }
 
-function defaultVault(): string {
-  return process.env.BM_VAULT_PATH ?? path.join(os.homedir(), 'BlackMagic');
+function defaultContext(): string {
+  return process.env.BM_CONTEXT_PATH ?? path.join(os.homedir(), 'BlackMagic');
 }
 
-// Root of the "home" vault (the folder that contains the projects registry).
+// Root of the "home" context (the folder that contains the projects registry).
 // This never changes — the registry lives here, even after switching to a
-// different project vault.
-export function homeVault(): string {
-  return defaultVault();
+// different project context.
+export function homeContext(): string {
+  return defaultContext();
 }
 
-// Active vault. Mutable — the projects registry module updates this when the
+// Active context. Mutable — the projects registry module updates this when the
 // user activates a different project. Every runtime code path reads live via
-// getVaultRoot() / ensureInsideVault().
-let activeVault: string = defaultVault();
+// getContextRoot() / ensureInsideContext().
+let activeContext: string = defaultContext();
 
-export function getVaultRoot(): string {
-  return activeVault;
+export function getContextRoot(): string {
+  return activeContext;
 }
 
-export function setVaultRoot(p: string) {
-  activeVault = p;
+export function setContextRoot(p: string) {
+  activeContext = p;
 }
 
 export function loadConfig(): Config {
-  const vault = getVaultRoot();
-  const configPath = path.join(vault, '.bm', 'config.toml');
+  const context = getContextRoot();
+  const configPath = path.join(context, '.bm', 'config.toml');
 
   // Daemon talks to our API proxy. The proxy holds the upstream keys and
   // never exposes them. Client only auths with its own ck_.
@@ -84,14 +83,13 @@ export function loadConfig(): Config {
   const apiUrl = process.env.BM_API_URL ?? billingUrl.replace('blackmagic.engineering', 'api.blackmagic.engineering');
   const defaultZennBase = `${apiUrl.replace(/\/+$/, '')}/v1`;
   const base: Config = {
-    vault_path: vault,
+    context_path: context,
     default_model: process.env.BM_DEFAULT_MODEL ?? 'gpt-5.4',
     zenn_base_url: process.env.ZENN_BASE_URL ?? defaultZennBase,
     zenn_api_key: process.env.ZENN_API_KEY,
     billing_url: billingUrl,
     daemon_port: process.env.BM_DAEMON_PORT ? Number(process.env.BM_DAEMON_PORT) : undefined,
     apify_api_key: process.env.APIFY_API_KEY,
-    enrichlayer_api_key: process.env.ENRICHLAYER_API_KEY,
     hubspot_api_key: process.env.HUBSPOT_API_KEY,
     apollo_api_key: process.env.APOLLO_API_KEY,
     attio_api_key: process.env.ATTIO_API_KEY,
@@ -124,15 +122,15 @@ export function loadConfig(): Config {
   return base;
 }
 
-// Legacy alias. Prefer getVaultRoot() — this only reflects the vault at
+// Legacy alias. Prefer getContextRoot() — this only reflects the context at
 // module-load time and will not track project switches.
-export const VAULT_ROOT = defaultVault();
+export const CONTEXT_ROOT = defaultContext();
 
-export function ensureInsideVault(p: string) {
-  const root = getVaultRoot();
+export function ensureInsideContext(p: string) {
+  const root = getContextRoot();
   const abs = path.resolve(root, p);
   if (!abs.startsWith(path.resolve(root))) {
-    throw new Error(`path escapes vault: ${p}`);
+    throw new Error(`path escapes context: ${p}`);
   }
   return abs;
 }

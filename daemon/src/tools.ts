@@ -2,11 +2,11 @@
 //  - a JSON Schema (exposed to the LLM via tools[])
 //  - a handler (executed locally by the daemon)
 //
-// Every handler receives a `ctx` with vault + config + secrets.
+// Every handler receives a `ctx` with context + config + secrets.
 
-import { readVaultFile, writeVaultFile, editVaultFile, renameVaultFile, listDir, grepVault } from './vault.js';
+import { readContextFile, writeContextFile, editContextFile, renameContextFile, listDir, grepContext } from './context.js';
 import {
-  loadRubric, applyRubric, loadRouting, applyRouting, stampVault, slugify,
+  loadRubric, applyRubric, loadRouting, applyRouting, stampContext, slugify,
 } from './pipeline.js';
 import type { Config } from './paths.js';
 import { McpRegistry } from './mcp.js';
@@ -44,18 +44,18 @@ export interface ToolDef {
 
 const read_file: ToolDef = {
   name: 'read_file',
-  description: 'Read a file from the vault. Returns { content, frontmatter, body }.',
+  description: 'Read a file from the context. Returns { content, frontmatter, body }.',
   parameters: {
     type: 'object',
-    properties: { path: { type: 'string', description: 'Relative path inside the vault' } },
+    properties: { path: { type: 'string', description: 'Relative path inside the context' } },
     required: ['path'],
   },
-  handler: async (args) => readVaultFile(args.path),
+  handler: async (args) => readContextFile(args.path),
 };
 
 const write_file: ToolDef = {
   name: 'write_file',
-  description: 'Create or overwrite a vault file. Use frontmatter YAML at the top for structured files.',
+  description: 'Create or overwrite a context file. Use frontmatter YAML at the top for structured files.',
   parameters: {
     type: 'object',
     properties: {
@@ -65,14 +65,14 @@ const write_file: ToolDef = {
     required: ['path', 'content'],
   },
   handler: async (args) => {
-    await writeVaultFile(args.path, args.content);
+    await writeContextFile(args.path, args.content);
     return { ok: true, path: args.path };
   },
 };
 
 const edit_file: ToolDef = {
   name: 'edit_file',
-  description: 'Replace a unique substring in a vault file. Fails if old_str is missing or ambiguous.',
+  description: 'Replace a unique substring in a context file. Fails if old_str is missing or ambiguous.',
   parameters: {
     type: 'object',
     properties: {
@@ -83,28 +83,28 @@ const edit_file: ToolDef = {
     required: ['path', 'old_str', 'new_str'],
   },
   handler: async (args) => {
-    await editVaultFile(args.path, args.old_str, args.new_str);
+    await editContextFile(args.path, args.old_str, args.new_str);
     return { ok: true };
   },
 };
 
 const rename_file: ToolDef = {
   name: 'rename_file',
-  description: 'Move a vault file to a new path. Useful when a deal transitions stages.',
+  description: 'Move a context file to a new path. Useful when a deal transitions stages.',
   parameters: {
     type: 'object',
     properties: { old_path: { type: 'string' }, new_path: { type: 'string' } },
     required: ['old_path', 'new_path'],
   },
   handler: async (args) => {
-    await renameVaultFile(args.old_path, args.new_path);
+    await renameContextFile(args.old_path, args.new_path);
     return { ok: true };
   },
 };
 
 const list_dir: ToolDef = {
   name: 'list_dir',
-  description: 'List immediate children of a vault directory.',
+  description: 'List immediate children of a context directory.',
   parameters: {
     type: 'object',
     properties: { path: { type: 'string', default: '.' } },
@@ -114,7 +114,7 @@ const list_dir: ToolDef = {
 
 const grep: ToolDef = {
   name: 'grep',
-  description: 'Search case-insensitive regex across vault markdown files.',
+  description: 'Search case-insensitive regex across context markdown files.',
   parameters: {
     type: 'object',
     properties: {
@@ -123,7 +123,7 @@ const grep: ToolDef = {
     },
     required: ['pattern'],
   },
-  handler: async (args) => grepVault(args.pattern, args.path ?? '.'),
+  handler: async (args) => grepContext(args.pattern, args.path ?? '.'),
 };
 
 const web_fetch: ToolDef = {
@@ -143,7 +143,7 @@ const web_fetch: ToolDef = {
 
 // Both web_search and enrich_company are proxied through blackmagic.engineering so the
 // user doesn't manage third-party keys. Server side charges the user's
-// credits per call and forwards the response. Authed with the vault's ck_.
+// credits per call and forwards the response. Authed with the context's ck_.
 async function proxyTool(toolName: string, args: Record<string, unknown>, ctx: ToolCtx) {
   const key = ctx.config.zenn_api_key;
   const base = (ctx.config.billing_url ?? 'https://blackmagic.engineering').replace(/\/+$/, '');
@@ -290,7 +290,7 @@ created_at: ${new Date().toISOString()}
 
 ${args.body}
 `;
-    await writeVaultFile(relPath, content);
+    await writeContextFile(relPath, content);
 
     // Resolve auto-send: explicit args.auto > global setting > pending.
     let auto = args.auto === true;
@@ -298,9 +298,9 @@ ${args.body}
       try {
         const fs = await import('node:fs/promises');
         const pathMod = await import('node:path');
-        const { getVaultRoot } = await import('./paths.js');
+        const { getContextRoot } = await import('./paths.js');
         const raw = await fs.readFile(
-          pathMod.join(getVaultRoot(), '.bm', 'drafts-settings.json'),
+          pathMod.join(getContextRoot(), '.bm', 'drafts-settings.json'),
           'utf-8',
         );
         const cfg = JSON.parse(raw);
@@ -324,7 +324,7 @@ ${args.body}
 const enrich_contact_linkedin: ToolDef = {
   name: 'enrich_contact_linkedin',
   description:
-    "Enrich a person via EnrichLayer (proxycurl-compatible) using their LinkedIn profile URL. Returns structured profile fields (title, company, location, summary, experience). Uses the user's own ENRICHLAYER_API_KEY — not the proxy.",
+    'Enrich a person from their LinkedIn profile URL — title, company, location, work history. Proxied through blackmagic.engineering; charged per match against the caller credit balance. No vendor key required.',
   parameters: {
     type: 'object',
     properties: {
@@ -332,23 +332,11 @@ const enrich_contact_linkedin: ToolDef = {
     },
     required: ['linkedinUrl'],
   },
-  handler: async (args, ctx) => {
-    const key = ctx.config.enrichlayer_api_key;
-    if (!key) {
-      return { error: 'No ENRICHLAYER_API_KEY configured. Set it in sidebar → Integrations, or add enrichlayer_api_key to ~/BlackMagic/.bm/config.toml.' };
-    }
-    const url = new URL('https://enrichlayer.com/api/v2/linkedin');
-    url.searchParams.set('url', args.linkedinUrl);
-    url.searchParams.set('use_cache', 'if-present');
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${key}` },
-    });
-    const text = await res.text();
-    let data: unknown;
-    try { data = JSON.parse(text); } catch { data = text; }
-    if (!res.ok) return { error: `enrichlayer ${res.status}: ${String(text).slice(0, 300)}` };
-    return data;
-  },
+  // Thin alias over enrich_contact. The server-side proxy already accepts
+  // { linkedin } on /api/agent-tools/enrich_contact and routes to PeopleDataLabs,
+  // so we reuse that endpoint rather than ship a duplicate. Skills/prompts keep
+  // calling `enrich_contact_linkedin({ linkedinUrl })` for readability.
+  handler: async (args, ctx) => proxyTool('enrich_contact', { linkedin: args.linkedinUrl }, ctx),
 };
 
 const scrape_apify_actor: ToolDef = {
@@ -393,9 +381,9 @@ const scrape_apify_actor: ToolDef = {
 async function readIntegrationCreds(provider: string): Promise<Record<string, string> | null> {
   const fs = await import('node:fs/promises');
   const path = await import('node:path');
-  const { getVaultRoot } = await import('./paths.js');
+  const { getContextRoot } = await import('./paths.js');
   try {
-    const raw = await fs.readFile(path.join(getVaultRoot(), '.bm', 'integrations.json'), 'utf-8');
+    const raw = await fs.readFile(path.join(getContextRoot(), '.bm', 'integrations.json'), 'utf-8');
     const data = JSON.parse(raw);
     const rec = data?.[provider];
     if (!rec || rec.status !== 'connected') return null;
@@ -882,7 +870,7 @@ const cms_create_draft: ToolDef = {
 // GEO (Generative Engine Optimization). Native replacement for Peec AI — runs
 // the seed prompt pool daily across ChatGPT / Perplexity / Google AI Overview
 // and stores raw results + extracted citations in signals/geo/. Handlers are
-// thin: the real work lives in geo.ts. All state is vault-local.
+// thin: the real work lives in geo.ts. All state is context-local.
 // ---------------------------------------------------------------------------
 
 const GEO_MODEL_ENUM = ['chatgpt', 'perplexity', 'google_ai_overview'] as const;
@@ -2515,15 +2503,15 @@ const notify: ToolDef = {
     required: ['subject', 'body'],
   },
   handler: async (args, ctx) => {
-    // Lazy-load credentials from the same vault file the UI writes to.
+    // Lazy-load credentials from the same context file the UI writes to.
     // Each channel handler is best-effort: a single failure doesn't
     // block the others.
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
-    const { getVaultRoot } = await import('./paths.js');
+    const { getContextRoot } = await import('./paths.js');
     let store: any = {};
     try {
-      const raw = await fs.readFile(path.join(getVaultRoot(), '.bm', 'integrations.json'), 'utf-8');
+      const raw = await fs.readFile(path.join(getContextRoot(), '.bm', 'integrations.json'), 'utf-8');
       store = JSON.parse(raw);
     } catch {}
 
@@ -2640,7 +2628,7 @@ const notify: ToolDef = {
 
 // Schedule a recurring trigger from inside a chat. Used when the user
 // tells an agent "yeah run this every Monday at 9" — the agent calls
-// this tool, a triggers/<name>.md file appears in the vault, and the
+// this tool, a triggers/<name>.md file appears in the context, and the
 // daemon's cron loop picks it up on the next listTriggers() refresh.
 //
 // Bindings supported: skill (preferred — invokes via the skill's
@@ -2688,7 +2676,7 @@ const trigger_create: ToolDef = {
     lines.push(args.description || `Auto-created by an agent at ${new Date().toISOString()}.`);
     lines.push('');
     const relPath = `triggers/${slug}.md`;
-    await writeVaultFile(relPath, lines.join('\n'));
+    await writeContextFile(relPath, lines.join('\n'));
     return { ok: true, path: relPath };
   },
 };
@@ -3387,14 +3375,14 @@ const pipedrive_search: ToolDef = {
 //
 // score_lead reads us/market/icp.md's `rubric:` block, applies each weighted
 // predicate to the company/contact record, writes `icp_score` +
-// `icp_reasons` frontmatter back to the vault file. Deterministic — same
+// `icp_reasons` frontmatter back to the context file. Deterministic — same
 // inputs produce the same score, no LLM in the loop.
 //
 // route_lead reads us/team/routing.md's `rules:` stack, picks the first
 // match, writes `assignee` frontmatter back. Falls through to `default`.
 //
 // enrich_score_route is the orchestrator. It:
-//   1. calls enrich_company via the proxy (if domain given and no vault file)
+//   1. calls enrich_company via the proxy (if domain given and no context file)
 //   2. runs score_lead
 //   3. runs route_lead
 //   4. for every connected CRM, upserts the company + stamps icp_score +
@@ -3404,11 +3392,11 @@ const pipedrive_search: ToolDef = {
 const score_lead: ToolDef = {
   name: 'score_lead',
   description:
-    "Score a company or contact against us/market/icp.md's weighted rubric. Writes icp_score (0-100), icp_reasons, and icp_rubric_version frontmatter to the given vault file. Deterministic — no LLM. If `record` is omitted, the scorer reads the existing frontmatter at `path`.",
+    "Score a company or contact against us/market/icp.md's weighted rubric. Writes icp_score (0-100), icp_reasons, and icp_rubric_version frontmatter to the given context file. Deterministic — no LLM. If `record` is omitted, the scorer reads the existing frontmatter at `path`.",
   parameters: {
     type: 'object',
     properties: {
-      path: { type: 'string', description: 'Vault file to score + stamp, e.g. companies/acme-com.md' },
+      path: { type: 'string', description: 'Context file to score + stamp, e.g. companies/acme-com.md' },
       record: {
         type: 'object',
         description: 'Optional override fields (employee_count, industry, tech_stack, hq, …). Merged on top of the file frontmatter.',
@@ -3420,12 +3408,12 @@ const score_lead: ToolDef = {
     const rubric = await loadRubric();
     let existing: Record<string, unknown> = {};
     try {
-      const f = await readVaultFile(String(args.path));
+      const f = await readContextFile(String(args.path));
       existing = (f.frontmatter ?? {}) as Record<string, unknown>;
     } catch {}
     const record = { ...existing, ...(args.record ?? {}) };
     const result = applyRubric(record, rubric);
-    await stampVault(String(args.path), {
+    await stampContext(String(args.path), {
       icp_score: result.score,
       icp_reasons: result.reasons,
       icp_rubric_version: result.rubricVersion,
@@ -3438,7 +3426,7 @@ const score_lead: ToolDef = {
 const route_lead: ToolDef = {
   name: 'route_lead',
   description:
-    "Pick an owner for a company/contact using us/team/routing.md's rule stack. Writes assignee frontmatter to the vault file. Reads the file's frontmatter (including icp_score stamped by score_lead) so rules can gate on score.",
+    "Pick an owner for a company/contact using us/team/routing.md's rule stack. Writes assignee frontmatter to the context file. Reads the file's frontmatter (including icp_score stamped by score_lead) so rules can gate on score.",
   parameters: {
     type: 'object',
     properties: {
@@ -3451,13 +3439,13 @@ const route_lead: ToolDef = {
     const routing = await loadRouting();
     let existing: Record<string, unknown> = {};
     try {
-      const f = await readVaultFile(String(args.path));
+      const f = await readContextFile(String(args.path));
       existing = (f.frontmatter ?? {}) as Record<string, unknown>;
     } catch {}
     const record = { ...existing, ...(args.record ?? {}) };
     const result = applyRouting(record, routing);
     if (result.assignee) {
-      await stampVault(String(args.path), {
+      await stampContext(String(args.path), {
         assignee: {
           type: result.assignee.type,
           id: result.assignee.id,
@@ -3492,7 +3480,7 @@ const enrich_score_route: ToolDef = {
           attio: { type: 'boolean' },
           salesforce: { type: 'boolean' },
           pipedrive: { type: 'boolean' },
-          vault: { type: 'boolean' },
+          context: { type: 'boolean' },
         },
       },
     },
@@ -3512,7 +3500,7 @@ const enrich_score_route: ToolDef = {
       else if (r && typeof r === 'object' && !('error' in r)) enriched = r as Record<string, unknown>;
     } catch {}
 
-    // Resolve a logo URL for the vault + CRM writes. Best-effort — if
+    // Resolve a logo URL for the context + CRM writes. Best-effort — if
     // both Clearbit and the favicon fallback fail, we just skip.
     let logo_url: string | null = null;
     try {
@@ -3537,11 +3525,11 @@ const enrich_score_route: ToolDef = {
 
     const results: Record<string, { ok: boolean; data?: any; error?: string; skipped?: boolean }> = {};
 
-    // 4a. vault — always the authoritative write.
-    const vaultPath = `companies/${slugify(String(merged.name ?? domain))}.md`;
-    if (want('vault', true)) {
+    // 4a. context — always the authoritative write.
+    const contextPath = `companies/${slugify(String(merged.name ?? domain))}.md`;
+    if (want('context', true)) {
       try {
-        await stampVault(vaultPath, {
+        await stampContext(contextPath, {
           kind: 'company',
           domain,
           name: merged.name ?? domain,
@@ -3567,9 +3555,9 @@ const enrich_score_route: ToolDef = {
               }
             : {}),
         }, `### ${new Date().toISOString().slice(0, 10)} — pipeline run\n\n- score: ${score.score} (${score.reasons.length} hits)\n- route: ${route.rule}`);
-        results.vault = { ok: true, data: { path: vaultPath } };
+        results.context = { ok: true, data: { path: contextPath } };
       } catch (err) {
-        results.vault = { ok: false, error: err instanceof Error ? err.message : String(err) };
+        results.context = { ok: false, error: err instanceof Error ? err.message : String(err) };
       }
     }
 

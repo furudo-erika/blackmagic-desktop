@@ -20,7 +20,7 @@ export default function SequencesPage() {
   const contacts = useQuery({
     queryKey: ['contacts-for-enroll'],
     queryFn: async () => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       return tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('contacts/') && f.path.endsWith('.md'),
       );

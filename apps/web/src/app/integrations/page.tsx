@@ -448,7 +448,7 @@ export default function IntegrationsPage() {
     <PageShell>
       <PageHeader
         title="Integrations"
-        subtitle="Paste API keys for the services your agents should read / write — CRMs, messaging, email providers, scrapers. BYOK, local-only: keys live in .bm/integrations.json and mirror to <vault>/.env."
+        subtitle="Paste API keys for the services your agents should read / write — CRMs, messaging, email providers, scrapers. BYOK, local-only: keys live in .bm/integrations.json and mirror to <context>/.env."
         icon={Plug}
       />
       <PageBody maxWidth="5xl">

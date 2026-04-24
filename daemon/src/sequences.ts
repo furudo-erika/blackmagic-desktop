@@ -20,8 +20,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { getVaultRoot } from './paths.js';
-import { writeVaultFile, walkTree } from './vault.js';
+import { getContextRoot } from './paths.js';
+import { writeContextFile, walkTree } from './context.js';
 
 export interface Touch {
   day: number;
@@ -52,7 +52,7 @@ function normaliseTouches(raw: unknown): Touch[] {
 }
 
 export async function listSequences(): Promise<Sequence[]> {
-  const dir = path.join(getVaultRoot(), 'sequences');
+  const dir = path.join(getContextRoot(), 'sequences');
   try {
     const entries = await fs.readdir(dir);
     const out: Sequence[] = [];
@@ -95,7 +95,7 @@ export async function listEnrollments(): Promise<Enrollment[]> {
     if (f.type !== 'file') continue;
     if (!f.path.startsWith('contacts/') || !f.path.endsWith('.md')) continue;
     try {
-      const raw = await fs.readFile(path.join(getVaultRoot(), f.path), 'utf-8');
+      const raw = await fs.readFile(path.join(getContextRoot(), f.path), 'utf-8');
       const m = matter(raw);
       const fm = m.data as any;
       if (!fm.sequence) continue;
@@ -114,11 +114,11 @@ export async function listEnrollments(): Promise<Enrollment[]> {
 }
 
 async function patchFrontmatter(relPath: string, patch: Record<string, unknown>) {
-  const abs = path.join(getVaultRoot(), relPath);
+  const abs = path.join(getContextRoot(), relPath);
   const raw = await fs.readFile(abs, 'utf-8');
   const m = matter(raw);
   const next = matter.stringify(m.content, { ...m.data, ...patch });
-  await writeVaultFile(relPath, next);
+  await writeContextFile(relPath, next);
 }
 
 export async function enrollContact(contactPath: string, sequencePath: string) {

@@ -78,7 +78,7 @@ export default function SkillsPage() {
   const playbooks = useQuery({
     queryKey: ['playbooks'],
     queryFn: async (): Promise<Playbook[]> => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('playbooks/') && f.path.endsWith('.md'),
       );
@@ -154,7 +154,7 @@ export default function SkillsPage() {
           )}
           {playbooks.data && allMatching.length === 0 && (
             <div className="px-4 py-4 text-[12px] text-muted dark:text-[#8C837C]">
-              {filter ? 'No skills match that filter.' : 'No skills in this vault yet.'}
+              {filter ? 'No skills match that filter.' : 'No skills in this context yet.'}
             </div>
           )}
           {GROUPS.filter((g) => grouped.has(g.id)).map((g) => (

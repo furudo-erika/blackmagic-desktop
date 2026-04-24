@@ -2,8 +2,8 @@
 
 /**
  * EntityDetail — Multica-style right-rail + activity-feed layout for any
- * vault entity (company / contact / deal). Props receive the entity's
- * vault path + prebuilt header content; this component handles:
+ * context entity (company / contact / deal). Props receive the entity's
+ * context path + prebuilt header content; this component handles:
  *   - Properties right rail (Assignee only for V1 — Status/Priority pickers
  *     are shaped as TODO placeholders until those fields exist)
  *   - AgentLiveCard for the entity's currently-running agent runs
@@ -32,7 +32,7 @@ import { api, type EntityActivityEntry, type EntityAssignee } from '../lib/api';
 type Member = { id: string; name: string };
 
 // V1: members come from a stubbed list (just "You" for single-user). Later
-// this will read from vault `team/*.md` files or an auth layer.
+// this will read from context `team/*.md` files or an auth layer.
 const MEMBERS: Member[] = [{ id: 'me', name: 'You' }];
 
 export function EntityDetail({
@@ -132,7 +132,7 @@ function AssigneePicker({ entityPath }: { entityPath: string }) {
   const agents = useQuery({
     queryKey: ['agents-list'],
     queryFn: async () => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter((f) => f.type === 'file' && f.path.startsWith('agents/') && f.path.endsWith('.md'));
       const rows = await Promise.all(files.map(async (f) => {
         const r = await api.readFile(f.path);

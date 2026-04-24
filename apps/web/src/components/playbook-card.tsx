@@ -3,7 +3,7 @@
 /**
  * Reusable PlaybookCard — used on /playbooks and /team/[slug].
  *
- * One row of the vault tree at playbooks/<slug>.md. Expands to show
+ * One row of the context tree at playbooks/<slug>.md. Expands to show
  * input fields, the full rendered prompt, and a Run button that calls
  * api.runAgent.
  */

@@ -8,7 +8,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { getVaultRoot } from './paths.js';
+import { getContextRoot } from './paths.js';
 import type { ToolDef } from './tools.js';
 
 interface McpServerSpec {
@@ -28,7 +28,7 @@ interface RawTool {
 }
 
 export async function loadMcpConfig(): Promise<McpConfig> {
-  const p = path.join(getVaultRoot(), '.bm', 'mcp.json');
+  const p = path.join(getContextRoot(), '.bm', 'mcp.json');
   try {
     return JSON.parse(await fs.readFile(p, 'utf-8')) as McpConfig;
   } catch {

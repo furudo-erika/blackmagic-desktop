@@ -31,7 +31,7 @@ function KV({ k, v, mono = false }: { k: string; v: React.ReactNode; mono?: bool
 
 export default function SettingsPage() {
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 5_000 });
-  const vault = health.data?.vaultPath ?? '~/BlackMagic';
+  const context = health.data?.contextPath ?? '~/BlackMagic';
   const integrations = useQuery({ queryKey: ['integrations'], queryFn: api.listIntegrations });
   const intKeys = useQuery({ queryKey: ['integration-keys'], queryFn: api.integrationKeys });
   const bridge = getBridge();
@@ -131,19 +131,19 @@ export default function SettingsPage() {
     <PageShell>
       <PageHeader
         title="Settings"
-        subtitle="Vault path, default model, billing key and developer options — anything that affects this device."
+        subtitle="Context path, default model, billing key and developer options — anything that affects this device."
         icon={SettingsIcon}
       />
       <PageBody maxWidth="2xl">
         <div className="space-y-4">
 
-          <Section icon={FolderOpen} title="Vault">
-            <KV k="Vault path" v={health.data?.vaultPath ?? '—'} mono />
+          <Section icon={FolderOpen} title="Context">
+            <KV k="Context path" v={health.data?.contextPath ?? '—'} mono />
             <button
               type="button"
               onClick={() => {
-                if (health.data?.vaultPath) {
-                  window.open('file://' + health.data.vaultPath, '_blank');
+                if (health.data?.contextPath) {
+                  window.open('file://' + health.data.contextPath, '_blank');
                 }
               }}
               className="text-flame text-[12px] hover:underline flex items-center gap-1"
@@ -154,7 +154,7 @@ export default function SettingsPage() {
 
           <Section icon={KeyRound} title="Account">
             <KV k="Signed in" v={health.data?.zennConfigured ? <span className="text-[#7E8C67]">yes</span> : <span className="text-flame">no</span>} />
-            <KV k="Key" v={<code className="text-[11px]">{vault}/.bm/config.toml</code>} mono />
+            <KV k="Key" v={<code className="text-[11px]">{context}/.bm/config.toml</code>} mono />
             <p className="text-[11px] text-muted dark:text-[#8C837C]">
               Manage all keys at{' '}
               <a
@@ -180,7 +180,7 @@ export default function SettingsPage() {
                 Looking for Amazon SES, GSC, Ghost, WordPress, Unipile, Discord, Telegram, Notion, Linear, GitHub, Stripe, Cal.com, RB2B?
               </p>
               <p className="text-[11px] text-muted dark:text-[#8C837C] mt-1">
-                Those are newer BYOK integrations and live in <strong>sidebar → Integrations</strong>, not here. This panel is kept only for a handful of legacy config.toml keys that haven't been migrated yet (EnrichLayer, Apollo, Slack webhook, Resend, LinkedIn cookie, From email). Pasting keys in Integrations also mirrors them to <code className="text-[11px]">{vault}/.env</code>.
+                Those are newer BYOK integrations and live in <strong>sidebar → Integrations</strong>, not here. This panel is kept only for a handful of legacy config.toml keys that haven't been migrated yet (EnrichLayer, Apollo, Slack webhook, Resend, LinkedIn cookie, From email). Pasting keys in Integrations also mirrors them to <code className="text-[11px]">{context}/.env</code>.
               </p>
               <div className="mt-2">
                 <a
@@ -193,7 +193,7 @@ export default function SettingsPage() {
             </div>
             <p className="text-[11px] text-muted dark:text-[#8C837C]">
               Legacy keys below are stored in{' '}
-              <code className="text-[11px]">{vault}/.bm/config.toml</code> and
+              <code className="text-[11px]">{context}/.bm/config.toml</code> and
               read directly by the built-in tools. For everything else, use Tools.
             </p>
             <div className="space-y-2">

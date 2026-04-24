@@ -46,7 +46,7 @@ export default function DealsPage() {
   const deals = useQuery({
     queryKey: ['deals'],
     queryFn: async (): Promise<Deal[]> => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('deals/') && f.path.endsWith('.md'),
       );
@@ -65,7 +65,7 @@ export default function DealsPage() {
     <PageShell>
       <PageHeader
         title="Deals"
-        subtitle="Pipeline from deals/ in your vault."
+        subtitle="Pipeline from deals/ in your context."
         icon={Briefcase}
         trailing={
           stageFilter ? (
@@ -143,7 +143,7 @@ export default function DealsPage() {
                       return (
                         <Link
                           key={d.path}
-                          href={`/vault?path=${encodeURIComponent(d.path)}`}
+                          href={`/context?path=${encodeURIComponent(d.path)}`}
                           className="block bg-white dark:bg-[#1F1B15] rounded-lg border border-line dark:border-[#2A241D] p-4 hover:border-flame/40 transition-colors"
                         >
                           <div className="flex items-center justify-between gap-2">

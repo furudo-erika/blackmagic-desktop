@@ -3,7 +3,7 @@
 // Uses Vercel as the example organization because it's a well-known B2B company
 // every evaluator recognises. Numbers below (ARR, headcount, specific customers)
 // are illustrative — the shape and motion is right, the exact figures are not
-// audited. Overwrite with the user's real vault via `bootstrap-self` once they sign in.
+// audited. Overwrite with the user's real context via `bootstrap-self` once they sign in.
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -682,11 +682,11 @@ function runIdFor(d: Date, slug: string): string {
   return `${stamp}-${slug}`;
 }
 
-export async function seedVercelRuntime(vaultRoot: string): Promise<{ runs: number; drafts: number; threads: number }> {
+export async function seedVercelRuntime(contextRoot: string): Promise<{ runs: number; drafts: number; threads: number }> {
   const now = Date.now();
-  const runsDir = path.join(vaultRoot, 'runs');
-  const draftsDir = path.join(vaultRoot, 'drafts');
-  const chatsDir = path.join(vaultRoot, 'chats');
+  const runsDir = path.join(contextRoot, 'runs');
+  const draftsDir = path.join(contextRoot, 'drafts');
+  const chatsDir = path.join(contextRoot, 'chats');
   await fs.mkdir(runsDir, { recursive: true });
   await fs.mkdir(draftsDir, { recursive: true });
   await fs.mkdir(chatsDir, { recursive: true });
@@ -813,15 +813,15 @@ export async function seedVercelRuntime(vaultRoot: string): Promise<{ runs: numb
   return { runs: runsWritten, drafts: drafts.length, threads: threads.length };
 }
 
-export async function seedVercelDemo(vaultRoot: string): Promise<{ written: number }> {
+export async function seedVercelDemo(contextRoot: string): Promise<{ written: number }> {
   let written = 0;
   for (const [rel, body] of Object.entries(VERCEL_DEMO_FILES)) {
-    const abs = path.join(vaultRoot, rel);
+    const abs = path.join(contextRoot, rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });
     await fs.writeFile(abs, body, 'utf-8');
     written++;
   }
-  const claudePath = path.join(vaultRoot, 'CLAUDE.md');
+  const claudePath = path.join(contextRoot, 'CLAUDE.md');
   try {
     const cur = await fs.readFile(claudePath, 'utf-8');
     if (cur.includes('_One paragraph: what you sell, to whom._') || cur.includes('# Your AI GTM engineer') || cur.includes('# Identity — read this before every answer')) {

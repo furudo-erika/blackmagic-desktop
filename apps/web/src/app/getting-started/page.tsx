@@ -47,7 +47,7 @@ const SETUP_STEPS: Step[] = [
   {
     n: 1,
     title: 'Create a project',
-    hint: "Already done — you're looking at it. Each project is a separate vault with its own companies, contacts, deals, and playbooks.",
+    hint: "Already done — you're looking at it. Each project is a separate context with its own companies, contacts, deals, and playbooks.",
     href: '/',
     icon: CircleCheck,
     cta: 'Open chat',
@@ -205,7 +205,7 @@ export default function GettingStartedPage() {
     <PageShell>
       <PageHeader
         title="Getting started"
-        subtitle="Two paths: set up a brand-new vault, or run a campaign on an account you already care about."
+        subtitle="Two paths: set up a brand-new context, or run a campaign on an account you already care about."
         icon={Sparkles}
         trailing={
           dismissed ? (
@@ -251,7 +251,7 @@ export default function GettingStartedPage() {
                 signals/visitors/&lt;date&gt;.json
               </code>{' '}
               and the daily sweep will de-anonymise and score it. Everything
-              runs locally against your vault.
+              runs locally against your context.
             </div>
           </div>
         </Panel>

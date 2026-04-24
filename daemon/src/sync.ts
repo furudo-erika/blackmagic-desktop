@@ -33,7 +33,7 @@ export async function pushTriggers(config: Config): Promise<void> {
         shell: t.shell ?? null,
         enabled: t.enabled !== false,
         body: t.body ?? null,
-        vaultPath: `triggers/${t.name}.md`,
+        contextPath: `triggers/${t.name}.md`,
       })),
     };
     const res = await fetch(`${url}/api/sync/triggers`, {
@@ -66,7 +66,7 @@ export async function pushDrafts(config: Config): Promise<void> {
         bodyPreview: (d.body ?? '').slice(0, 500),
         tool: d.tool ?? null,
         status: d.status,
-        vaultPath: d.path,
+        contextPath: d.path,
         createdAt: d.created_at ?? null,
       })),
     };

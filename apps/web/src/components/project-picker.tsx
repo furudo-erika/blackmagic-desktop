@@ -46,7 +46,7 @@ export function ProjectPicker({
     try {
       const reg = await api.activateProject(id);
       qc.setQueryData(['projects'], reg);
-      // The daemon has flipped VAULT_ROOT — everything else needs to re-fetch.
+      // The daemon has flipped CONTEXT_ROOT — everything else needs to re-fetch.
       qc.invalidateQueries();
       const p = reg.projects.find((x) => x.id === id);
       if (p) onActivated?.(p);
@@ -99,7 +99,7 @@ export function ProjectPicker({
 
   const reg = q.data;
 
-  // Preview the real destination path so users know where the vault
+  // Preview the real destination path so users know where the context
   // will land instead of a hardcoded "/Users/you/…" placeholder
   // (QA BUG-05). We infer $HOME from any existing project's parent
   // directory; fall back to ~ if the registry is empty.
@@ -152,7 +152,7 @@ export function ProjectPicker({
         Choose a project
       </h1>
       <p style={{ fontSize: 14, color: '#605A57', marginTop: 0, marginBottom: 20 }}>
-        Each project is its own vault folder — notes, agents, drafts, and
+        Each project is its own context folder — notes, agents, drafts, and
         triggers live under it. Switch anytime.
       </p>
 

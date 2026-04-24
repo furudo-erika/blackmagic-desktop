@@ -27,7 +27,7 @@ export default function AutomationsPage() {
     {
       icon: BookOpen,
       title: 'Skills',
-      subtitle: 'Capabilities your agents pull in during conversations — skill markdown files stored in the vault.',
+      subtitle: 'Capabilities your agents pull in during conversations — skill markdown files stored in the context.',
       href: '/skills',
     },
     {

@@ -69,7 +69,7 @@ export const api = {
     request<{
       ok: boolean;
       version: string;
-      vaultPath: string;
+      contextPath: string;
       model: string;
       zennConfigured: boolean;
       engine?: 'codex-cli' | 'builtin';
@@ -104,18 +104,18 @@ export const api = {
     request<{ ok: true }>('/api/config/api-key', { method: 'POST', body: JSON.stringify({ key }) }),
   authStart: () => request<{ browserUrl: string; state: string }>('/api/auth/start'),
   tools: () => request<{ tools: Array<{ name: string; description: string; source: string }> }>('/api/tools'),
-  vaultTree: () => request<{ tree: Array<{ path: string; type: 'file' | 'dir' }> }>('/api/vault/tree'),
+  contextTree: () => request<{ tree: Array<{ path: string; type: 'file' | 'dir' }> }>('/api/context/tree'),
   readFile: (p: string) =>
     request<{ content: string; frontmatter: Record<string, unknown>; body: string }>(
-      `/api/vault/file?path=${encodeURIComponent(p)}`,
+      `/api/context/file?path=${encodeURIComponent(p)}`,
     ),
   writeFile: (path: string, content: string) =>
-    request<{ ok: true }>('/api/vault/file', { method: 'PUT', body: JSON.stringify({ path, content }) }),
+    request<{ ok: true }>('/api/context/file', { method: 'PUT', body: JSON.stringify({ path, content }) }),
   backlinks: (p: string) =>
-    request<{ backlinks: string[] }>(`/api/vault/backlinks?path=${encodeURIComponent(p)}`),
+    request<{ backlinks: string[] }>(`/api/context/backlinks?path=${encodeURIComponent(p)}`),
   listBackups: (p: string) =>
     request<{ backups: Array<{ name: string; path: string }> }>(
-      `/api/vault/backups?path=${encodeURIComponent(p)}`,
+      `/api/context/backups?path=${encodeURIComponent(p)}`,
     ),
   integrationKeys: () =>
     request<{
@@ -408,7 +408,7 @@ export const api = {
       }>;
     }>('/api/sequences/walk', { method: 'POST' }),
 
-  // Projects (multi-vault). See daemon/src/projects.ts.
+  // Projects (multi-context). See daemon/src/projects.ts.
   listProjects: () =>
     request<ProjectsRegistry>('/api/projects'),
   addProject: (name: string, path?: string) =>

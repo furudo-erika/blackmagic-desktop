@@ -21,7 +21,7 @@ export default function ContactsPage() {
   const contacts = useQuery({
     queryKey: ['contacts'],
     queryFn: async (): Promise<Contact[]> => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('contacts/') && f.path.endsWith('.md'),
       );
@@ -72,7 +72,7 @@ export default function ContactsPage() {
     <PageShell>
       <PageHeader
         title="Contacts"
-        subtitle="People in your vault, grouped by company. Enrich a company to populate its buying committee."
+        subtitle="People in your context, grouped by company. Enrich a company to populate its buying committee."
         icon={Users}
       />
       <PageBody maxWidth="4xl">
@@ -127,7 +127,7 @@ export default function ContactsPage() {
                     <div key={c.path} className="px-4 py-3">
                       <div className="flex items-center justify-between gap-3">
                         <Link
-                          href={`/vault?path=${encodeURIComponent(c.path)}`}
+                          href={`/context?path=${encodeURIComponent(c.path)}`}
                           className="flex-1 min-w-0 -mx-2 px-2 py-1 rounded hover:bg-cream-light dark:hover:bg-[#17140F] transition-colors"
                         >
                           <div className="text-sm text-ink dark:text-[#E6E0D8] truncate">

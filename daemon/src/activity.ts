@@ -1,6 +1,6 @@
 // Entity activity feed + agent assignment.
 //
-// Every vault entity (company / contact / deal) carries:
+// Every context entity (company / contact / deal) carries:
 //   - an `assignee` frontmatter field — who owns the next action on it
 //   - an append-only activity log at signals/activity/<entity-path>.jsonl
 //
@@ -17,7 +17,7 @@ import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { ensureInsideVault, getVaultRoot } from './paths.js';
+import { ensureInsideContext, getContextRoot } from './paths.js';
 
 export type ActorType = 'member' | 'agent' | 'system';
 export interface Actor {
@@ -61,7 +61,7 @@ function activityPathFor(entityPath: string): string {
   // Keep the sidecar adjacent but segregated: signals/activity/<entity>.jsonl
   // with directory structure mirroring entityPath up to the last segment.
   const rel = entityPath.replace(/\.md$/, '');
-  return path.join(getVaultRoot(), 'signals', 'activity', `${rel}.jsonl`);
+  return path.join(getContextRoot(), 'signals', 'activity', `${rel}.jsonl`);
 }
 
 // ---------------------------------------------------------------------------
@@ -69,14 +69,14 @@ function activityPathFor(entityPath: string): string {
 // ---------------------------------------------------------------------------
 
 async function readEntityFrontmatter(entityPath: string): Promise<{ fm: Record<string, unknown>; body: string; raw: string }> {
-  const abs = ensureInsideVault(entityPath);
+  const abs = ensureInsideContext(entityPath);
   const raw = await fs.readFile(abs, 'utf-8');
   const parsed = matter(raw);
   return { fm: (parsed.data ?? {}) as Record<string, unknown>, body: parsed.content, raw };
 }
 
 async function writeEntityFrontmatter(entityPath: string, fm: Record<string, unknown>, body: string): Promise<void> {
-  const abs = ensureInsideVault(entityPath);
+  const abs = ensureInsideContext(entityPath);
   const out = matter.stringify(body, fm);
   await fs.writeFile(abs, out, 'utf-8');
 }
@@ -242,7 +242,7 @@ export async function recordRunFinish(entityPath: string, runId: string, agentSl
 // ---------------------------------------------------------------------------
 
 export async function listRunsForEntity(entityPath: string): Promise<any[]> {
-  const runsDir = path.join(getVaultRoot(), 'runs');
+  const runsDir = path.join(getContextRoot(), 'runs');
   if (!fsSync.existsSync(runsDir)) return [];
   const dirs = await fs.readdir(runsDir);
   const out: any[] = [];

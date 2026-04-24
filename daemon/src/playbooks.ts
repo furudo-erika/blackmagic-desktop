@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
-import { getVaultRoot, type Config } from './paths.js';
+import { getContextRoot, type Config } from './paths.js';
 import { runAgent } from './agent.js';
 
 interface PlaybookSpec {
@@ -16,14 +16,14 @@ const PLAYBOOK_ALIASES: Record<string, string> = {
 };
 
 async function resolvePlaybookPath(name: string): Promise<string> {
-  const exactPath = path.join(getVaultRoot(), 'playbooks', `${name}.md`);
+  const exactPath = path.join(getContextRoot(), 'playbooks', `${name}.md`);
   try {
     await fs.access(exactPath);
     return exactPath;
   } catch {
     const alias = PLAYBOOK_ALIASES[name];
     if (!alias) return exactPath;
-    return path.join(getVaultRoot(), 'playbooks', `${alias}.md`);
+    return path.join(getContextRoot(), 'playbooks', `${alias}.md`);
   }
 }
 
@@ -41,7 +41,7 @@ export async function loadPlaybook(name: string): Promise<PlaybookSpec> {
 }
 
 export async function listPlaybooks(): Promise<PlaybookSpec[]> {
-  const dir = path.join(getVaultRoot(), 'playbooks');
+  const dir = path.join(getContextRoot(), 'playbooks');
   try {
     const entries = await fs.readdir(dir);
     const out: PlaybookSpec[] = [];

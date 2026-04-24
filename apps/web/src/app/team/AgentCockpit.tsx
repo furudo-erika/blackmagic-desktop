@@ -6,9 +6,9 @@
  * Layout matches the rest of the entity-detail surface (company / contact /
  * deal): breadcrumbs → big title + one-line subtitle → activity feed +
  * threaded comments → run history → right-rail Properties with Assignee
- * picker. An agent here is just an entity whose vault path is
+ * picker. An agent here is just an entity whose context path is
  * `agents/<slug>.md` — the activity log / assignee / runs APIs accept any
- * vault path, so we reuse EntityDetail wholesale instead of hand-rolling a
+ * context path, so we reuse EntityDetail wholesale instead of hand-rolling a
  * second layout. The agent-specific extras (live/idle dot, skills-this-
  * agent-can-run list, tools count) ride along as `children` in the main
  * column and `headerRight` in the Properties rail.
@@ -64,7 +64,7 @@ function timeAgo(ms: number | null): string {
   return `${Math.floor(d / 86400)}d ago`;
 }
 
-type VaultAgent = {
+type ContextAgent = {
   slug: string;
   name: string;
   icon: string;
@@ -73,7 +73,7 @@ type VaultAgent = {
   starterPrompts: string[];
 };
 
-async function loadVaultAgent(slug: string): Promise<VaultAgent | null> {
+async function loadContextAgent(slug: string): Promise<ContextAgent | null> {
   try {
     const r = await api.readFile(`agents/${slug}.md`);
     const fm = r.frontmatter ?? {};
@@ -101,10 +101,10 @@ export default function AgentCockpit() {
 
   const agentQ = useQuery({
     queryKey: ['cockpit-agent', slug],
-    queryFn: async (): Promise<VaultAgent | null> => {
+    queryFn: async (): Promise<ContextAgent | null> => {
       if (!slug) return null;
-      const vault = await loadVaultAgent(slug);
-      if (vault) return vault;
+      const context = await loadContextAgent(slug);
+      if (context) return context;
       const a = getAgent(slug);
       if (!a) return null;
       return {
@@ -122,7 +122,7 @@ export default function AgentCockpit() {
   const playbooksQ = useQuery({
     queryKey: ['cockpit-playbooks', slug],
     queryFn: async (): Promise<Playbook[]> => {
-      const tree = await api.vaultTree();
+      const tree = await api.contextTree();
       const files = tree.tree.filter(
         (f) => f.type === 'file' && f.path.startsWith('playbooks/') && f.path.endsWith('.md'),
       );
@@ -185,7 +185,7 @@ export default function AgentCockpit() {
           <Bot className="w-8 h-8 mx-auto mb-3 text-muted dark:text-[#8C837C] opacity-50" />
           <h2 className="text-base font-semibold text-ink dark:text-[#F5F1EA] mb-1">Unknown agent “{slug}”</h2>
           <p className="text-[13px] text-muted dark:text-[#8C837C]">
-            No file at <code>agents/{slug}.md</code>. Drop one in the vault and refresh.
+            No file at <code>agents/{slug}.md</code>. Drop one in the context and refresh.
           </p>
         </div>
       </div>
