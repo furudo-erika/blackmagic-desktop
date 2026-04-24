@@ -120,7 +120,6 @@ export const api = {
   integrationKeys: () =>
     request<{
       apify_api_key: boolean;
-      enrichlayer_api_key: boolean;
       hubspot_api_key: boolean;
       apollo_api_key: boolean;
       attio_api_key: boolean;
@@ -138,7 +137,6 @@ export const api = {
     }>('/api/config/integration-keys'),
   setIntegrationKeys: (body: {
     apify_api_key?: string;
-    enrichlayer_api_key?: string;
     hubspot_api_key?: string;
     apollo_api_key?: string;
     attio_api_key?: string;

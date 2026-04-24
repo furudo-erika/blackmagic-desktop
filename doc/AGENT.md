@@ -61,7 +61,7 @@ On each call the daemon composes the system prompt as:
 | `web_fetch(url)` | GET + readability extract | No |
 | `web_search(query)` | Perplexity Sonar | No (paid) |
 | `pdl_enrich(domain)` | PeopleDataLabs company enrich | No (paid) |
-| `enrichlayer_person(linkedin_url)` | Person/email enrich | No (paid) |
+| `enrich_contact_linkedin(linkedinUrl)` | Person enrich from LinkedIn URL (proxied, PDL-backed) | No (paid) |
 | `apify_linkedin_search(title, geo?, limit?)` | LinkedIn profile search | No (paid) |
 | `draft_create(channel, to, subject?, body, tool)` | Write a file into `drafts/` — NEVER sends | No |
 

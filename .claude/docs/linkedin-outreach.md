@@ -35,9 +35,9 @@ draft_create, enroll_contact_in_sequence
 
 ## Dependencies
 
-- `ENRICHLAYER_API_KEY` (proxycurl-compatible) for
-  `enrich_contact_linkedin`. Without it the agent bails loudly rather
-  than skipping.
+- `enrich_contact_linkedin` (proxied through blackmagic.engineering,
+  PDL-backed, charged per match). No user-side key needed; the agent
+  bails loudly if the proxy returns an error.
 - The upstream job that writes `signals/linkedin/<date>.md` — if empty,
   agent writes a "nothing to do today" summary and exits.
 

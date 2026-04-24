@@ -2,6 +2,32 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.20 — 2026-04-24
+
+### Changed
+- **LinkedIn person enrichment is now first-party.**
+  `enrich_contact_linkedin` stopped being a BYOK wrapper around
+  EnrichLayer and now routes through `blackmagic.engineering`'s
+  existing `enrich_contact` proxy (PeopleDataLabs-backed). No user-
+  side key, no sidebar paste step — each match is charged per-call
+  against the caller credit balance, same as `enrich_contact` and
+  `enrich_company`. The tool name and `linkedinUrl` parameter
+  shape are unchanged, so every skill/playbook that referenced it
+  keeps working untouched.
+
+### Removed
+- **`ENRICHLAYER_API_KEY` config slot.** Dropped from `Config`,
+  `.bm/config.toml` loader, the daemon's integration-keys endpoint,
+  the Settings → Integration keys (legacy) panel, and the API
+  client types. Existing keys in `config.toml` are silently
+  ignored on next start — nothing to migrate.
+
+### Docs
+- `doc/AGENT.md`, `.claude/docs/linkedin-outreach.md`, `README.md`,
+  and the getting-started page all stopped naming EnrichLayer; the
+  LinkedIn-enrich capability is described as proxy-backed with zero
+  setup.
+
 ## 0.5.19 — 2026-04-24
 
 ### Changed

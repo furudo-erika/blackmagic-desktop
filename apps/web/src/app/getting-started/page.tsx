@@ -63,7 +63,7 @@ const SETUP_STEPS: Step[] = [
   {
     n: 3,
     title: 'Connect at least one integration',
-    hint: "EnrichLayer (LinkedIn enrich) and Apify (company + contact scrapers) unlock most of the GTM flows. Gmail/Slack wire up draft approvals.",
+    hint: "Apify (company + contact scrapers), HubSpot/Attio/Salesforce, and Gmail/Slack wire up draft approvals. LinkedIn person enrichment now runs through the built-in proxy — no key needed.",
     href: '/integrations',
     icon: Plug,
     cta: 'Connect integrations',

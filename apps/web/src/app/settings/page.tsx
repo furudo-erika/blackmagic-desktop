@@ -37,7 +37,6 @@ export default function SettingsPage() {
   const bridge = getBridge();
 
   const [apifyDraft, setApifyDraft] = useState('');
-  const [enrichDraft, setEnrichDraft] = useState('');
   const [hubspotDraft, setHubspotDraft] = useState('');
   const [apolloDraft, setApolloDraft] = useState('');
   const [attioDraft, setAttioDraft] = useState('');
@@ -60,7 +59,6 @@ export default function SettingsPage() {
     try {
       const body: Record<string, string> = {};
       if (apifyDraft.trim()) body.apify_api_key = apifyDraft.trim();
-      if (enrichDraft.trim()) body.enrichlayer_api_key = enrichDraft.trim();
       if (hubspotDraft.trim()) body.hubspot_api_key = hubspotDraft.trim();
       if (apolloDraft.trim()) body.apollo_api_key = apolloDraft.trim();
       if (attioDraft.trim()) body.attio_api_key = attioDraft.trim();
@@ -80,7 +78,6 @@ export default function SettingsPage() {
       } else {
         await api.setIntegrationKeys(body);
         setApifyDraft('');
-        setEnrichDraft('');
         setHubspotDraft('');
         setApolloDraft('');
         setAttioDraft('');
@@ -180,7 +177,7 @@ export default function SettingsPage() {
                 Looking for Amazon SES, GSC, Ghost, WordPress, Unipile, Discord, Telegram, Notion, Linear, GitHub, Stripe, Cal.com, RB2B?
               </p>
               <p className="text-[11px] text-muted dark:text-[#8C837C] mt-1">
-                Those are newer BYOK integrations and live in <strong>sidebar → Integrations</strong>, not here. This panel is kept only for a handful of legacy config.toml keys that haven't been migrated yet (EnrichLayer, Apollo, Slack webhook, Resend, LinkedIn cookie, From email). Pasting keys in Integrations also mirrors them to <code className="text-[11px]">{context}/.env</code>.
+                Those are newer BYOK integrations and live in <strong>sidebar → Integrations</strong>, not here. This panel is kept only for a handful of legacy config.toml keys that haven't been migrated yet (Apollo, Slack webhook, Resend, LinkedIn cookie, From email). Pasting keys in Integrations also mirrors them to <code className="text-[11px]">{context}/.env</code>.
               </p>
               <div className="mt-2">
                 <a
@@ -197,18 +194,6 @@ export default function SettingsPage() {
               read directly by the built-in tools. For everything else, use Tools.
             </p>
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
-                  EnrichLayer
-                </label>
-                <input
-                  type="password"
-                  value={enrichDraft}
-                  onChange={(e) => setEnrichDraft(e.target.value)}
-                  placeholder={intKeys.data?.enrichlayer_api_key ? '✓ SAVED · paste to replace' : 'proxycurl-compatible key'}
-                  className="flex-1 bg-cream dark:bg-[#0F0D0A] border border-line dark:border-[#2A241D] rounded-md px-2 py-1.5 text-[12px] font-mono"
-                />
-              </div>
               <div className="flex items-center gap-2">
                 <label className="w-36 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">
                   Apify
