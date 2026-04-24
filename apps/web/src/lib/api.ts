@@ -80,20 +80,32 @@ export const api = {
   // out-of-credits banner both handle null by hiding themselves, so
   // we don't want the 401 to surface as a thrown error that pollutes
   // the devtools console on every route change.
+  // Plan shape mirrors /api/v1/plan on the web side (see
+  // blackmagic-web/src/app/api/v1/plan/route.ts). `subscriptionStatus`
+  // and `cancelAtPeriodEnd` are surfaced so the CreditsBanner can
+  // branch on "sub active but allowance used up" vs "payment failed"
+  // vs "no subscription, out of credits" — they were null until
+  // 0.5.26 web landed. Older web builds without those fields return
+  // undefined here, which the banner treats as the legacy
+  // no-subscription shape.
   plan: async (): Promise<{
-    plan: 'free' | 'growth' | 'scale' | 'enterprise';
+    plan: 'free' | 'starter' | 'pro' | 'team' | 'enterprise';
     creditsIncluded: number;
     creditsUsed: number;
     creditsRemaining: number;
     resetAt: string | null;
+    subscriptionStatus?: 'active' | 'trialing' | 'past_due' | 'canceled' | null;
+    cancelAtPeriodEnd?: boolean;
   } | null> => {
     try {
       return await request<{
-        plan: 'free' | 'growth' | 'scale' | 'enterprise';
+        plan: 'free' | 'starter' | 'pro' | 'team' | 'enterprise';
         creditsIncluded: number;
         creditsUsed: number;
         creditsRemaining: number;
         resetAt: string | null;
+        subscriptionStatus?: 'active' | 'trialing' | 'past_due' | 'canceled' | null;
+        cancelAtPeriodEnd?: boolean;
       }>('/api/plan');
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) return null;

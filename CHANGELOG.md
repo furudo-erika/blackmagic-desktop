@@ -2,6 +2,31 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.26 — 2026-04-24
+
+### Added
+- **Credits banner is subscription-aware.** The top-of-app
+  banner now branches on the new `subscriptionStatus` field
+  returned by `/api/v1/plan` (web 0.5.26):
+    - **Payment failed** (amber, takes precedence) — urgent
+      "update card" CTA pointing at the Stripe Customer Portal.
+      Shown even if the user still has credits on hand, because
+      Stripe's dunning retry will pause access at the next step.
+    - **Active sub, allowance exhausted** — soft "Top up to
+      keep going" nudge that names the current tier and shows
+      the next reset date in human terms ("tomorrow",
+      "in 4 days", "Nov 12"). Avoids pushing the user toward a
+      plan upgrade when all they need is a top-up pack.
+    - **No sub, out of credits** — existing copy preserved.
+  Each banner type dismisses independently.
+- **Plan tier names aligned with web 0.5.26.** `api.plan()`
+  now returns `free | starter | pro | team | enterprise`
+  instead of the legacy `free | growth | scale | enterprise`.
+  Older web builds that don't yet return
+  `subscriptionStatus`/`cancelAtPeriodEnd` degrade gracefully
+  to the legacy "no subscription" branch — no breakage during
+  the rolling deploy.
+
 ## 0.5.25 — 2026-04-24
 
 ### Fixed
