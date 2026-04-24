@@ -1208,7 +1208,7 @@ kind: agent
 name: GEO Analyst
 slug: geo-analyst
 icon: Radar
-model: gpt-5.4
+model: gpt-5.5
 revision: 3
 max_turns: 100
 tools:

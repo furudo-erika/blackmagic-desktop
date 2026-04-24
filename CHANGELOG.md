@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.23 — 2026-04-24
+
+### Changed
+- **Default model → gpt-5.5.** Shipped upstream on
+  api.blackmagic.engineering on April 23 2026 and now wired in
+  as the fallback for `BM_DEFAULT_MODEL` and for agent frontmatter
+  without an explicit `model:` pin. Official OpenAI pricing
+  ($5/M input, $30/M output) is in the `PRICE` table so billing
+  math lands correctly. Agents that pin a specific model keep
+  their pin; only the implicit default moves.
+
 ## 0.5.22 — 2026-04-24
 
 ### Fixed

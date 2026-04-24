@@ -7,6 +7,7 @@ import { summarizeRunPreview } from './run-preview.js';
 
 // Price table — must match doc/BILLING.md
 const PRICE: Record<string, { in: number; out: number }> = {
+  'gpt-5.5': { in: 5, out: 30 },
   'gpt-5.3-codex': { in: 2.5, out: 7.5 },
   'gpt-5.3-codex-spark': { in: 2.5, out: 7.5 },
   'gpt-5.2-codex': { in: 2.5, out: 7.5 },
@@ -33,7 +34,7 @@ export async function loadAgent(name: string): Promise<AgentSpec> {
   const fm = m.data as any;
   return {
     name,
-    model: fm.model ?? 'gpt-5.3-codex',
+    model: fm.model ?? 'gpt-5.5',
     tools: Array.isArray(fm.tools) ? fm.tools : [],
     temperature: typeof fm.temperature === 'number' ? fm.temperature : 0.2,
     systemBody: m.content.trim(),
@@ -102,7 +103,7 @@ export interface RunResult {
 }
 
 function priceCents(model: string, tokIn: number, tokOut: number): number {
-  const p = PRICE[model] ?? PRICE['gpt-5.3-codex']!;
+  const p = PRICE[model] ?? PRICE['gpt-5.5']!;
   return Math.ceil(((tokIn * p.in) + (tokOut * p.out)) / 1_000_000 * 100);
 }
 

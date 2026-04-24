@@ -84,7 +84,7 @@ export function loadConfig(): Config {
   const defaultZennBase = `${apiUrl.replace(/\/+$/, '')}/v1`;
   const base: Config = {
     context_path: context,
-    default_model: process.env.BM_DEFAULT_MODEL ?? 'gpt-5.4',
+    default_model: process.env.BM_DEFAULT_MODEL ?? 'gpt-5.5',
     zenn_base_url: process.env.ZENN_BASE_URL ?? defaultZennBase,
     zenn_api_key: process.env.ZENN_API_KEY,
     billing_url: billingUrl,
