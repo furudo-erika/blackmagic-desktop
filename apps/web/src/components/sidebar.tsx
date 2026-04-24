@@ -258,7 +258,7 @@ export function Sidebar() {
         <HistorySidebarRow pathname={pathname} router={router} />
         <NavRow icon={Inbox}           label="Drafts"    href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
 
-        <SectionLabel>Data</SectionLabel>
+        <SectionLabel>Context</SectionLabel>
         <NavRow icon={Building2}       label="Companies" href="/companies" pathname={pathname} />
         <NavRow icon={Users}           label="Contacts"  href="/contacts"  pathname={pathname} />
         <NavRow icon={Briefcase}       label="Deals"     href="/deals"     pathname={pathname} />

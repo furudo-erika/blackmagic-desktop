@@ -230,8 +230,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ starred }),
     }),
+  // fire-and-forget: endpoint returns as soon as the run dir + prompt are
+  // persisted. The full run completes in the background; the UI picks
+  // up progress via the `/api/agent/runs` poll.
   runAgent: (agent: string, task: string, opts?: { force?: boolean }) =>
-    request<{ runId: string; final: string; tokensIn: number; tokensOut: number; costCents: number }>(
+    request<{ runId: string; runDir: string }>(
       '/api/agent/run',
       { method: 'POST', body: JSON.stringify({ agent, task, force: opts?.force }) },
     ),

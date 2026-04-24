@@ -2,6 +2,37 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.21 — 2026-04-24
+
+### Fixed
+- **Agent composer no longer wedges on "Starting…".**
+  `/api/agent/run` was `await`-ing the full multi-turn loop before
+  responding, so the composer stayed disabled for the entire run
+  (often minutes). The endpoint is now fire-and-forget: prepare
+  the run dir + `prompt.md` + stub `meta.json`, return
+  `{runId}` immediately, finish the turn loop in the background.
+  The UI unlocks the second the run is registered and picks up
+  progress via the existing 5-second `/api/agent/runs` poll.
+- **Runs list is chronological again.** Sort was lex-on-`runId`,
+  which put every legacy `codex-<ms>` run ahead of any dated
+  `<ISO>-<agent>` run regardless of age — making today's runs
+  appear to vanish under Apr-20 codex entries. Each run now
+  reports a normalized `startedAt` (ms) and the endpoint sorts
+  on that.
+- **Agent runs show up in Chat History.** Previously agent-page
+  submissions only wrote to `runs/` and never appeared in the
+  history timeline — /chat was the only source. Every run now
+  mirrors a `{task, final}` thread into `chats/<runId>.json` at
+  completion, so Chat History reflects agent activity too.
+- **Input panel no longer leaks the system prompt.** The run
+  detail endpoint was returning `prompt.md` verbatim — the full
+  CLAUDE.md + agent body + output protocol + tool list. The
+  Input panel now receives only the user task.
+
+### Changed
+- **Sidebar section "Data" renamed to "Context"** for
+  consistency with the post-0.5.19 vault→context vocabulary.
+
 ## 0.5.20 — 2026-04-24
 
 ### Changed

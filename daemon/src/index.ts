@@ -166,7 +166,30 @@ async function loadRunListEntry(runsDir: string, runId: string) {
   const done = typeof finalMd === 'string' && finalMd.trim().length > 0;
   entry.done = done;
   entry.status = deriveRunStatus({ done, meta, finalMd, stderr: stdout });
+  entry.startedAt = runStartedAtMs(entry.startedAt, entry.runId);
   return entry;
+}
+
+// Runs mix two ID shapes (`codex-<ms>` from the legacy shell runner and
+// `<ISO>-<agent>` from the current daemon). Sorting the list by runId
+// string is lexicographic — `'c' > '2'` — which pushes every legacy
+// codex run ahead of any dated one regardless of age. Normalise each
+// entry to a millisecond timestamp so the runs list is actually
+// chronological.
+function runStartedAtMs(metaStartedAt: unknown, runId: string): number {
+  if (typeof metaStartedAt === 'string') {
+    const t = Date.parse(metaStartedAt);
+    if (Number.isFinite(t)) return t;
+  }
+  const codex = /^codex-(\d+)$/.exec(runId);
+  if (codex) return Number(codex[1]);
+  const iso = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/.exec(runId);
+  if (iso) {
+    const [, date, h, m, s, ms] = iso;
+    const t = Date.parse(`${date}T${h}:${m}:${s}.${ms}Z`);
+    if (Number.isFinite(t)) return t;
+  }
+  return 0;
 }
 
 // Map a run's on-disk state to a user-facing status (QA BUG-02). The
@@ -996,12 +1019,39 @@ async function main() {
           return c.json({ error: 'preflight_failed', preflight: p }, 412);
         }
       }
-      const result = await runAgent({
+      // Fire-and-forget. Multi-turn agent loops routinely take minutes;
+      // awaiting the full run here left the composer wedged on
+      // "Starting…" until it finished. Prepare the run (dir + prompt +
+      // stub meta) synchronously so the runId is persisted, then let the
+      // turn loop complete in the background — the UI picks up progress
+      // via the /api/agent/runs polling.
+      const { prepareAgentRun } = await import('./agent.js');
+      const prepared = await prepareAgentRun({
         agent: body.agent,
         task: body.task,
         config,
       });
-      return c.json(result);
+      prepared.run().catch(async (err) => {
+        console.error(`[agent] ${prepared.runId} failed:`, err);
+        // Make the failure visible in the runs list — without a final.md
+        // the run shows as perpetually "running" and loadRunListEntry
+        // never flips it to `failed`.
+        try {
+          const msg = err instanceof Error ? err.message : String(err);
+          await fs.writeFile(
+            path.join(prepared.runDir, 'final.md'),
+            `_Run failed._\n\n\`\`\`\n${msg}\n\`\`\`\n`,
+            'utf-8',
+          );
+          const metaPath = path.join(prepared.runDir, 'meta.json');
+          const raw = await fs.readFile(metaPath, 'utf-8').catch(() => '{}');
+          const meta = JSON.parse(raw || '{}');
+          meta.exitCode = 1;
+          meta.endedAt = new Date().toISOString();
+          await fs.writeFile(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+        } catch {}
+      });
+      return c.json({ runId: prepared.runId, runDir: prepared.runDir });
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
     }
@@ -1016,7 +1066,10 @@ async function main() {
           .filter((e) => e.isDirectory())
           .map((e) => loadRunListEntry(runsDir, e.name)),
       );
-      runs.sort((a, b) => (a.runId < b.runId ? 1 : -1));
+      // Sort by real start time (ms) descending. Runs mix legacy
+      // `codex-<ms>` and ISO-prefixed IDs; lex-sort of runId pushed
+      // every codex-* above every dated one regardless of age.
+      runs.sort((a, b) => (Number(b.startedAt) || 0) - (Number(a.startedAt) || 0));
       return c.json({ runs });
     } catch {
       return c.json({ runs: [] });
@@ -1036,7 +1089,13 @@ async function main() {
           .catch(() => []),
       ]);
       const conversation = await loadRunConversation(meta, prompt, finalMd);
-      return c.json({ meta, prompt, final: finalMd, toolCalls, ...conversation });
+      // The on-disk prompt.md includes the full baked system prompt
+      // (CLAUDE.md + agent body + OUTPUT_PROTOCOL + tool list) — useful
+      // for debugging but NOT what should appear in the Input panel.
+      // Strip it down to just the user task so the UI renders what the
+      // user actually typed.
+      const userPrompt = extractTaskFromPromptMarkdown(prompt) ?? '';
+      return c.json({ meta, prompt: userPrompt, systemPrompt: prompt, final: finalMd, toolCalls, ...conversation });
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 404);
     }

@@ -130,7 +130,23 @@ export interface RunOptions {
  * per-token deltas can be layered on top of the WS later without changing
  * the tool-dispatch logic.
  */
-export async function runAgent(opts: RunOptions): Promise<RunResult> {
+export interface PreparedRun {
+  runId: string;
+  runDir: string;
+  run: () => Promise<RunResult>;
+}
+
+/**
+ * Prepare an agent run — create the run directory, write `prompt.md` + a
+ * stub `meta.json` (with `startedAt`), and return a handle whose `run()`
+ * executes the actual turn loop.
+ *
+ * Split out from `runAgent` so the HTTP `/api/agent/run` endpoint can
+ * return a `{runId}` immediately after prep and let the loop finish in the
+ * background. Callers that want the old blocking behaviour keep using
+ * `runAgent()`, which is now a thin wrapper around this.
+ */
+export async function prepareAgentRun(opts: RunOptions): Promise<PreparedRun> {
   const { agent, task, config } = opts;
   const onEvent = opts.onEvent ?? (() => {});
 
@@ -151,7 +167,8 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
     .filter((t): t is ToolDef => Boolean(t));
 
   // Prepare run dir
-  const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${agent}`;
+  const startedAt = new Date().toISOString();
+  const runId = `${startedAt.replace(/[:.]/g, '-')}-${agent}`;
   const runDir = path.join(getContextRoot(), 'runs', runId);
   await fs.mkdir(runDir, { recursive: true });
 
@@ -167,6 +184,56 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
     `# Run ${runId}\n\n## System\n\n${systemPrompt}\n\n## Task\n\n${task}\n`,
     'utf-8',
   );
+
+  // Stub meta so the runs list can order by startedAt and show a preview
+  // while the loop is still in flight. Replaced at the end with the full
+  // record (tokens, cost, turns).
+  const stubPreview = summarizeRunPreview(task);
+  await fs.writeFile(
+    path.join(runDir, 'meta.json'),
+    JSON.stringify(
+      {
+        runId,
+        agent,
+        model: spec.model,
+        startedAt,
+        preview: stubPreview,
+        threadId: opts.threadId,
+        entity_ref: opts.entityRef,
+      },
+      null,
+      2,
+    ),
+    'utf-8',
+  );
+
+  const run = (): Promise<RunResult> => executeRunLoop({
+    opts, spec, runId, runDir, startedAt, systemPrompt, allTools, enabledTools, maxTurns, onEvent,
+  });
+  return { runId, runDir, run };
+}
+
+export async function runAgent(opts: RunOptions): Promise<RunResult> {
+  const prepared = await prepareAgentRun(opts);
+  return prepared.run();
+}
+
+interface RunLoopArgs {
+  opts: RunOptions;
+  spec: AgentSpec;
+  runId: string;
+  runDir: string;
+  startedAt: string;
+  systemPrompt: string;
+  allTools: Map<string, ToolDef>;
+  enabledTools: ToolDef[];
+  maxTurns: number;
+  onEvent: (ev: RunEvent) => void;
+}
+
+async function executeRunLoop(args: RunLoopArgs): Promise<RunResult> {
+  const { opts, spec, runId, runDir, startedAt, systemPrompt, allTools, enabledTools, maxTurns, onEvent } = args;
+  const { agent, task, config } = opts;
 
   // Responses API: `instructions` is a top-level field (required for codex
   // passthrough on zenn). `input` carries the turn history.
@@ -383,6 +450,8 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
         runId,
         agent,
         model: spec.model,
+        startedAt,
+        endedAt: new Date().toISOString(),
         tokensIn,
         tokensOut,
         costCents,
@@ -397,6 +466,37 @@ export async function runAgent(opts: RunOptions): Promise<RunResult> {
     ),
     'utf-8',
   );
+
+  // Mirror every agent run into the chats/ store so Chat History shows
+  // a single timeline across /chat threads AND agent-page submissions.
+  // Previously agent runs only lived under runs/ and never appeared in
+  // history.
+  try {
+    const chatsDir = path.join(getContextRoot(), 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+    const threadId = opts.threadId ?? runId;
+    await fs.writeFile(
+      path.join(chatsDir, `${threadId}.json`),
+      JSON.stringify(
+        {
+          threadId,
+          agent,
+          updatedAt: new Date().toISOString(),
+          runId,
+          messages: [
+            { role: 'user', content: task },
+            { role: 'assistant', content: finalText },
+          ],
+          starred: false,
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    );
+  } catch (err) {
+    console.error('[agent] failed to mirror run into chats/:', err);
+  }
 
   // NOTE: billing is now handled server-side by /api/agent/responses, which
   // meters tokens from the zenn stream it forwards. We no longer post here
