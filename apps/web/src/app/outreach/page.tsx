@@ -103,7 +103,7 @@ export default function OutreachPage() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'sent' | 'approved' | 'rejected'>('all');
 
-  const all = drafts.data ?? [];
+  const all = Array.isArray(drafts.data) ? drafts.data : [];
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
     return all.filter((d) => {

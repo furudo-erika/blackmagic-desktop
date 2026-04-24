@@ -2,6 +2,19 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.25 — 2026-04-24
+
+### Fixed
+- **Drafts page no longer white-screens on stale auth.** When
+  the daemon port/token rotated (e.g. after an app restart)
+  the Electron window could briefly hold the old bearer and
+  `/api/drafts` would 401. That path left `drafts.data` in a
+  non-array state under some refetch timings, and the filter
+  `useMemo` crashed with `R.filter is not a function` — turning
+  a transient auth hiccup into a full page error. The list now
+  coerces through `Array.isArray` before filtering, so the 401
+  just renders the empty state until the token refreshes.
+
 ## 0.5.24 — 2026-04-24
 
 ### Added
