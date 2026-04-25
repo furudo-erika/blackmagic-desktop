@@ -2,6 +2,19 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.31 — 2026-04-25
+
+### Added
+- **Content Agent — image + video generation, surfaced.** The
+  Content Agent (Seedance 2.0, Veo 3.1, Kling, Nano-Banana) was
+  already shipping behind `/api/v1/video/generations` and
+  `/api/v1/images/generations`, but the marketing site never
+  hyped it. Landing page now lists it as agent #17 in the
+  Brand & Content group: model picker, prompt-in-your-voice,
+  output to `vault/assets`, post directly to LinkedIn or X.
+  Hero feature strip and the brand info-card highlight the
+  generation lineup.
+
 ## 0.5.30 — 2026-04-25
 
 ### Fixed
