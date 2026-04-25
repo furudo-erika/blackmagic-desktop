@@ -82,10 +82,10 @@ function ToastPill({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
       <button
         type="button"
         onClick={onDismiss}
-        className="shrink-0 text-muted hover:text-ink dark:hover:text-[#F5F1EA]"
+        className="shrink-0 cursor-pointer rounded-md p-1.5 -m-1 text-muted hover:text-ink dark:hover:text-[#F5F1EA] hover:bg-cream-light dark:hover:bg-[#17140F]"
         aria-label="Dismiss"
       >
-        <X className="w-3 h-3" />
+        <X className="w-3.5 h-3.5" />
       </button>
     </div>
   );

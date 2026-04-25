@@ -78,9 +78,9 @@ export function UpgradeBanner() {
           type="button"
           onClick={dismiss}
           aria-label="Dismiss until next release"
-          className="text-white/50 hover:text-white p-1 rounded"
+          className="shrink-0 cursor-pointer rounded-md p-2 -m-1 text-white/60 hover:text-white hover:bg-white/15"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-4 h-4" />
         </button>
       </div>
     </div>

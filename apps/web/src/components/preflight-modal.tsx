@@ -107,7 +107,7 @@ export function PreflightModal({
           <button
             type="button"
             onClick={onCancel}
-            className="p-1.5 rounded-md hover:bg-cream-light dark:hover:bg-[#1F1B15] text-muted dark:text-[#8C837C]"
+            className="shrink-0 cursor-pointer rounded-md p-2 -m-1 hover:bg-cream-light dark:hover:bg-[#1F1B15] text-muted hover:text-ink dark:hover:text-[#F5F1EA]"
             aria-label="Close"
           >
             <X className="w-4 h-4" />

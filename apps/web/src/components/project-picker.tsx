@@ -130,18 +130,31 @@ export function ProjectPicker({
           type="button"
           onClick={onClose}
           aria-label="Close"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#F5F1EA';
+            e.currentTarget.style.color = '#1A1614';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = '#605A57';
+          }}
           style={{
             position: 'absolute',
             top: 12,
             right: 12,
             background: 'transparent',
             border: 'none',
+            borderRadius: 6,
             color: '#605A57',
-            fontSize: 18,
+            fontSize: 22,
             cursor: 'pointer',
-            width: 24,
-            height: 24,
+            width: 32,
+            height: 32,
             lineHeight: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background-color 120ms ease, color 120ms ease',
           }}
         >
           ×
