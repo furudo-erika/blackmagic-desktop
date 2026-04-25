@@ -2,6 +2,15 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.28 — 2026-04-25
+
+### Changed
+- **Default to light mode.** Cream + flame is the brand voice;
+  the dark default no longer matches the marketing site or the
+  onboarding aesthetic. New installs land on light. Users who
+  explicitly opted into dark via the sidebar moon/sun button
+  keep their preference (`localStorage` `bm-theme` = `dark`).
+
 ## 0.5.27 — 2026-04-25
 
 ### Added
