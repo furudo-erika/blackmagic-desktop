@@ -499,8 +499,22 @@ export function ChatSurface({
     },
   });
 
+  // First scroll after a thread switch must be instant — opening an agent
+  // should drop the user at the latest message, not animate from top while
+  // they wait. Subsequent scrolls during streaming stay smooth so new tokens
+  // glide in. Reset on every threadId change so each agent open is "instant".
+  const pendingInstantScrollRef = useRef(true);
+  useEffect(() => { pendingInstantScrollRef.current = true; }, [threadId]);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!bottomRef.current) return;
+    const behavior: ScrollBehavior = pendingInstantScrollRef.current ? 'instant' : 'smooth';
+    // Defer one frame so the just-hydrated messages have laid out before we
+    // measure scroll target — otherwise scrollIntoView lands short of bottom.
+    const raf = requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior, block: 'end' });
+      pendingInstantScrollRef.current = false;
+    });
+    return () => cancelAnimationFrame(raf);
   }, [messages, sendMut.isPending]);
 
   useEffect(() => {

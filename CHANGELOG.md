@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.32 — 2026-04-25
+
+### Fixed
+- **Open an agent → land at the latest message.** Chat surface now
+  jump-scrolls to the bottom on every agent / thread switch instead
+  of leaving you parked mid-history. The smooth-scroll-on-mount path
+  often missed the bottom when the thread was long, forcing a manual
+  scroll. First scroll after a thread change is now `instant` and
+  deferred one frame so the just-hydrated messages have laid out
+  before we measure. Subsequent scrolls during streaming stay smooth.
+
 ## 0.5.31 — 2026-04-25
 
 ### Added
