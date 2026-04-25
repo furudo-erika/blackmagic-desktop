@@ -109,10 +109,12 @@ export function Sidebar() {
   const pathname = usePathname() || '/';
 
   // Theme ------------------------------------------------------------------
+  // Default to LIGHT mode; cream + flame is the brand. Users who
+  // explicitly opt into dark via the toggle keep their preference.
   const [dark, setDark] = useState(false);
   useEffect(() => {
     const stored = localStorage.getItem('bm-theme');
-    const initial = stored !== 'light';
+    const initial = stored === 'dark';
     setDark(initial);
     document.documentElement.classList.toggle('dark', initial);
   }, []);
