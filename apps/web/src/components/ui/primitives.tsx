@@ -293,8 +293,9 @@ export function DetailDrawer({
           </div>
         </div>
         <button
+          type="button"
           onClick={onClose}
-          className="text-muted hover:text-ink dark:hover:text-[#F5F1EA] p-1 -m-1"
+          className="shrink-0 cursor-pointer rounded-md p-2 -m-1 text-muted hover:text-ink dark:hover:text-[#F5F1EA] hover:bg-cream-light dark:hover:bg-[#17140F]"
           aria-label="Close"
         >
           <X className="w-4 h-4" />

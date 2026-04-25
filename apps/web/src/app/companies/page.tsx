@@ -103,6 +103,7 @@ function DrawerSection({ icon: Icon, label, count, allHref, empty, children }: {
 }
 
 function CompanyDetail({ company, onClose }: { company: Company; onClose: () => void }) {
+  const qc = useQueryClient();
   const file = useQuery({
     queryKey: ['context-file', company.path],
     queryFn: () => api.readFile(company.path),
@@ -113,6 +114,22 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
     queryKey: ['context-backups', company.path],
     queryFn: () => api.listBackups(company.path),
     staleTime: 30_000,
+  });
+
+  // Re-run the researcher on this specific company. Same mutation shape
+  // as the page-level Enrich button, just scoped to the current row so
+  // the user doesn't have to re-type the domain.
+  const reEnrich = useMutation({
+    mutationFn: () => {
+      const d = company.domain ?? company.slug;
+      return api.runAgent('researcher', `Re-enrich ${d} and update companies/${company.slug}.md.`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['context-file', company.path] });
+      qc.invalidateQueries({ queryKey: ['companies-files'] });
+      qc.invalidateQueries({ queryKey: ['context-backups', company.path] });
+      qc.invalidateQueries({ queryKey: ['runs'] });
+    },
   });
 
   const slug = company.slug.toLowerCase();
@@ -136,6 +153,26 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
   return (
     <DetailDrawer eyebrow="Company" title={company.name} onClose={onClose} width={440}>
       <div className="p-5 space-y-5">
+        {/* Per-company action row — re-runs researcher on this domain */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="primary"
+            onClick={() => reEnrich.mutate()}
+            disabled={reEnrich.isPending}
+          >
+            <Sparkles className="w-3 h-3" />
+            {reEnrich.isPending ? 'Enriching…' : 'Enrich this company'}
+          </Button>
+          {reEnrich.isError && (
+            <span className="text-[11px] text-flame">
+              {reEnrich.error instanceof Error ? reEnrich.error.message : 'failed'}
+            </span>
+          )}
+          {reEnrich.isSuccess && !reEnrich.isPending && (
+            <span className="text-[11px] text-emerald-600">queued</span>
+          )}
+        </div>
+
         {Object.keys(company.frontmatter).length > 0 && (
           <section>
             <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-2">Frontmatter</div>
