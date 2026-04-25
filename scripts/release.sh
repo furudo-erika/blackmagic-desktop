@@ -143,4 +143,11 @@ echo "✔ Released v$VERSION (minVersion=$MIN_VERSION)."
 echo "  $PUBLIC_BASE/version.json"
 echo "  $PUBLIC_BASE/black-magic-mac-arm64.dmg"
 echo "  $PUBLIC_BASE/black-magic-mac-x64.dmg"
-echo "  To upgrade: brew upgrade --cask blackmagic-ai"
+
+# Auto-upgrade the local install so the operator never has to babysit the
+# tap roundtrip. `brew update` refreshes the tap cache that we just pushed
+# to seconds ago. Failures are tolerated — the release is already live.
+echo
+echo "▶ Auto-upgrading local install…"
+brew update >/dev/null 2>&1 || true
+brew upgrade --cask blackmagic-ai || echo "  (local upgrade skipped — run manually if needed)"
