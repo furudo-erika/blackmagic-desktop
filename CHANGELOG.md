@@ -2,6 +2,16 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.30 — 2026-04-25
+
+### Fixed
+- **Every X / dismiss button is now actually clickable.** Audited
+  the whole desktop UI after the Companies drawer regression.
+  Five buttons had hit areas under 32×32px or no hover affordance —
+  fixed in `ui/toast`, `credits-banner`, `upgrade-banner`,
+  `preflight-modal`, and `project-picker`. Each now ships with a
+  ≥32×32 tap target, hover background tile, and a pointer cursor.
+
 ## 0.5.29 — 2026-04-25
 
 ### Fixed
