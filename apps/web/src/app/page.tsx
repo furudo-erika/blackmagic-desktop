@@ -23,7 +23,7 @@
  * `listChats` daemon endpoints — no new API surface needed.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -61,6 +61,33 @@ export default function HomePage() {
   const router = useRouter();
   const [draft, setDraft] = useState('');
   const [homeAgent, setHomeAgent] = useState<string | undefined>(undefined);
+
+  // First-launch gate: if us/company.md is missing or empty, the project
+  // hasn't been bootstrapped yet — every agent would be flying blind.
+  // Send the user to /onboarding/bootstrap so we collect their domain
+  // and run bootstrap-self before they can do anything else. Cached for
+  // the session via localStorage so we don't redirect repeatedly if the
+  // user backs out and clicks Home again on purpose.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.localStorage.getItem('bm-onboarding-skipped') === '1') return;
+    let cancelled = false;
+    api
+      .readFile('us/company.md')
+      .then((r) => {
+        if (cancelled) return;
+        const body = (r.body ?? '').trim();
+        if (!body) router.replace('/onboarding/bootstrap');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Missing file → onboarding
+        router.replace('/onboarding/bootstrap');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   // Load the same agents roster the chat composer uses, for the
   // picker pill + @-mention popover. Stable across tabs because both

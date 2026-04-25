@@ -22,13 +22,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-import {
-  PageShell,
-  PageHeader,
-  PageBody,
-  Panel,
-  Button,
-} from '../../../components/ui/primitives';
+import { Panel, Button } from '../../../components/ui/primitives';
 import { api, ApiError } from '../../../lib/api';
 import { isValidDomain, normaliseDomain } from '../../../lib/validators';
 
@@ -77,13 +71,26 @@ export default function OnboardingBootstrapPage() {
   }
 
   return (
-    <PageShell>
-      <PageHeader
-        title="Profile your company"
-        subtitle="One domain is enough. Black Magic crawls your site and fills in the us/ folder so every draft and research task is grounded in your own context."
-        icon={Sparkles}
-      />
-      <PageBody>
+    <div className="h-full overflow-y-auto bg-cream dark:bg-[#0F0D0A]">
+      <div className="max-w-3xl mx-auto px-8 pt-16 pb-20">
+        {/* Brand kicker */}
+        <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.22em] text-muted dark:text-[#8C837C] mb-5">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-flame" />
+          First-run setup
+        </div>
+
+        {/* Huge serif title — matches blackmagic.engineering */}
+        <h1 className="font-serif italic text-[44px] md:text-[64px] leading-[1.02] tracking-[-0.015em] text-ink dark:text-[#F5F1EA] mb-5">
+          Tell us who you are.
+        </h1>
+
+        <p className="text-[16px] leading-[1.65] text-muted dark:text-[#8C837C] max-w-[560px] mb-10">
+          One domain is enough. Black Magic crawls your site, reads your
+          docs, and fills in <code className="font-mono text-[14px]">us/</code> —
+          the folder every agent reads from. Every draft, brief, and research
+          task gets grounded in your own context, not generic AI sludge.
+        </p>
+
         <Panel>
           <form onSubmit={submit} className="flex flex-col gap-4">
             <Field
@@ -206,19 +213,43 @@ export default function OnboardingBootstrapPage() {
           </Panel>
         )}
 
-        <Panel className="mt-4">
-          <div className="text-xs text-muted">
-            <span className="text-ink dark:text-[#E6E0D8] font-medium">
-              What the agent fills in:
-            </span>{' '}
-            company overview, product map, pricing, ICP, positioning,
-            objections, brand voice, competitors, customers, team. Every
-            factual claim cites a source URL; unknowns are marked
-            <code> unknown</code> — never invented.
-          </div>
-        </Panel>
-      </PageBody>
-    </PageShell>
+        {/* What the agent fills in — 3-col Multica-style grid */}
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
+          <FillInCard
+            title="Who you are"
+            copy="Company overview, product map, pricing, positioning. Pulled from your site + 10-K + about page."
+          />
+          <FillInCard
+            title="Who you sell to"
+            copy="ICP, segments, top customers, common objections. Mined from case studies and review sites."
+          />
+          <FillInCard
+            title="How you sound"
+            copy="Brand voice, do / don’t list, customer proofs. Extracted from the way you actually write today."
+          />
+        </div>
+
+        <p className="mt-10 text-[12px] text-muted dark:text-[#8C837C] leading-[1.7]">
+          Every factual claim cites a source URL. Unknowns are marked{' '}
+          <code className="font-mono">unknown</code> — never invented. You can
+          edit anything in the <code className="font-mono">us/</code> folder
+          after the run.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function FillInCard({ title, copy }: { title: string; copy: string }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <h4 className="text-[15px] font-semibold text-ink dark:text-[#F5F1EA] leading-snug">
+        {title}
+      </h4>
+      <p className="text-[13px] leading-[1.6] text-muted dark:text-[#8C837C]">
+        {copy}
+      </p>
+    </div>
   );
 }
 
