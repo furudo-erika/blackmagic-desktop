@@ -2,6 +2,23 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.27 — 2026-04-25
+
+### Added
+- **First-run onboarding gate.** Home now redirects to
+  `/onboarding/bootstrap` on mount when `us/company.md` is
+  missing or empty. Without that file every agent flies blind,
+  so we send the user to the Company Profiler before they
+  touch the composer. Escape hatch:
+  `localStorage.bm-onboarding-skipped=1`.
+- **Brand-aligned bootstrap page.** `/onboarding/bootstrap`
+  now uses the same visual language as the marketing site —
+  Instrument Serif italic display title ("Tell us who you
+  are."), flame kicker, generous breathing room, and a
+  three-column "what gets filled in" row underneath the form
+  (Who you are · Who you sell to · How you sound). Form
+  logic and `bootstrap-self` playbook invocation unchanged.
+
 ## 0.5.26 — 2026-04-24
 
 ### Added
