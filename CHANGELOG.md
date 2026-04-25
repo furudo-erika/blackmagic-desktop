@@ -2,6 +2,22 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.29 — 2026-04-25
+
+### Fixed
+- **Companies drawer close X is actually clickable.** The X
+  button had a 24×24px hit area with no hover affordance —
+  trivially missed and looked dead. Bumped to 32×32 with a
+  cream hover tile.
+
+### Added
+- **Per-company enrich button.** The Companies detail drawer
+  now has a primary "Enrich this company" button at the top
+  that re-runs the researcher against the selected row's
+  domain. On success the frontmatter / notes / runs panes
+  refresh in place — no need to re-type the domain in the
+  page-level Enrich form.
+
 ## 0.5.28 — 2026-04-25
 
 ### Changed
