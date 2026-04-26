@@ -469,6 +469,40 @@ export async function runDaily(cfg: Config, opts: { date?: string; models?: GeoM
   const work: Array<{ prompt: GeoPrompt; model: GeoModel }> = [];
   for (const p of prompts) for (const m of enabled) work.push({ prompt: p, model: m });
 
+  // Progress JSON the UI polls while "Run now" is pending. Written to
+  // signals/geo/runs/<date>/_progress.json after each completed call so
+  // the user sees "12/90 · ChatGPT · prompt-foo" instead of a frozen
+  // "Running…" button. Cleared at end of run.
+  const progressPath = path.join(runsRoot(), date, '_progress.json');
+  await fs.mkdir(path.dirname(progressPath), { recursive: true });
+  let done = 0;
+  async function writeProgress(current: { model: GeoModel; prompt_id: string } | null) {
+    try {
+      await writeJson(progressPath, {
+        started_at: new Date(started).toISOString(),
+        date,
+        total: work.length,
+        done,
+        current,
+        ok: runsOk,
+        error: runsErr,
+        running: true,
+      });
+    } catch {}
+  }
+  await writeProgress(null);
+
+  // Per-call timeout so one stuck Perplexity request can't hang the
+  // whole sweep. 90s is generous (real calls are 5-30s); anything
+  // longer is almost certainly a network stall.
+  const PER_CALL_TIMEOUT_MS = 90_000;
+  function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error(`timeout after ${Math.round(ms / 1000)}s: ${label}`)), ms);
+      p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+    });
+  }
+
   let cursor = 0;
   async function worker() {
     while (true) {
@@ -477,8 +511,13 @@ export async function runDaily(cfg: Config, opts: { date?: string; models?: GeoM
       const item = work[i];
       if (!item) return;
       const { prompt, model } = item;
+      await writeProgress({ model, prompt_id: prompt.id });
       try {
-        const rec = await runPrompt(prompt, model, cfg, geoCfg.brands);
+        const rec = await withTimeout(
+          runPrompt(prompt, model, cfg, geoCfg.brands),
+          PER_CALL_TIMEOUT_MS,
+          `${model} / ${prompt.id}`,
+        );
         rec.date = date;
         await writeRun(rec);
         if (rec.error) { runsErr += 1; errors.push({ prompt_id: prompt.id, model, error: rec.error }); }
@@ -487,6 +526,8 @@ export async function runDaily(cfg: Config, opts: { date?: string; models?: GeoM
         runsErr += 1;
         errors.push({ prompt_id: prompt.id, model, error: err instanceof Error ? err.message : String(err) });
       }
+      done += 1;
+      await writeProgress(null);
     }
   }
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
@@ -506,7 +547,42 @@ export async function runDaily(cfg: Config, opts: { date?: string; models?: GeoM
   }
   const indexPath = path.join(runsRoot(), date, 'index.json');
   await writeJson(indexPath, summary);
+  // Mark progress as finished so the UI's pending poller stops the
+  // spinner promptly even before the mutation's HTTP response unwinds.
+  try {
+    await writeJson(progressPath, {
+      started_at: new Date(started).toISOString(),
+      date,
+      total: work.length,
+      done: work.length,
+      current: null,
+      ok: runsOk,
+      error: runsErr,
+      running: false,
+      finished_at: new Date().toISOString(),
+    });
+  } catch {}
   return summary;
+}
+
+// Latest progress snapshot — UI polls this while "Run now" is in flight
+// to show "<done>/<total> · <current model> · <current prompt>" instead
+// of an opaque spinner. Returns null if no run has ever started.
+export async function getRunProgress(): Promise<unknown | null> {
+  // Look at today's progress first, then fall back to most recent date
+  // with a _progress.json (e.g. if a run from late yesterday is still
+  // active across midnight).
+  const today = new Date().toISOString().slice(0, 10);
+  const candidates = [today, ...(await listRunDates()).reverse()];
+  const seen = new Set<string>();
+  for (const d of candidates) {
+    if (seen.has(d)) continue;
+    seen.add(d);
+    const p = path.join(runsRoot(), d, '_progress.json');
+    const data = await readJson<unknown | null>(p, null);
+    if (data) return data;
+  }
+  return null;
 }
 
 function missingKeyReason(_m: GeoModel, cfg: Config): string | null {

@@ -449,6 +449,8 @@ export const api = {
   geoRun: (body: { date?: string; models?: GeoModel[]; concurrency?: number } = {}) =>
     request<GeoRunSummary>('/api/geo/run', { method: 'POST', body: JSON.stringify(body) }),
   geoRuns: () => request<{ runs: GeoRunSummary[] }>('/api/geo/runs'),
+  geoRunProgress: () =>
+    request<{ progress: GeoRunProgress | null }>('/api/geo/run/progress'),
   geoReportBrands: (q: { start_date?: string; end_date?: string; model?: GeoModel } = {}) =>
     request<{ rows: GeoBrandRow[] }>(`/api/geo/reports/brands?${qs(q)}`),
   geoReportDomains: (q: { start_date?: string; end_date?: string; model?: GeoModel; limit?: number } = {}) =>
@@ -579,6 +581,18 @@ export type GeoRunSummary = {
   runs_error: number;
   errors: Array<{ prompt_id: string; model: GeoModel; error: string }>;
   duration_ms: number;
+};
+
+export type GeoRunProgress = {
+  started_at: string;
+  date: string;
+  total: number;
+  done: number;
+  current: { model: GeoModel; prompt_id: string } | null;
+  ok: number;
+  error: number;
+  running: boolean;
+  finished_at?: string;
 };
 
 export type Project = { id: string; name: string; path: string; logo_url?: string };

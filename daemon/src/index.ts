@@ -543,6 +543,9 @@ async function main() {
   app.get('/api/geo/runs', async (c) => {
     return c.json({ runs: await geo.listDailySummaries() });
   });
+  app.get('/api/geo/run/progress', async (c) => {
+    return c.json({ progress: await geo.getRunProgress() });
+  });
   app.get('/api/geo/reports/brands', async (c) => {
     const q = c.req.query();
     return c.json({ rows: await geo.reportBrands({ start_date: q.start_date, end_date: q.end_date, model: q.model as geo.GeoModel }) });

@@ -53,6 +53,17 @@ export default function GeoPage() {
     },
   });
 
+  // Live progress while "Run now" is in flight. Daemon writes
+  // signals/geo/runs/<date>/_progress.json after each prompt × model
+  // call; we poll every 1.5s so the user sees "12/90 · ChatGPT ·
+  // <prompt-id>" instead of an opaque "Running…" spinner.
+  const runProgress = useQuery({
+    queryKey: ['geo-run-progress'],
+    queryFn: api.geoRunProgress,
+    refetchInterval: runMut.isPending ? 1500 : false,
+    enabled: runMut.isPending,
+  });
+
   const needsConfig = (cfg.data?.brands ?? []).length === 0;
   const latestRun = runs.data?.runs?.slice(-1)[0];
 
@@ -89,7 +100,11 @@ export default function GeoPage() {
               ) : (
                 <Play className="w-3 h-3 mr-1 inline" />
               )}
-              {runMut.isPending ? 'Running… (can take ~30s)' : 'Run now'}
+              {runMut.isPending
+                ? (runProgress.data?.progress
+                    ? `Running ${runProgress.data.progress.done}/${runProgress.data.progress.total}`
+                    : 'Starting…')
+                : 'Run now'}
             </Button>
           </div>
         }
@@ -101,6 +116,35 @@ export default function GeoPage() {
             <p className="text-xs text-muted dark:text-[#8C837C] mt-1">
               Add your brand + competitors below to start tracking. At least one must have <code>is_us: true</code>.
             </p>
+          </Panel>
+        )}
+
+        {runMut.isPending && runProgress.data?.progress && (
+          <Panel className="p-3 mb-4 border-flame/40">
+            <div className="flex items-center justify-between gap-3 text-[12px]">
+              <div className="flex items-center gap-2 min-w-0">
+                <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-flame" />
+                <span className="font-semibold text-ink dark:text-[#F5F1EA] shrink-0">
+                  {runProgress.data.progress.done}/{runProgress.data.progress.total}
+                </span>
+                <span className="text-muted dark:text-[#8C837C] truncate font-mono">
+                  {runProgress.data.progress.current
+                    ? `${runProgress.data.progress.current.model} · ${runProgress.data.progress.current.prompt_id}`
+                    : 'queueing…'}
+                </span>
+              </div>
+              <div className="text-[11px] font-mono text-muted dark:text-[#8C837C] shrink-0">
+                {runProgress.data.progress.ok} ok · {runProgress.data.progress.error} err
+              </div>
+            </div>
+            <div className="mt-2 h-1 w-full bg-cream dark:bg-[#0F0D0A] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-flame transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, (runProgress.data.progress.done / Math.max(1, runProgress.data.progress.total)) * 100)}%`,
+                }}
+              />
+            </div>
           </Panel>
         )}
 

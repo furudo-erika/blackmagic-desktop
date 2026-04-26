@@ -2,6 +2,23 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.37 — 2026-04-26
+
+### Fixed
+- **GEO "Run now" no longer freezes the UI.** Two problems
+  fused into one bad UX. (1) The whole sweep ran in a single
+  blocking POST so any stuck Perplexity / ChatGPT call would
+  hang the button forever. Each per-prompt × per-model call
+  now has a 90s deadline — a hung request is logged as an
+  error and the rest of the sweep continues. (2) There was no
+  visible progress. The daemon now writes
+  `signals/geo/runs/<date>/_progress.json` after every call;
+  the UI polls it every 1.5s while the button is pending and
+  shows `<done>/<total> · <model> · <prompt-id>` plus a live
+  progress bar. Button label flips from "Starting…" to
+  "Running 12/90" so you can tell the sweep is actually
+  moving.
+
 ## 0.5.36 — 2026-04-26
 
 ### Removed
