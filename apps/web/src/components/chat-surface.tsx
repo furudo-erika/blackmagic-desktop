@@ -312,6 +312,7 @@ export function ChatSurface({
   })();
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // When the picker changes which agent routes the conversation, also
   // switch the persisted thread. Each agent keeps its own history under
@@ -503,19 +504,34 @@ export function ChatSurface({
   // should drop the user at the latest message, not animate from top while
   // they wait. Subsequent scrolls during streaming stay smooth so new tokens
   // glide in. Reset on every threadId change so each agent open is "instant".
+  //
+  // We pin to the bottom by setting scrollTop = scrollHeight on the scroll
+  // container directly rather than scrollIntoView, because markdown content
+  // (code highlighting, embedded media) lays out *after* the first paint —
+  // a single-rAF measure lands above the eventual bottom on long threads.
+  // Retry the pin across rAF + 50/150/300/600ms so late layout still gets
+  // pulled to the bottom. After the settle window, we switch to smooth for
+  // token streaming.
   const pendingInstantScrollRef = useRef(true);
   useEffect(() => { pendingInstantScrollRef.current = true; }, [threadId]);
   useEffect(() => {
-    if (!bottomRef.current) return;
-    const behavior: ScrollBehavior = pendingInstantScrollRef.current ? 'instant' : 'smooth';
-    // Defer one frame so the just-hydrated messages have laid out before we
-    // measure scroll target — otherwise scrollIntoView lands short of bottom.
-    const raf = requestAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({ behavior, block: 'end' });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    if (pendingInstantScrollRef.current) {
+      const pin = () => { container.scrollTop = container.scrollHeight; };
+      const raf = requestAnimationFrame(pin);
+      const timers = [50, 150, 300, 600].map((ms) => setTimeout(pin, ms));
       pendingInstantScrollRef.current = false;
+      return () => {
+        cancelAnimationFrame(raf);
+        timers.forEach(clearTimeout);
+      };
+    }
+    const raf = requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     });
     return () => cancelAnimationFrame(raf);
-  }, [messages, sendMut.isPending]);
+  }, [messages, sendMut.isPending, threadId]);
 
   useEffect(() => {
     sendPendingRef.current = sendMut.isPending;
@@ -577,7 +593,7 @@ export function ChatSurface({
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-6 py-6">
         {messages.length === 0 && !sendMut.isPending && (
           <div className="max-w-5xl mx-auto py-6 space-y-8">
             {/* Onboarding nudge moved to a global app-shell banner

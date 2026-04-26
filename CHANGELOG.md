@@ -2,6 +2,18 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.33 — 2026-04-26
+
+### Fixed
+- **Agent tab scroll-to-bottom, for real this time.** 0.5.32's
+  one-rAF `scrollIntoView` still landed mid-history on long threads
+  because markdown content (code highlighting, embedded media) lays
+  out *after* the first paint, so the measured bottom was stale.
+  Switched to pinning `scrollTop = scrollHeight` on the scroll
+  container directly and retrying across 0/50/150/300/600 ms so
+  late layout still gets dragged to the bottom. Streaming scrolls
+  stay smooth.
+
 ## 0.5.32 — 2026-04-25
 
 ### Fixed
