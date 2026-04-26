@@ -537,8 +537,15 @@ async function main() {
   });
   app.post('/api/geo/run', async (c) => {
     const body = await c.req.json<{ date?: string; models?: geo.GeoModel[]; concurrency?: number }>().catch(() => ({}));
-    const summary = await geo.runDaily(config, body);
-    return c.json(summary);
+    try {
+      const summary = await geo.runDaily(config, body);
+      return c.json(summary);
+    } catch (err) {
+      if (err && typeof err === 'object' && (err as { code?: string }).code === 'GEO_RUN_LOCKED') {
+        return c.json({ error: (err as Error).message, code: 'GEO_RUN_LOCKED' }, 409);
+      }
+      throw err;
+    }
   });
   app.get('/api/geo/runs', async (c) => {
     return c.json({ runs: await geo.listDailySummaries() });

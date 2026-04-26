@@ -53,16 +53,28 @@ export default function GeoPage() {
     },
   });
 
-  // Live progress while "Run now" is in flight. Daemon writes
-  // signals/geo/runs/<date>/_progress.json after each prompt × model
-  // call; we poll every 1.5s so the user sees "12/90 · ChatGPT ·
-  // <prompt-id>" instead of an opaque "Running…" spinner.
+  // Live progress for "Run now". Polls server-side `_progress.json`
+  // independently of `runMut.isPending` so the strip survives tab
+  // switches (the React state resets on remount, but the daemon's
+  // run keeps going). Fast poll while running, slow background poll
+  // otherwise so we cheaply detect a freshly-started run; no poll at
+  // all if we've never seen any progress data.
   const runProgress = useQuery({
     queryKey: ['geo-run-progress'],
     queryFn: api.geoRunProgress,
-    refetchInterval: runMut.isPending ? 1500 : false,
-    enabled: runMut.isPending,
+    enabled: true,
+    refetchInterval: (query) => {
+      const data = query.state.data as { progress?: { running?: boolean } | null } | undefined;
+      const prog = data?.progress;
+      if (prog && prog.running === true) return 1500;
+      if (prog) return 5000;
+      return false;
+    },
   });
+
+  // True whenever this client kicked off a run OR the daemon reports a
+  // run still in flight (covers the post-tab-switch remount case).
+  const runActive = runMut.isPending || runProgress.data?.progress?.running === true;
 
   const needsConfig = (cfg.data?.brands ?? []).length === 0;
   const latestRun = runs.data?.runs?.slice(-1)[0];
@@ -94,13 +106,13 @@ export default function GeoPage() {
               <option value="perplexity">Perplexity</option>
               <option value="google_ai_overview">AI Overview</option>
             </select>
-            <Button variant="primary" onClick={() => runMut.mutate()} disabled={runMut.isPending}>
-              {runMut.isPending ? (
+            <Button variant="primary" onClick={() => runMut.mutate()} disabled={runActive}>
+              {runActive ? (
                 <Loader2 className="w-3 h-3 mr-1 inline animate-spin" />
               ) : (
                 <Play className="w-3 h-3 mr-1 inline" />
               )}
-              {runMut.isPending
+              {runActive
                 ? (runProgress.data?.progress
                     ? `Running ${runProgress.data.progress.done}/${runProgress.data.progress.total}`
                     : 'Starting…')
@@ -119,7 +131,7 @@ export default function GeoPage() {
           </Panel>
         )}
 
-        {runMut.isPending && runProgress.data?.progress && (
+        {runActive && runProgress.data?.progress && (
           <Panel className="p-3 mb-4 border-flame/40">
             <div className="flex items-center justify-between gap-3 text-[12px]">
               <div className="flex items-center gap-2 min-w-0">
@@ -155,6 +167,15 @@ export default function GeoPage() {
             <Stat label="Runs ok" value={latestRun.runs_ok} />
             <Stat label="Errors" value={latestRun.runs_error} tone={latestRun.runs_error > 0 ? 'bad' : 'ok'} />
           </div>
+        )}
+        {runMut.isError && (
+          <Panel className="p-3 mb-4 border-flame/40">
+            <div className="text-xs font-semibold text-flame mb-1">
+              {/already running|GEO_RUN_LOCKED|409/i.test(String((runMut.error as Error)?.message ?? ''))
+                ? 'Already running — see progress above'
+                : `Run failed: ${(runMut.error as Error)?.message ?? 'unknown error'}`}
+            </div>
+          </Panel>
         )}
         {runMut.data?.errors && runMut.data.errors.length > 0 && (
           <Panel className="p-3 mb-4 border-flame/40">

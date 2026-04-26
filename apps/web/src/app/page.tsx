@@ -205,9 +205,18 @@ export default function HomePage() {
     // chat surface opens the right history. Otherwise land on the
     // global default thread (`bm-last-thread`), matching the legacy
     // home behavior.
-    const id = newThreadId();
+    //
+    // CRITICAL: only mint a new threadId if there isn't already one for
+    // this agent — otherwise the home composer would bulldoze the
+    // ongoing conversation every time the user typed here, and the
+    // next render would land in a brand-new empty thread (the
+    // "我又说了一个命令，agent开了新对话" bug). Reusing the existing
+    // threadId means the pending prompt is appended to the live
+    // conversation, which is what the user expects.
     if (typeof window !== 'undefined') {
       const threadKey = homeAgent ? `bm-team-thread-${homeAgent}` : 'bm-last-thread';
+      const existing = window.localStorage.getItem(threadKey);
+      const id = existing && existing.trim() ? existing : newThreadId();
       window.localStorage.setItem(threadKey, id);
       window.localStorage.setItem('bm-pending-prompt', text);
     }
@@ -321,9 +330,13 @@ export default function HomePage() {
           agentSlug={homeAgent}
           onSend={(prompt, slug) => {
             setDraft('');
-            const id = newThreadId();
+            // Same reuse rule as the composer above — don't bulldoze
+            // an existing conversation just because a starter card
+            // was clicked. Append to the agent's live thread instead.
             if (typeof window !== 'undefined') {
               const threadKey = slug ? `bm-team-thread-${slug}` : 'bm-last-thread';
+              const existing = window.localStorage.getItem(threadKey);
+              const id = existing && existing.trim() ? existing : newThreadId();
               window.localStorage.setItem(threadKey, id);
               window.localStorage.setItem('bm-pending-prompt', prompt);
             }

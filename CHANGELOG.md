@@ -12,6 +12,40 @@ All notable changes to BlackMagic AI. Dates in UTC.
   so "Black Magic" / "hello@blackmagic.run" displayed in the
   decorative serif instead of the sans body font. Pinned that
   block to `var(--font-sans)` so it inherits the right family.
+- **Home composer no longer bulldozes an agent's existing
+  conversation.** Typing into the home composer (or clicking a
+  starter card) used to mint a brand-new `threadId` every time
+  and stash it under `bm-team-thread-<agent>` in localStorage,
+  so when the chat surface mounted it landed on a fresh empty
+  thread and the user's previous conversation with that agent
+  appeared to vanish. The composer now reuses the existing
+  `threadKey` value if one is set and only mints a new id when
+  there genuinely is no prior thread, so prompts append to the
+  live conversation instead of replacing it.
+- **GEO "Run now" can no longer trigger two concurrent sweeps.**
+  When the progress strip vanished on a tab-switch (see next
+  bullet) users would click "Run now" again, kicking off a
+  second `runDaily` that wrote to the same
+  `signals/geo/runs/<date>/_progress.json` as the first. The
+  two writers stomped each other and the UI counter oscillated
+  wildly (e.g. 150 → 15 → 150). `runDaily` now reads the
+  existing `_progress.json` first and refuses to start if
+  `running: true` and `started_at` is within the last 30 minutes
+  (throws a tagged `GEO_RUN_LOCKED` error; the staleness window
+  prevents a daemon crash from permanently wedging future runs).
+  The `/api/geo/run` POST handler maps that error to a clean
+  `409 { code: 'GEO_RUN_LOCKED' }` response.
+- **GEO progress strip survives tab switches.** The progress
+  banner and "Running 12/90" button label only rendered while
+  `runMut.isPending` was true, but that React state resets on
+  every component remount, so leaving and returning to `/geo`
+  made a still-running sweep look dead. The page now polls
+  `/api/geo/run/progress` independently (1.5s while a run is
+  active server-side, 5s background poll otherwise) and a
+  derived `runActive = runMut.isPending || progress.running`
+  drives both the button and the banner. A small flame panel
+  surfaces the 409 above as "Already running — see progress
+  above" instead of crashing the mutation.
 
 ## 0.5.39 — 2026-04-26
 

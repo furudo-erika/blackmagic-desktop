@@ -453,6 +453,27 @@ export async function runDaily(cfg: Config, opts: { date?: string; models?: GeoM
   const models = opts.models ?? geoCfg.models ?? [];
   const started = Date.now();
 
+  // Concurrent-run guard. Two parallel runDaily invocations writing to
+  // the same _progress.json (e.g. user double-clicked "Run now" because
+  // the progress strip vanished on tab-switch) cause the UI counter to
+  // oscillate wildly (150 → 15 → 150). Refuse to start if a recent run
+  // is already marked running. 30min staleness threshold so a daemon
+  // crash mid-run doesn't permanently wedge future runs.
+  {
+    const existingProgressPath = path.join(runsRoot(), date, '_progress.json');
+    const existing = await readJson<any | null>(existingProgressPath, null);
+    if (existing && existing.running === true) {
+      const startedAtMs = Date.parse(existing.started_at ?? '');
+      const ageMs = Number.isFinite(startedAtMs) ? Date.now() - startedAtMs : Infinity;
+      if (Number.isFinite(ageMs) && ageMs < 30 * 60_000) {
+        throw Object.assign(
+          new Error(`A GEO run is already in progress for ${date} — wait for it to finish or check /signals/geo/runs/${date}/_progress.json`),
+          { code: 'GEO_RUN_LOCKED' },
+        );
+      }
+    }
+  }
+
   // Skip models missing keys, log a clean error so the summary shows why.
   const missing: string[] = [];
   const enabled: GeoModel[] = [];
