@@ -2,6 +2,21 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.34 — 2026-04-26
+
+### Added
+- **Skill: `linkedin-trendjack-llm-launch`.** Packages Paolo's
+  AI-launch trendjacking playbook (500k+ impressions, 1k–2k
+  comments, 20–90 calls per post when the 5–24h window hits).
+  Locks the launch via web search, validates timing, builds a
+  copy-paste prompt resource for your ICP, drafts the four-component
+  post (newsflash hook · value overview · frictionless CTA ·
+  official launch graphic), saves to `drafts/linkedin/` for human
+  approval, and schedules a 72h recap. Includes a conversion
+  playbook (DM-the-resource → 48h follow-up → calendar) so the
+  attention actually converts. Optionally self-schedules an every-
+  2h "watcher" cron that no-ops when no fresh launch is detected.
+
 ## 0.5.33 — 2026-04-26
 
 ### Fixed

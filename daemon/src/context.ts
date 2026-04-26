@@ -3994,6 +3994,132 @@ Weekly pipeline-health report across all open deals.
        ARR at risk × days stuck
 6. Reply with the headline + the top-5 deals to unblock.
 `,
+
+  'linkedin-trendjack-llm-launch.md': `---
+kind: skill
+name: linkedin-trendjack-llm-launch
+group: content
+agent: content-studio
+inputs:
+  - { name: launch, required: false }
+  - { name: angle, required: false }
+requires:
+  us_files: [us/company.md]
+  optional_integrations: [unipile, slack, discord, telegram]
+---
+
+Trendjack a major LLM/AI launch on LinkedIn to siphon attention and
+convert it into qualified inbound. Source: Paolo's "how we trendjack
+AI launches to book 1000s of B2B calls on linkedin" playbook —
+500k+ impressions, 1k–2k comments, 20–90 calls per post when timing
+hits the 5–24h post-launch window.
+
+## When to run
+- A major model just shipped (gpt, claude, gemini, llama, deepseek,
+  qwen, mistral) OR a smaller AI tool launch is breaking the feed
+  AND it's been 2–24h since the announcement (sweet spot).
+- Pass \`launch\` to point at a specific event ("gemini-3", "claude-5",
+  url, or free-text). If absent, ask the model + web_search to find
+  the freshest launch in the last 48h.
+
+## Pre-flight
+- Read \`us/company.md\` for the user's voice, ICP, primary offer,
+  and front-end "tripwire" (workshop / lead-magnet) if any. If
+  \`us/company.md\` is still the seed template, reply with
+  "configure us/company.md first — the post needs your ICP + offer"
+  and stop.
+- Read \`us/voice.md\` if present so the post sounds like the user,
+  not generic LinkedIn slop.
+
+## Steps
+
+1. **Lock the launch.** If \`{{launch}}\` is empty, run
+   \`web_search\` for the last 48h: "<top labs> launch announcement",
+   "new model release this week". Pick the single highest-attention
+   one. Write the chosen event + announcement URL into
+   \`signals/trendjack/<YYYY-MM-DD>-launch.md\` with frontmatter
+   \`kind: signal.trendjack, launch, url, hours_since_launch\`.
+2. **Validate timing.** If \`hours_since_launch < 2\` reply
+   "too early — wait until people have actually tested it" and stop.
+   If \`> 36\` reply "window closing — post within 2 hours or skip".
+3. **Build the resource (the lead magnet).** Spend the bulk of
+   compute here — the post is worthless without something the
+   commenters actually want. Default deliverables, in priority order:
+     a. 10–20 copy-paste prompts that solve a real ICP pain using the
+        new model. Each prompt names the persona, the input, and the
+        expected output.
+     b. A short "what's actually new + how to use it for <ICP>" doc.
+     c. One worked example end-to-end.
+   Write to \`vault/assets/trendjack/<YYYY-MM-DD>-<launch>/prompts.md\`.
+   Mirror to a public Notion / Google Doc / vault link the user can
+   DM out — fall back to the local markdown if no host is wired up.
+4. **Draft the post.** Four-component structure:
+     - **Newsflash hook** — line 1: "<launch> just <happened>. <bold
+       claim about ICP>". Examples:
+         · "Gemini 3 just launched — it's now doing the work of a
+           $200k/yr GTM consultant for free."
+         · "Claude 5 dropped overnight. 99% of B2B founders are still
+           paying for worse outputs."
+     - **Value overview** — "I just spent <N hours> building <specific
+       resource> that lets you <specific outcome> in <short time>."
+       Anchor the time investment, the count ("15 prompts", not
+       "some"), the speed, and the comparison to the expensive
+       alternative.
+     - **Frictionless CTA** — "Comment <ONE_WORD> below + connect
+       and I'll DM you the link." Pick a launch-themed keyword
+       (\`GEMINI\`, \`CLAUDE\`, \`PROMPTS\`).
+     - **Visual asset** — official launch graphic. Use
+       \`web_fetch\` on the announcement page, save the hero image to
+       \`vault/assets/trendjack/<date>-<launch>/cover.<ext>\`.
+       Brand recognition + credibility transfer beats anything custom.
+   Keep voice in lowercase / sentence-case if that matches
+   \`us/voice.md\`. Length: 12–25 short lines, line breaks between
+   every beat.
+5. **Write the artifact.** Save the full post to
+   \`drafts/linkedin/<YYYY-MM-DD>-<launch>.md\` with frontmatter
+   \`kind: linkedin_post, status: pending, launch, cta_keyword,
+   resource_path, image_path, target_post_window: "<ISO timestamp>"\`.
+6. **Surface for approval.** Reply with:
+     - the hook line
+     - the CTA keyword
+     - a 1-line summary of the resource
+     - the draft path + image path
+     - the recommended post-time window (next 0–4h)
+   Do **not** auto-post. The user reviews, then either edits the
+   draft or runs the LinkedIn outreach skill to publish.
+7. **Set up the conversion follow-through.** Append to the draft a
+   "## Conversion playbook" section the user can run after posting:
+     a. Reply to every comment within the first 1–2 hours.
+     b. DM the resource link to every commenter (use the LinkedIn
+        outreach skill — \`linkedin-daily-outreach\` style — with the
+        first message = the link + a one-liner).
+     c. 24–48h follow-up DM: "did you get a chance to use it? what's
+        your biggest <ICP-pain>?".
+     d. Qualified prospects → calendar link from the user's profile
+        button (verify it's set; if not, flag in the reply).
+8. **Schedule the recap.** Call \`trigger_create({ name:
+   "trendjack-recap-<date>", cron: "<+72h one-shot via at-style>",
+   skill: "linkedin-post-recap", payload: { post_path: <draft path> }
+   })\` so 3 days later the system pulls comment count, DMs sent,
+   calls booked and writes the case-study note.
+
+## Self-schedule
+If the user says "do this every time a model ships", call
+\`trigger_create({ name: "ai-launch-watch", cron: "0 */2 * * *",
+skill: "linkedin-trendjack-llm-launch" })\` — the skill itself
+short-circuits at step 2 when there's no fresh launch, so the cron
+is cheap.
+
+## Why this works
+- LLM launches concentrate global attention for 5–24h; commenting
+  during that window inherits the launch's distribution curve.
+- Comments — not likes — push the post to the commenter's network,
+  so a low-friction one-word CTA compounds reach.
+- Branded launch imagery transfers credibility and stops the scroll
+  in a feed of pure-text posts.
+- The resource (prompts / playbook) is the actual product — the post
+  is the distribution wrapper. Don't post without one.
+`,
 };
 
 // Multi-touch drip sequences. A sequence is an ordered list of touches with
