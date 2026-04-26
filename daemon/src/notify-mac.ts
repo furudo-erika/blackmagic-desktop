@@ -5,6 +5,45 @@
 // this is the floor — every run finishes with at least one OS-level
 // ping so the user knows their agent looped through.
 import { spawn } from 'node:child_process';
+import type { Config } from './paths.js';
+
+export type NotificationEvent =
+  | 'agent_started'
+  | 'agent_completed'
+  | 'trigger_fired'
+  | 'trigger_completed';
+
+export type NotificationSettings = {
+  enabled: boolean;
+  events: Record<NotificationEvent, boolean>;
+};
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  enabled: true,
+  events: {
+    agent_started: true,
+    agent_completed: true,
+    trigger_fired: true,
+    trigger_completed: true,
+  },
+};
+
+export function notificationSettings(config: Config): NotificationSettings {
+  return {
+    enabled: config.notifications_enabled !== false,
+    events: {
+      agent_started: config.notify_agent_started !== false,
+      agent_completed: config.notify_agent_completed !== false,
+      trigger_fired: config.notify_trigger_fired !== false,
+      trigger_completed: config.notify_trigger_completed !== false,
+    },
+  };
+}
+
+export function shouldNotify(config: Config, event: NotificationEvent): boolean {
+  const settings = notificationSettings(config);
+  return settings.enabled && settings.events[event] !== false;
+}
 
 export function notifyMac(subject: string, body: string, opts: { silent?: boolean } = {}) {
   if (process.platform !== 'darwin') return;
@@ -16,6 +55,17 @@ export function notifyMac(subject: string, body: string, opts: { silent?: boolea
     const proc = spawn('osascript', ['-e', script], { stdio: 'ignore' });
     proc.on('error', () => {});
   } catch {}
+}
+
+export function notifyEvent(
+  config: Config,
+  event: NotificationEvent,
+  subject: string,
+  body: string,
+  opts: { silent?: boolean } = {},
+) {
+  if (!shouldNotify(config, event)) return;
+  notifyMac(subject, body, opts);
 }
 
 // Pull report-style paths out of an assistant final message so the

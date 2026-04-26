@@ -41,6 +41,11 @@ export interface Config {
   resend_api_key?: string;
   from_email?: string;
   linkedin_cookie?: string;
+  notifications_enabled?: boolean;
+  notify_agent_started?: boolean;
+  notify_agent_completed?: boolean;
+  notify_trigger_fired?: boolean;
+  notify_trigger_completed?: boolean;
 }
 
 function defaultContext(): string {

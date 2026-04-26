@@ -23,7 +23,7 @@ import {
   loadRubric, applyRubric, loadRouting, applyRouting,
 } from './pipeline.js';
 import { runAgent } from './agent.js';
-import { notifyMac, extractReportPaths } from './notify-mac.js';
+import { notifyEvent, notificationSettings, extractReportPaths } from './notify-mac.js';
 import { listPlaybooks, runPlaybook } from './playbooks.js';
 import { triggerList, fireTrigger, loadCronTriggers, lastShellRuns } from './triggers.js';
 import { listSequences, listEnrollments, enrollContact, stopEnrollment } from './sequences.js';
@@ -461,6 +461,55 @@ async function main() {
     'linkedin_cookie',
   ] as const;
   type IntegrationKey = (typeof INTEGRATION_KEYS)[number];
+
+  const NOTIFICATION_CONFIG_KEYS = [
+    'notifications_enabled',
+    'notify_agent_started',
+    'notify_agent_completed',
+    'notify_trigger_fired',
+    'notify_trigger_completed',
+  ] as const;
+  type NotificationConfigKey = (typeof NOTIFICATION_CONFIG_KEYS)[number];
+  async function updateConfigToml(values: Partial<Record<string, string | boolean | undefined>>) {
+    const cfgDir = path.join(getContextRoot(), '.bm');
+    await fs.mkdir(cfgDir, { recursive: true });
+    const cfgPath = path.join(cfgDir, 'config.toml');
+    let existing = '';
+    try { existing = await fs.readFile(cfgPath, 'utf-8'); } catch {}
+    let lines = existing.split('\n');
+    for (const [k, val] of Object.entries(values)) {
+      lines = lines.filter((l) => !new RegExp(`^\\s*${k}\\s*=`).test(l));
+      if (val === undefined) {
+        (config as any)[k] = undefined;
+      } else if (typeof val === 'boolean') {
+        lines.push(`${k} = ${val}`);
+        (config as any)[k] = val;
+      } else {
+        lines.push(`${k} = "${String(val).replace(/"/g, '\\"')}"`);
+        (config as any)[k] = val;
+      }
+    }
+    await fs.writeFile(cfgPath, lines.join('\n').trim() + '\n', 'utf-8');
+  }
+
+  app.get('/api/config/notifications', (c) => c.json(notificationSettings(config)));
+  app.put('/api/config/notifications', async (c) => {
+    const body = await c.req.json<{
+      enabled?: boolean;
+      events?: Partial<Record<'agent_started' | 'agent_completed' | 'trigger_fired' | 'trigger_completed', boolean>>;
+    }>().catch(() => ({} as any));
+    const updates: Partial<Record<NotificationConfigKey, boolean>> = {};
+    if (typeof body.enabled === 'boolean') updates.notifications_enabled = body.enabled;
+    if (body.events && typeof body.events === 'object') {
+      if (typeof body.events.agent_started === 'boolean') updates.notify_agent_started = body.events.agent_started;
+      if (typeof body.events.agent_completed === 'boolean') updates.notify_agent_completed = body.events.agent_completed;
+      if (typeof body.events.trigger_fired === 'boolean') updates.notify_trigger_fired = body.events.trigger_fired;
+      if (typeof body.events.trigger_completed === 'boolean') updates.notify_trigger_completed = body.events.trigger_completed;
+    }
+    await updateConfigToml(updates);
+    return c.json(notificationSettings(config));
+  });
+
   app.get('/api/config/integration-keys', (c) =>
     c.json({
       apify_api_key: Boolean(config.apify_api_key),
@@ -486,24 +535,13 @@ async function main() {
   );
   app.post('/api/config/integration-keys', async (c) => {
     const body = await c.req.json<Partial<Record<IntegrationKey, string>>>();
-    const cfgDir = path.join(getContextRoot(), '.bm');
-    await fs.mkdir(cfgDir, { recursive: true });
-    const cfgPath = path.join(cfgDir, 'config.toml');
-    let existing = '';
-    try { existing = await fs.readFile(cfgPath, 'utf-8'); } catch {}
-    let lines = existing.split('\n');
+    const updates: Partial<Record<IntegrationKey, string | undefined>> = {};
     for (const k of INTEGRATION_KEYS) {
       const val = body[k];
       if (val === undefined) continue;
-      lines = lines.filter((l) => !new RegExp(`^\\s*${k}\\s*=`).test(l));
-      if (val) {
-        lines.push(`${k} = "${String(val).replace(/"/g, '\\"')}"`);
-        (config as any)[k] = val;
-      } else {
-        (config as any)[k] = undefined;
-      }
+      updates[k] = val || undefined;
     }
-    await fs.writeFile(cfgPath, lines.join('\n').trim() + '\n', 'utf-8');
+    await updateConfigToml(updates);
     return c.json({ ok: true });
   });
 
@@ -612,7 +650,11 @@ async function main() {
     const slugs = entry.mentions ?? [];
     for (const slug of slugs) {
       const task = `Continue work on ${body.path}. The latest comment from ${author.name ?? author.id}: "${body.body}"`;
-      runAgent({ agent: slug, task, config, entityRef: body.path }).catch((err) => {
+      notifyEvent(config, 'agent_started', `${slug} started`, `Mention on ${body.path}`);
+      runAgent({ agent: slug, task, config, entityRef: body.path }).then((result) => {
+        notifyEvent(config, 'agent_completed', `${slug} finished`, result.final.split('\n').find((l) => l.trim())?.slice(0, 200) ?? 'done');
+      }).catch((err) => {
+        notifyEvent(config, 'agent_completed', `${slug} failed`, err instanceof Error ? err.message : String(err));
         console.error(`[activity] mention-triggered run for ${slug} failed:`, err?.message || err);
       });
     }
@@ -633,7 +675,11 @@ async function main() {
     if (result.assignee.type === 'agent' && result.assignee.id &&
         (result.previous.type !== 'agent' || result.previous.id !== result.assignee.id)) {
       const task = `You were just assigned to ${body.path}. Read that file (and related context in the context), then execute your loop end-to-end.`;
-      runAgent({ agent: result.assignee.id, task, config, entityRef: body.path }).catch((err) => {
+      notifyEvent(config, 'agent_started', `${result.assignee.id} started`, `Assigned to ${body.path}`);
+      runAgent({ agent: result.assignee.id, task, config, entityRef: body.path }).then((runResult) => {
+        notifyEvent(config, 'agent_completed', `${result.assignee.id} finished`, runResult.final.split('\n').find((l) => l.trim())?.slice(0, 200) ?? 'done');
+      }).catch((err) => {
+        notifyEvent(config, 'agent_completed', `${result.assignee.id} failed`, err instanceof Error ? err.message : String(err));
         console.error(`[activity] assignment-triggered run for ${result.assignee.id} failed:`, err?.message || err);
       });
     }
@@ -731,11 +777,17 @@ async function main() {
     if (!body.domain) return c.json({ error: 'domain required' }, 400);
 
     // Kick off researcher agent to enrich the user's own company.
+    notifyEvent(config, 'agent_started', 'researcher started', `Onboarding enrichment for ${body.domain}`);
     runAgent({
       agent: 'researcher',
       task: `Enrich the user's own company at ${body.domain} and save to me.md (not companies/). Focus: what we sell, target customer, tone. Use enrich_company + web_search.`,
       config,
-    }).catch((err) => console.error('[onboarding] enrich failed:', err));
+    }).then((result) => {
+      notifyEvent(config, 'agent_completed', 'researcher finished', result.final.split('\n').find((l) => l.trim())?.slice(0, 200) ?? 'done');
+    }).catch((err) => {
+      notifyEvent(config, 'agent_completed', 'researcher failed', err instanceof Error ? err.message : String(err));
+      console.error('[onboarding] enrich failed:', err);
+    });
 
     // Write the user-supplied CLAUDE.md right away so the first chat has
     // some context even before the agent run finishes.
@@ -1042,8 +1094,16 @@ async function main() {
         task: body.task,
         config,
       });
-      prepared.run().catch(async (err) => {
+      notifyEvent(config, 'agent_started', `${body.agent} started`, summarizeRunPreview(body.task) ?? body.task.slice(0, 200));
+      prepared.run().then((result) => {
+        const paths = extractReportPaths(result.final ?? '');
+        const summary = paths.length
+          ? `wrote ${paths.length} file${paths.length > 1 ? 's' : ''}: ${paths.join(' · ')}`
+          : ((result.final ?? '').split('\n').find((l) => l.trim())?.slice(0, 200) ?? 'done');
+        notifyEvent(config, 'agent_completed', `${body.agent} finished`, summary);
+      }).catch(async (err) => {
         console.error(`[agent] ${prepared.runId} failed:`, err);
+        notifyEvent(config, 'agent_completed', `${body.agent} failed`, err instanceof Error ? err.message : String(err));
         // Make the failure visible in the runs list — without a final.md
         // the run shows as perpetually "running" and loadRunListEntry
         // never flips it to `failed`.
@@ -1186,6 +1246,7 @@ async function main() {
       const runId = `codex-${Date.now()}`;
       const runDir = path.join(getContextRoot(), 'runs', runId);
       await fs.mkdir(runDir, { recursive: true });
+      notifyEvent(config, 'agent_started', `${body.agent ?? 'codex'} started`, summarizeRunPreview(last.content) ?? last.content.slice(0, 200));
 
       const encoder = new TextEncoder();
       let finalText = '';
@@ -1330,7 +1391,7 @@ async function main() {
             const summary = paths.length
               ? `wrote ${paths.length} file${paths.length > 1 ? 's' : ''}: ${paths.join(' · ')}`
               : (finalText.split('\n').find((l) => l.trim())?.slice(0, 200) ?? 'done');
-            notifyMac(subject, summary);
+            notifyEvent(config, 'agent_completed', subject, summary);
           } catch {}
           controller.close();
         },
@@ -1348,6 +1409,7 @@ async function main() {
     // Fallback: our own Responses API loop, streamed as SSE so the renderer
     // shows tokens arriving. runAgent already emits { type, data } events via
     // onEvent — we just forward them as SSE frames, matching the codex path.
+    notifyEvent(config, 'agent_started', `${body.agent ?? 'researcher'} started`, summarizeRunPreview(last.content) ?? last.content.slice(0, 200));
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -1398,7 +1460,7 @@ async function main() {
             const summary = paths.length
               ? `wrote ${paths.length} file${paths.length > 1 ? 's' : ''}: ${paths.join(' · ')}`
               : ((result.final ?? '').split('\n').find((l) => l.trim())?.slice(0, 200) ?? 'done');
-            notifyMac(subject, summary);
+            notifyEvent(config, 'agent_completed', subject, summary);
           } catch {}
         } catch (err) {
           send('error', { message: err instanceof Error ? err.message : String(err) });

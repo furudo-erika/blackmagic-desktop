@@ -6,6 +6,7 @@ import cron from 'node-cron';
 import { getContextRoot, type Config } from './paths.js';
 import { runAgent } from './agent.js';
 import { runPlaybook } from './playbooks.js';
+import { notifyEvent } from './notify-mac.js';
 
 interface TriggerSpec {
   name: string;
@@ -222,16 +223,31 @@ export async function fireTrigger(name: string, config: Config, input: Record<st
   const spec = specs.find((t) => t.name === name);
   if (!spec) throw new Error(`trigger not found: ${name}`);
   if (!spec.enabled) throw new Error(`trigger disabled: ${name}`);
+  notifyEvent(config, 'trigger_fired', `Trigger fired: ${name}`, spec.schedule ? `cron ${spec.schedule}` : 'manual or webhook run');
+  const finish = (ok: boolean, detail: string) => {
+    notifyEvent(config, 'trigger_completed', `Trigger ${ok ? 'completed' : 'failed'}: ${name}`, detail);
+  };
   // Shell triggers win over playbook ones — they're complete pipelines and
   // have no reason to go through the agent.
-  if (spec.shell) {
-    console.log(`[triggers] shell run ${name}: ${spec.shell}`);
-    const result = await runShellTrigger(spec);
-    console.log(`[triggers] shell done ${name}: exit=${result.exit} log=${result.log}`);
+  try {
+    if (spec.shell) {
+      console.log(`[triggers] shell run ${name}: ${spec.shell}`);
+      const result = await runShellTrigger(spec);
+      console.log(`[triggers] shell done ${name}: exit=${result.exit} log=${result.log}`);
+      finish(result.ok, `exit ${result.exit === null ? 'killed' : result.exit} · ${result.log}`);
+      return result;
+    }
+    const result = spec.playbook
+      ? await runPlaybook(spec.playbook, input, config)
+      : await runAgent({ agent: spec.agent ?? 'researcher', task: spec.body, config });
+    const final: string = typeof (result as any).final === 'string' ? (result as any).final : '';
+    const summary = final.split('\n').find((l: string) => l.trim())?.slice(0, 200) ?? 'done';
+    finish(true, summary);
     return result;
+  } catch (err) {
+    finish(false, err instanceof Error ? err.message : String(err));
+    throw err;
   }
-  if (spec.playbook) return runPlaybook(spec.playbook, input, config);
-  return runAgent({ agent: spec.agent ?? 'researcher', task: spec.body, config });
 }
 
 export async function loadCronTriggers(config: Config) {

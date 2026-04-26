@@ -2,6 +2,22 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.42 — 2026-04-26
+
+### Added
+- **macOS notifications for agent + trigger lifecycle.** Every
+  agent run now pings the system Notification Center on start
+  *and* completion (previously only completion fired, and only
+  on the codex/fallback chat paths — mention-triggered runs,
+  assignment-triggered runs, onboarding enrichment, and
+  `/api/agent/run` were silent). Triggers also notify on fire
+  and on completion, covering shell, playbook, and agent
+  trigger paths. Default: all four events on.
+- **Settings → Notifications panel.** Master toggle plus
+  per-event switches (agent started, agent completed, trigger
+  fired, trigger completed). Persisted to `~/.bm/config.toml`
+  via the new `/api/config/notifications` endpoint.
+
 ## 0.5.41 — 2026-04-26
 
 ### Added

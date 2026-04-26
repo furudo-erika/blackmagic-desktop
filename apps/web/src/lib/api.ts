@@ -168,6 +168,37 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  getNotificationSettings: () =>
+    request<{
+      enabled: boolean;
+      events: {
+        agent_started: boolean;
+        agent_completed: boolean;
+        trigger_fired: boolean;
+        trigger_completed: boolean;
+      };
+    }>('/api/config/notifications'),
+  setNotificationSettings: (body: {
+    enabled?: boolean;
+    events?: Partial<{
+      agent_started: boolean;
+      agent_completed: boolean;
+      trigger_fired: boolean;
+      trigger_completed: boolean;
+    }>;
+  }) =>
+    request<{
+      enabled: boolean;
+      events: {
+        agent_started: boolean;
+        agent_completed: boolean;
+        trigger_fired: boolean;
+        trigger_completed: boolean;
+      };
+    }>('/api/config/notifications', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
   chat: (
     messages: Array<{ role: 'user' | 'assistant'; content: string }>,
     agent?: string,

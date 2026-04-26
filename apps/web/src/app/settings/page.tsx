@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { getBridge, setBridge } from '../../lib/bridge';
-import { ExternalLink, FolderOpen, Cpu, KeyRound, Settings as SettingsIcon, Plug, Sun, Moon, FileText } from 'lucide-react';
+import { Bell, ExternalLink, FolderOpen, KeyRound, Settings as SettingsIcon, Plug, FileText } from 'lucide-react';
 import { PageShell, PageHeader, PageBody } from '../../components/ui/primitives';
 import { Markdown } from '../../components/markdown';
 
@@ -29,11 +29,42 @@ function KV({ k, v, mono = false }: { k: string; v: React.ReactNode; mono?: bool
   );
 }
 
+function ToggleRow({
+  label,
+  hint,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className={'flex items-center justify-between gap-4 rounded-lg border border-line dark:border-[#2A241D] px-3 py-2.5 ' + (disabled ? 'opacity-60' : '')}>
+      <span className="min-w-0">
+        <span className="block text-[12px] font-medium text-ink dark:text-[#E6E0D8]">{label}</span>
+        {hint && <span className="block text-[11px] text-muted dark:text-[#8C837C]">{hint}</span>}
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 accent-flame shrink-0"
+      />
+    </label>
+  );
+}
+
 export default function SettingsPage() {
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 5_000 });
   const context = health.data?.contextPath ?? '~/BlackMagic';
   const integrations = useQuery({ queryKey: ['integrations'], queryFn: api.listIntegrations });
   const intKeys = useQuery({ queryKey: ['integration-keys'], queryFn: api.integrationKeys });
+  const notifications = useQuery({ queryKey: ['notification-settings'], queryFn: api.getNotificationSettings });
   const bridge = getBridge();
 
   const [apifyDraft, setApifyDraft] = useState('');
@@ -53,6 +84,8 @@ export default function SettingsPage() {
   const [linkedinCookieDraft, setLinkedinCookieDraft] = useState('');
   const [keySaving, setKeySaving] = useState(false);
   const [keySaveMsg, setKeySaveMsg] = useState<string | null>(null);
+  const [notificationSaving, setNotificationSaving] = useState(false);
+  const [notificationSaveMsg, setNotificationSaveMsg] = useState<string | null>(null);
   async function saveIntegrationKeys() {
     setKeySaving(true);
     setKeySaveMsg(null);
@@ -122,7 +155,30 @@ export default function SettingsPage() {
     location.reload();
   }
 
+  async function updateNotifications(body: Parameters<typeof api.setNotificationSettings>[0]) {
+    setNotificationSaving(true);
+    setNotificationSaveMsg(null);
+    try {
+      await api.setNotificationSettings(body);
+      await notifications.refetch();
+      setNotificationSaveMsg('saved');
+    } catch (err) {
+      setNotificationSaveMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setNotificationSaving(false);
+    }
+  }
+
   const connected = (integrations.data?.integrations ?? []).filter((i) => i.status === 'connected');
+  const notificationSettings = notifications.data ?? {
+    enabled: true,
+    events: {
+      agent_started: true,
+      agent_completed: true,
+      trigger_fired: true,
+      trigger_completed: true,
+    },
+  };
 
   return (
     <PageShell>
@@ -401,6 +457,45 @@ export default function SettingsPage() {
                   </li>
                 ))}
               </ul>
+            )}
+          </Section>
+
+          <Section icon={Bell} title="Notifications">
+            <ToggleRow
+              label="System notifications"
+              hint="Use macOS Notification Center for agent and trigger events."
+              checked={notificationSettings.enabled}
+              disabled={notifications.isLoading || notificationSaving}
+              onChange={(enabled) => updateNotifications({ enabled })}
+            />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <ToggleRow
+                label="Agent started"
+                checked={notificationSettings.events.agent_started}
+                disabled={notifications.isLoading || notificationSaving || !notificationSettings.enabled}
+                onChange={(checked) => updateNotifications({ events: { agent_started: checked } })}
+              />
+              <ToggleRow
+                label="Agent completed"
+                checked={notificationSettings.events.agent_completed}
+                disabled={notifications.isLoading || notificationSaving || !notificationSettings.enabled}
+                onChange={(checked) => updateNotifications({ events: { agent_completed: checked } })}
+              />
+              <ToggleRow
+                label="Trigger fired"
+                checked={notificationSettings.events.trigger_fired}
+                disabled={notifications.isLoading || notificationSaving || !notificationSettings.enabled}
+                onChange={(checked) => updateNotifications({ events: { trigger_fired: checked } })}
+              />
+              <ToggleRow
+                label="Trigger completed"
+                checked={notificationSettings.events.trigger_completed}
+                disabled={notifications.isLoading || notificationSaving || !notificationSettings.enabled}
+                onChange={(checked) => updateNotifications({ events: { trigger_completed: checked } })}
+              />
+            </div>
+            {notificationSaveMsg && (
+              <p className="text-[11px] text-muted dark:text-[#8C837C]">{notificationSaveMsg}</p>
             )}
           </Section>
 
