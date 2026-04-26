@@ -2,6 +2,24 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.41 — 2026-04-26
+
+### Added
+- **Skill: `kol-collab-brief-reply`.** When a KOL replies "yes,
+  send me the campaign brief, deliverables, timeline, and content
+  guidelines" (every paid-LinkedIn collab needs the same four
+  sections), this skill writes the brief artifact and the reply
+  draft in your voice within 2-3 minutes instead of you re-writing
+  600 words from scratch every deal. Bound to the SDR agent so it
+  auto-surfaces as a "▸ KOL Collab Brief Reply" card on the SDR
+  tab — no digging. Smart KOL resolution: with no input, scans
+  `contacts/` for the most recent contact whose latest inbound
+  mentions "brief", "deliverables", or "rates" and picks them.
+  Outputs `drafts/kol-briefs/<date>-<kol>.md` (four sections,
+  date-anchored timeline, hard requirements, what-we-provide) plus
+  a `draft_create` reply on the same channel they replied on.
+  Approval-gated — never auto-sends contracts.
+
 ## 0.5.40 — 2026-04-26
 
 ### Fixed

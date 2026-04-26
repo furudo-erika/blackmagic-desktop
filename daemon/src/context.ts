@@ -3016,6 +3016,168 @@ sends automatically.**
    reply rate (your judgment) for the user to review first.
 `,
 
+  'kol-collab-brief-reply.md': `---
+kind: skill
+name: kol-collab-brief-reply
+group: creator-marketing
+agent: sdr
+inputs:
+  - { name: kol, required: false, description: "KOL slug, email, LinkedIn URL, or contacts/<file>.md path. If omitted, picks the most recent KOL who replied 'send me the brief' and isn't yet briefed." }
+  - { name: budget_usd, required: false, description: "Cap for the deal in USD. Reads us/market/kol-budget.md or asks if neither is set." }
+  - { name: launch_window, required: false, description: "ISO date or natural language ('next 2 weeks'). Default: 14 days from today." }
+  - { name: product, required: false, description: "Which product/SKU the campaign is for. Defaults to us/product/overview.md primary." }
+requires:
+  us_files: [us/company.md, us/brand/voice.md, us/product/overview.md]
+  optional_us_files: [us/market/kol-budget.md, us/market/icp.md, us/brand/messaging.md]
+---
+
+When a KOL replies "yes, send me the campaign brief, deliverables,
+timeline, and content guidelines" — this skill writes the reply.
+Every paid-LinkedIn / creator-collab follow-up needs the same four
+sections, and getting them out within 24h is the difference between
+closing the deal and ghosting. This skill builds the artifact and
+drafts the email/DM in your voice, gated for your approval.
+
+## Pre-flight
+
+- Resolve the KOL: by slug, email, LinkedIn URL, or markdown path.
+  If \`{{kol}}\` is empty, scan \`contacts/\` for the most recent
+  contact with frontmatter \`status: contacted\` AND a recent inbound
+  reply mentioning "brief", "deliverables", or "rates" — pick that
+  one. If still nothing matches, reply asking which KOL.
+- Read the KOL's contact file. Pull: name, handle, follower count,
+  segment/niche, country, language, prior messages. If the contact
+  is in a sequence under \`sequences/\` (e.g.
+  \`sequences/kol-arabic-linkedin.md\`), read that sequence to match
+  positioning.
+- Read \`us/company.md\`, \`us/product/overview.md\`,
+  \`us/brand/voice.md\`, \`us/brand/messaging.md\`. These anchor the
+  brief — never invent product claims.
+- Resolve budget: \`{{budget_usd}}\` → \`us/market/kol-budget.md\`
+  (line-item by follower band, e.g. \`5k-15k: $250-500\`) →
+  ask. Don't draft a brief without a number.
+
+## Steps
+
+1. **Build the campaign brief artifact.** Write
+   \`drafts/kol-briefs/<YYYY-MM-DD>-<kol-slug>.md\` with frontmatter
+   \`kind: kol_brief, kol, segment, budget_usd, launch_window,
+   status: pending\`. Body has exactly these four sections (KOLs
+   asked for these by name — same order, same labels):
+     - **Campaign brief** — 3-5 sentences. What we're launching, why
+       NOW, the one specific use-case the KOL's audience cares about
+       (NOT a generic "API testing" line — pull the segment-specific
+       angle from \`us/brand/messaging.md\` or the sequence file).
+       Include the working campaign name (\`<product>-<KOL-handle>-
+       <iso-week>\`).
+     - **Expected deliverables** — bulleted, concrete, countable. Pick
+       the right format for the KOL's segment:
+         · LinkedIn-first KOLs → 1 long-form post (≥ 800 chars) +
+           1 short follow-up post + 1 carousel OR 1 short video clip.
+         · Twitter/X KOLs → 1 thread (5-8 tweets) + 1 reply-bait
+           solo + 1 quote of our launch tweet.
+         · YouTube/long-form → 1 dedicated tutorial OR a 2-3 min
+           segment in a planned video, plus 1 short cut.
+         · Newsletter → 1 dedicated section (≥ 250 words) + 1 link
+           in the next issue's roundup.
+       For every deliverable: format, length, whether the product
+       link must be in the first comment/description, the # of
+       branded hashtags (we usually want 0-1 — over-tagging tanks
+       reach).
+     - **Timeline** — Date-anchored milestones, not vague. Default:
+         · Today + 2 days: KOL confirms acceptance + sends draft
+           outline / hook.
+         · Today + 5 days: We approve outline / give product access.
+         · Today + 10 days: KOL ships draft for our review.
+         · Today + 12 days: Final approval / agreed edits done.
+         · Today + 14 days (= \`{{launch_window}}\`): GO LIVE.
+         · Launch + 3 days: Performance check-in (impressions,
+           clicks, signups attributed).
+         · Launch + 7 days: Final payout + retainer-vs-one-off
+           decision.
+     - **Content guidelines** — what they MUST do, what they MUST
+       NOT do, what we'll provide. Hard requirements:
+         · Product is named \`<product>\`. Don't substitute a competitor
+           name.
+         · The CTA link must be the tracked UTM we provide (we'll
+           send when outline is approved).
+         · Disclosure: KOL must include \`#sponsored\` / \`#ad\` /
+           \`#partnership\` per their platform's rules.
+         · Product positioning lifted from \`us/brand/messaging.md\` —
+           paste the 3 core lines verbatim into the brief so the KOL
+           knows what we agree on.
+         · Forbidden claims: no "X is dead", no unsupported numbers,
+           no negative-comparison hit-pieces (we want a positive-
+           framed organic feel).
+         · Tone: match the KOL's existing voice (don't rewrite their
+           personality). Reading the last 5 of their public posts is
+           recommended; mirror cadence + emoji density.
+     - **What we provide** (sub-section under content guidelines):
+         · Tracked UTM link
+         · 5-7 product screenshots / b-roll
+         · Quick-start access (free Pro for the duration of the
+           campaign + 30 days)
+         · A point person (the user) for technical questions
+   End the artifact with: \`---\` then a one-line internal note:
+   \`Internal: budget $<n>, payout terms: 50% on launch / 50% on
+   day-7 metrics, channel: <linkedin_dm | email>\`.
+
+2. **Draft the reply.** Now wrap the artifact in a short, voice-
+   matched message and call \`draft_create\` so it lands in
+   \`drafts/\` for human approval (default approve-gated — never
+   auto-send a contract):
+     - Channel = same channel the KOL replied on (read the contact
+       file's \`last_channel\` or default to \`email\` if it was an
+       email reply, \`linkedin_dm\` if LinkedIn).
+     - Subject (email only): \`Re: <previous subject>\` if there was
+       one; else \`Campaign brief — <product> × <KOL handle>\`.
+     - Body: ≤ 180 words. Open with one specific reference to what
+       the KOL said in their reply (not "thanks for your interest").
+       Paste the campaign brief inline (markdown is fine for email
+       and LinkedIn DM both — Unipile renders it). End with one
+       concrete next step: "If the deliverables + timeline work,
+       reply with your quote and I'll send the contract + UTM link
+       within 24h."
+     - Voice: pulled from \`us/brand/voice.md\`. If the KOL's prior
+       message used a specific salutation or sign-off, mirror it
+       (e.g. they wrote "Best regards, Hussein" → close with the
+       user's "Best, <first name>", not "Cheers" or "Thanks!").
+     - Call \`draft_create({ channel, to: <email or linkedin url>,
+       subject, body, tool: <"send_email" | "linkedin_send_dm">,
+       attachments: [<artifact path>] })\`.
+
+3. **Update contact + sequence state.**
+     - In the contact's frontmatter: set \`status: brief_sent\`,
+       \`brief_sent_at: <iso>\`, \`brief_path:
+       drafts/kol-briefs/<...>.md\`. Add a one-line entry to the
+       contact body's \`## Timeline\` section:
+       \`<iso> — Brief drafted (\`<artifact path>\`); awaiting
+       approval.\`
+     - If the KOL is in a sequence file under \`sequences/\`,
+       advance their step to \`brief-sent\` so the auto-followup
+       (3 days later if no reply) fires correctly.
+
+4. **Notify.** \`notify({ subject: "Brief draft pending — <KOL
+   name>", body: "Drafted in your voice — <draft path>. Reply
+   approves and dispatches.", link: <draft path>, urgency:
+   "normal" })\`. Channel-agnostic — the user's Integrations decide
+   where it lands (Slack / Telegram / Feishu / macOS).
+
+5. **Reply** with: the KOL's name, the budget you used, the draft
+   path, the artifact path, and the one most-likely-to-be-pushed-
+   back-on item (e.g. "deliverables ask 3 pieces; KOLs in the 10k
+   band sometimes negotiate down to 2 — be ready").
+
+## Why this exists
+
+KOLs reply with the same four asks — campaign brief, deliverables,
+timeline, content guidelines — every time. Without this skill the
+user re-writes the same 600-word brief from scratch per deal, takes
+24-48h, and the KOL's enthusiasm cools. With it, brief lands inside
+2-3 minutes, in the user's voice, with the budget and timeline
+already anchored to your defaults.
+`,
+
   // === GSC content-feedback loop ==========================================
   'gsc-content-brief.md': `---
 kind: skill
