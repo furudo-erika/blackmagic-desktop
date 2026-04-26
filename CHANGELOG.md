@@ -2,6 +2,22 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.38 — 2026-04-26
+
+### Added
+- **Discoverability for the LinkedIn trendjacking skill (0.5.34).**
+  The skill shipped with no UI entry point — users had no obvious
+  way to find it or invoke it. Three fixes:
+    - Added a "Content & social" group to the `/skills` page so
+      `linkedin-trendjack-llm-launch` shows up in its own bucket
+      instead of falling under "Other".
+    - The Content Studio agent now lists the skill in its body and
+      gets a starter-prompt card on its tab: "Trendjack the freshest
+      LLM launch on LinkedIn." One click runs the skill end-to-end.
+    - Bumped `content-studio` revision to 3 so existing seeded
+      contexts pick up the new starter prompts and skill reference
+      on next launch.
+
 ## 0.5.37 — 2026-04-26
 
 ### Fixed

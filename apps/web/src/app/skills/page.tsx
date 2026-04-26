@@ -51,6 +51,7 @@ const GROUPS: Array<{ id: string; label: string; color: string }> = [
   { id: 'meeting-prep', label: 'Meeting prep', color: '#D4A65A' },
   { id: 'pipeline-health', label: 'Pipeline hygiene', color: '#6A8EC4' },
   { id: 'linkedin-intent', label: 'LinkedIn intent', color: '#B06AB3' },
+  { id: 'content', label: 'Content & social', color: '#E8523A' },
 ];
 
 function skillSlug(pb: Playbook): string {

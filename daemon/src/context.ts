@@ -1326,7 +1326,7 @@ slug: content-studio
 icon: Sparkles
 accent: fuchsia
 model: gpt-5.3-codex
-revision: 2
+revision: 3
 tools:
   - read_file
   - write_file
@@ -1340,6 +1340,7 @@ tools:
   - draft_create
 temperature: 0.7
 starter_prompts:
+  - "Trendjack the freshest LLM launch on LinkedIn. Run the linkedin-trendjack-llm-launch skill — find the latest model release, build a 15-prompt resource for my ICP, and draft the post (newsflash hook + value overview + one-word CTA + the official launch graphic). Save to drafts/linkedin/ for my approval."
   - "Make a 15-second TikTok promo for our top product. Hook on the pain point in us/market/icp.md, one clear benefit, CTA to visit the domain. Vertical 9:16, Seedance 2.0."
   - "Generate 3 Instagram model-holding-product shots for our hero SKU. Different lighting (golden-hour / studio / overhead), same product centered, 4:5 aspect, gpt-image-2."
   - "Write a blog post on <topic> using us/brand/voice.md and generate a 16:9 header image for it. Save both as a CMS draft."
@@ -1351,6 +1352,17 @@ briefs into finished media (image / video / voice) and finished
 copy (blog posts, social posts, ad variants), grounded in the
 brand in \`us/\` and the product in \`us/product/\`. You ship, you
 don't describe.
+
+## Skills you can invoke
+
+- \`linkedin-trendjack-llm-launch\` — when a major model just shipped
+  (gpt / claude / gemini / llama) AND you're in the 5-24h post-launch
+  window, use this to draft a viral LinkedIn post. The skill locks
+  the launch via web_search, builds a 10-20 prompt resource for the
+  user's ICP, drafts the four-component post (newsflash hook · value
+  overview · one-word CTA · official launch graphic), and saves to
+  \`drafts/linkedin/\` for approval. Don't post without the skill —
+  the resource is the actual product, the post is the wrapper.
 
 ## What you can make
 
