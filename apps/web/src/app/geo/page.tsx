@@ -10,7 +10,6 @@ import { Radar, Play, Plus, Trash2, RefreshCw, Loader2 } from 'lucide-react';
 import { api, type GeoBrand, type GeoBrandRow, type GeoGapRow, type GeoDomainRow, type GeoPrompt, type GeoModel, type GeoBrandDeltaRow, type GeoDomainDeltaRow, type GeoTrendOverlay } from '../../lib/api';
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { PageShell, PageHeader, PageBody, Panel, Button } from '../../components/ui/primitives';
-import { DashboardTabs } from '../../components/dashboard-tabs';
 
 const MODEL_LABELS: Record<GeoModel, string> = {
   chatgpt: 'ChatGPT',
@@ -65,7 +64,6 @@ export default function GeoPage() {
         icon={Radar}
         trailing={
           <div className="flex items-center gap-2">
-            <DashboardTabs />
             <select
               value={windowDays}
               onChange={(e) => setWindowDays(Number(e.target.value) as 7 | 14 | 28)}

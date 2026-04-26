@@ -2,6 +2,14 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.36 — 2026-04-26
+
+### Removed
+- **Runtimes ↔ GEO tab strip.** Killed the inline tab switcher
+  that hung off `/geo` (and `/dashboard`) headers. The two pages
+  already live in the sidebar; the duplicated mini-nav was just
+  visual noise.
+
 ## 0.5.35 — 2026-04-26
 
 ### Added
