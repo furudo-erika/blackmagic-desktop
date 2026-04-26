@@ -2,6 +2,17 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.40 — 2026-04-26
+
+### Fixed
+- **Dashboard header user name + email no longer rendered in
+  Instrument Serif.** The site-wide `header { font-family:
+  serif !important }` rule was bleeding into the user info
+  block in the dashboard top-right (avatar dropdown trigger),
+  so "Black Magic" / "hello@blackmagic.run" displayed in the
+  decorative serif instead of the sans body font. Pinned that
+  block to `var(--font-sans)` so it inherits the right family.
+
 ## 0.5.39 — 2026-04-26
 
 ### Added
