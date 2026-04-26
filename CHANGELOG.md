@@ -2,6 +2,26 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.39 — 2026-04-26
+
+### Added
+- **Every agent's skills auto-appear as one-click cards on its
+  tab.** Previously a skill was only reachable by opening
+  `/skills`, scrolling through 30+ items grouped across many
+  buckets, picking one, filling inputs, then clicking "Invoke".
+  Most users never found anything past the GTM starter pack.
+  The agent tabs (Content Studio, Researcher, SDR, AE, etc.)
+  now read every `playbooks/*.md` whose frontmatter binds it to
+  that agent (`agent: <slug>`) and render each as a "▸ Skill
+  Name" scenario card alongside the agent's hand-written
+  starter prompts. Click → composer fills with a one-shot
+  invocation that tells the agent to run the skill end-to-end.
+  Section header renamed from "Starter prompts for X" to
+  "Things X can do" since it now mixes starters and skills.
+  Zero per-skill wiring required — every new skill auto-
+  surfaces on the right agent's tab the moment its frontmatter
+  is correct.
+
 ## 0.5.38 — 2026-04-26
 
 ### Added

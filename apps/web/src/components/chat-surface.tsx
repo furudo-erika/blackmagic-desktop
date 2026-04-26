@@ -287,22 +287,67 @@ export function ChatSurface({
     staleTime: 60_000,
   });
 
+  // Skills bound to the active agent — auto-surfaced as click-to-run
+  // cards on the agent's tab so users don't have to dig through /skills
+  // to find them. A skill belongs to an agent if its frontmatter has
+  // `agent: <slug>`; the same logic the daemon uses to route a skill
+  // run. Each card invokes the skill end-to-end; users can still tweak
+  // the prompt before sending.
+  const agentSkills = useQuery({
+    queryKey: ['agent-skills', effectiveAgent ?? ''],
+    queryFn: async () => {
+      if (!effectiveAgent) return [] as Array<{ slug: string; name: string; tagline: string }>;
+      const tree = await api.contextTree();
+      const files = tree.tree.filter(
+        (f) => f.type === 'file' && f.path.startsWith('playbooks/') && f.path.endsWith('.md'),
+      );
+      const rows = await Promise.all(
+        files.map(async (f) => {
+          const r = await api.readFile(f.path);
+          const fm = r.frontmatter ?? {};
+          if (String(fm.agent ?? '') !== effectiveAgent) return null;
+          const slug = f.path.replace(/^playbooks\//, '').replace(/\.md$/, '');
+          const name = typeof fm.name === 'string' && fm.name ? fm.name : slug;
+          const body = (r.body ?? '').trim();
+          const tagline = body
+            .split('\n')
+            .map((l) => l.trim())
+            .find((l) => l && !l.startsWith('#') && !l.startsWith('-') && !l.startsWith('*')) ?? '';
+          return { slug, name, tagline: tagline.slice(0, 140) };
+        }),
+      );
+      return rows.filter((r): r is { slug: string; name: string; tagline: string } => r !== null);
+    },
+    enabled: !!effectiveAgent,
+    staleTime: 60_000,
+  });
+
   // When the caller didn't pass explicit scenarios but an agent is active,
-  // pull that agent's starter_prompts from its context file and surface them
-  // as click-to-run scenario cards. Falls back to a single "Run X end-to-
-  // end" starter so every agent has at least one obvious move.
+  // build the gallery from (a) the agent's hand-written starter_prompts,
+  // PLUS (b) one card per skill bound to this agent. Skills go after
+  // the starters because starters are curated; skills are auto-discovered.
+  // Every skill thus has at least one click-path: open the agent → click
+  // the skill card.
   const derivedScenarios: ChatScenario[] = (() => {
     if (scenarios.length > 0) return scenarios;
     if (!effectiveAgent) return [];
     const a = agentOptions.data?.find((x) => x.slug === effectiveAgent);
     if (!a) return [];
     const starters = Array.isArray(a.starterPrompts) ? a.starterPrompts : [];
-    if (starters.length > 0) {
-      return starters.map((p) => ({
-        title: p.length > 48 ? p.slice(0, 45) + '…' : p,
-        prompt: p,
-      }));
+    const out: ChatScenario[] = starters.map((p) => ({
+      title: p.length > 48 ? p.slice(0, 45) + '…' : p,
+      prompt: p,
+    }));
+    for (const sk of agentSkills.data ?? []) {
+      out.push({
+        title: `▸ ${sk.name}`,
+        prompt:
+          `Run the \`${sk.slug}\` skill for me end-to-end. Read playbooks/${sk.slug}.md, ` +
+          `execute every step using the inputs you can infer from us/, and only stop if a step ` +
+          `genuinely needs a human decision.`,
+      });
     }
+    if (out.length > 0) return out;
     return [
       {
         title: `Run ${a.name} end-to-end`,
@@ -608,7 +653,7 @@ export function ChatSurface({
             {derivedScenarios.length > 0 && (
               <div>
                 <h2 className="text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-3">
-                  {effectiveAgent ? `Starter prompts for ${agentOptions.data?.find((x) => x.slug === effectiveAgent)?.name ?? effectiveAgent}` : 'Try one of these'}
+                  {effectiveAgent ? `Things ${agentOptions.data?.find((x) => x.slug === effectiveAgent)?.name ?? effectiveAgent} can do` : 'Try one of these'}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {derivedScenarios.map((s) => (
