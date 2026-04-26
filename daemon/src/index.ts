@@ -23,6 +23,7 @@ import {
   loadRubric, applyRubric, loadRouting, applyRouting,
 } from './pipeline.js';
 import { runAgent } from './agent.js';
+import { notifyMac, extractReportPaths } from './notify-mac.js';
 import { listPlaybooks, runPlaybook } from './playbooks.js';
 import { triggerList, fireTrigger, loadCronTriggers, lastShellRuns } from './triggers.js';
 import { listSequences, listEnrollments, enrollContact, stopEnrollment } from './sequences.js';
@@ -1308,6 +1309,19 @@ async function main() {
           } catch {}
 
           send('done', { runId, final: finalText, exitCode });
+          // Floor-level "run complete" desktop ping — the user wanted to
+          // know when an agent loop finishes even if they've switched
+          // tabs. Skills can still call the richer `notify` tool to fan
+          // out to Slack / Feishu / etc; this guarantees at least the
+          // local ping fires every run.
+          try {
+            const paths = extractReportPaths(finalText);
+            const subject = `${body.agent ?? 'codex'} finished${exitCode ? ` (code ${exitCode})` : ''}`;
+            const summary = paths.length
+              ? `wrote ${paths.length} file${paths.length > 1 ? 's' : ''}: ${paths.join(' · ')}`
+              : (finalText.split('\n').find((l) => l.trim())?.slice(0, 200) ?? 'done');
+            notifyMac(subject, summary);
+          } catch {}
           controller.close();
         },
       });
@@ -1368,6 +1382,14 @@ async function main() {
             tokensOut: result.tokensOut,
             costCents: result.costCents,
           });
+          try {
+            const paths = extractReportPaths(result.final ?? '');
+            const subject = `${body.agent ?? 'researcher'} finished`;
+            const summary = paths.length
+              ? `wrote ${paths.length} file${paths.length > 1 ? 's' : ''}: ${paths.join(' · ')}`
+              : ((result.final ?? '').split('\n').find((l) => l.trim())?.slice(0, 200) ?? 'done');
+            notifyMac(subject, summary);
+          } catch {}
         } catch (err) {
           send('error', { message: err instanceof Error ? err.message : String(err) });
         } finally {

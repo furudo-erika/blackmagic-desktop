@@ -644,7 +644,10 @@ export function ChatSurface({
                 >
                   {m.role === 'user' ? m.content : <Markdown source={m.content} />}
                   {m.role === 'assistant' && m.content && !(isLastAssistant && sendMut.isPending) && (
-                    <MessageFooter content={m.content} />
+                    <>
+                      <ActionChips content={m.content} />
+                      <MessageFooter content={m.content} />
+                    </>
                   )}
                 </div>
               </div>
@@ -771,6 +774,51 @@ function ReasoningRow({ text }: { text: string }) {
     <div className="flex items-baseline gap-2 text-[12.5px] leading-snug">
       <Sparkles className="w-3.5 h-3.5 shrink-0 relative top-[2px] text-muted dark:text-[#6B625C]" />
       <span className="italic text-muted dark:text-[#8C837C]">{clean}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Action chips — surfaced under any assistant message that mentions
+// freshly-written reports / drafts / vault assets. Clicking opens the
+// file in the context viewer. The user complained that finished runs
+// produced reports but no obvious next move ("where are the actions?")
+// — this row turns each path into a one-click jump.
+// Kept tiny on purpose: just an "Open" link per path, capped at 5.
+// ---------------------------------------------------------------------------
+const REPORT_PATH_RE =
+  /(?<![A-Za-z0-9_/-])((?:signals|drafts|vault|reports)\/[A-Za-z0-9_./-]+?\.(?:md|pdf|json|csv|txt))/g;
+
+function extractReportPaths(text: string): string[] {
+  if (!text) return [];
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = REPORT_PATH_RE.exec(text)) !== null) seen.add(m[1]!);
+  return Array.from(seen).slice(0, 5);
+}
+
+function ActionChips({ content }: { content: string }) {
+  const paths = extractReportPaths(content);
+  if (paths.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+      {paths.map((p) => {
+        const basename = p.split('/').pop() || p;
+        const top = p.split('/')[0] ?? '';
+        return (
+          <a
+            key={p}
+            href={`/context?path=${encodeURIComponent(p)}`}
+            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-line dark:border-[#2A241D] bg-cream dark:bg-[#0F0D0A] text-[11px] font-mono text-ink dark:text-[#E6E0D8] hover:border-flame hover:text-flame transition-colors"
+            title={p}
+          >
+            <span className="uppercase tracking-wider text-[9px] text-muted dark:text-[#8C837C]">
+              {top}
+            </span>
+            <span className="truncate max-w-[260px]">{basename}</span>
+          </a>
+        );
+      })}
     </div>
   );
 }

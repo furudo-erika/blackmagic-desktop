@@ -2,6 +2,22 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.35 — 2026-04-26
+
+### Added
+- **Run-complete desktop notifications.** Every agent loop now fires
+  a native macOS notification when it wraps — even if you've
+  switched to another tab. Subject = "<agent> finished", body =
+  the report paths the run wrote (e.g. `signals/mentions/2026-04-26.md`)
+  or the first line of the final summary if no paths matched. Skills
+  can still call the richer `notify` tool to fan out to Slack /
+  Feishu / Discord / Telegram; this is the floor every run gets.
+- **Action chips under finished agent messages.** Assistant replies
+  that reference paths under `signals/`, `drafts/`, `vault/`, or
+  `reports/` now render a row of one-click chips below the bubble
+  — each opens the file in the context viewer. No more "great, an
+  agent ran, where's the next move?".
+
 ## 0.5.34 — 2026-04-26
 
 ### Added
