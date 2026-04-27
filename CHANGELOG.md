@@ -2,6 +2,27 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.43 — 2026-04-27
+
+### Added
+- **Export PDF button on the GEO page.** A new "Export PDF"
+  action in the GEO header (right before "Run now") snapshots
+  the current dashboard — charts, deltas, citation tables — to
+  `~/BlackMagic/vault/exports/geo-<YYYY-MM-DD>.pdf` using
+  Electron's native `webContents.printToPDF` and auto-opens it
+  in Preview. No headless browser, no server round-trip; the
+  PDF is exactly what you see on screen, minus the chrome.
+- **Generic `bm:export-pdf` IPC handler + preload bridge.** The
+  main process exposes a reusable PDF export pipeline through
+  `window.bmBridge.exportPDF({ filename, sectionTitle })` so the
+  same machinery can be wired into other report pages later
+  (Runs, KOL pipeline, Content) without touching Electron again.
+- **Print stylesheet polish.** A new `@media print` block in
+  `globals.css` plus `print:hidden` Tailwind utilities on the
+  GEO header buttons, the live progress strip, the sidebar, and
+  the upgrade/credits banners suppress the app chrome from the
+  rendered PDF. The artifact is the data, not the navigation.
+
 ## 0.5.42 — 2026-04-26
 
 ### Added

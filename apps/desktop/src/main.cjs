@@ -257,6 +257,40 @@ ipcMain.handle('bm:pick-folder', async () => {
   }
 });
 
+// Save the focused window's webContents as a PDF under
+// ~/BlackMagic/vault/exports/<filename>. Generic on purpose — any report
+// page can call window.bmBridge.exportPDF({filename, sectionTitle}). The
+// renderer is responsible for adding `print:hidden` Tailwind utilities to
+// chrome that shouldn't appear in the artifact.
+ipcMain.handle('bm:export-pdf', async (event, args) => {
+  try {
+    const filename = args && typeof args.filename === 'string' ? args.filename : '';
+    if (!filename || /[\\/]/.test(filename)) {
+      return { ok: false, error: 'invalid filename' };
+    }
+    // Prefer the window that issued the IPC; fall back to any focused window.
+    const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+    if (!win) return { ok: false, error: 'no focused window' };
+    const buffer = await win.webContents.printToPDF({
+      pageSize: 'A4',
+      printBackground: true,
+      landscape: false,
+      margins: { marginType: 'default' },
+    });
+    const dir = path.join(os.homedir(), 'BlackMagic', 'vault', 'exports');
+    fs.mkdirSync(dir, { recursive: true });
+    const filepath = path.join(dir, filename);
+    fs.writeFileSync(filepath, buffer);
+    // Auto-open in Preview.app (or the platform default PDF viewer). Failure
+    // here is non-fatal — the file is already on disk.
+    try { await shell.openPath(filepath); } catch {}
+    return { ok: true, path: filepath };
+  } catch (err) {
+    console.error('[main] exportPDF failed:', err);
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
 ipcMain.handle('bm:open-external', async (_event, url) => {
   if (typeof url !== 'string') return false;
   // Allow http/https only.

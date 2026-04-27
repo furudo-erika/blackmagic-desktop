@@ -17,6 +17,10 @@ declare global {
         subtitle?: string;
         silent?: boolean;
       }) => Promise<boolean>;
+      exportPDF?: (args: {
+        filename: string;
+        sectionTitle?: string;
+      }) => Promise<{ ok: true; path: string } | { ok: false; error: string }>;
       onUpdateAvailable?: (
         cb: (payload: {
           currentVersion: string;

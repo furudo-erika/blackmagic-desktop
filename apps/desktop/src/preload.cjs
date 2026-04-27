@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('bmBridge', {
   openExternal: (url) => ipcRenderer.invoke('bm:open-external', String(url)),
   pickFolder: () => ipcRenderer.invoke('bm:pick-folder'),
   notify: (payload) => ipcRenderer.invoke('bm:notify', payload),
+  exportPDF: (args) => ipcRenderer.invoke('bm:export-pdf', args),
   // Main process pushes {currentVersion, latestVersion} when R2's version.json
   // reports a newer release. Renderer renders an "upgrade via brew" banner.
   onUpdateAvailable: (cb) => {

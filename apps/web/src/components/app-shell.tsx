@@ -36,10 +36,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Providers>
         <LoginGate>
           <div className="flex flex-col h-screen">
-            <UpgradeBanner />
-            <CreditsBanner />
+            <div className="bm-print-hide">
+              <UpgradeBanner />
+              <CreditsBanner />
+            </div>
             <div className="flex flex-1 min-h-0">
-              <Sidebar />
+              <div className="bm-print-hide flex">
+                <Sidebar />
+              </div>
               <main className="flex-1 overflow-hidden">{children}</main>
             </div>
           </div>

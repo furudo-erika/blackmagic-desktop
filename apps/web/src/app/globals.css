@@ -117,3 +117,19 @@ html.dark input::placeholder {
   opacity: 0.85;
   color: #A89F96;
 }
+
+/* Print stylesheet — used by the desktop app's "Export PDF" button which
+   calls Electron's webContents.printToPDF on the live DOM. We want the
+   artifact to be the data, not the chrome: hide the sidebar, the macOS
+   titlebar drag region, header buttons, and any elements explicitly
+   marked .bm-print-hide. Tailwind's `print:hidden` utility handles
+   page-level chrome (header buttons, progress strip). The chart panels
+   and tables print at full width. */
+@media print {
+  .bm-titlebar { display: none !important; }
+  .bm-print-hide { display: none !important; }
+  /* Pages use overflow:hidden on <main> to keep the sidebar pinned on
+     screen — for print we need the full content visible, not clipped. */
+  main { overflow: visible !important; }
+  html, body { background: #fff !important; }
+}
