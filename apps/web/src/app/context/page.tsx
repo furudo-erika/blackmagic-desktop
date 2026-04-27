@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
 import { Markdown } from '../../components/markdown';
 import { Search, Save, Pencil, Eye, FileText } from 'lucide-react';
+import { ExportPDFButton } from '../../components/export-pdf-button';
 
 type FileEntry = { path: string; type: 'file' | 'dir' };
 
@@ -119,19 +120,36 @@ function ContextContent() {
             Everything on disk at <code className="text-[11px] bg-cream-light dark:bg-[#17140F] px-1.5 py-0.5 rounded">{health.data?.contextPath ?? '…'}</code>
           </p>
         </div>
-        <div className="relative w-64">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-muted dark:text-[#8C837C]" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter by path…"
-            className="w-full bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md pl-7 pr-3 py-1.5 text-xs font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
-          />
+        <div className="flex items-center gap-2 print:hidden">
+          {selected && (() => {
+            // Strip extension for the export filename — opening
+            // `signals/geo/runs/2026-04-26/index.json` exports to
+            // `index-<today>.pdf`. Sanitize odd characters so we never
+            // produce an invalid filename for the IPC handler.
+            const base = (selected.split('/').pop() ?? 'context').replace(/\.[^.]+$/, '');
+            const safe = base.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'context';
+            const today = new Date().toISOString().slice(0, 10);
+            return (
+              <ExportPDFButton
+                filename={`${safe}-${today}.pdf`}
+                sectionTitle={selected}
+              />
+            );
+          })()}
+          <div className="relative w-64">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-muted dark:text-[#8C837C]" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter by path…"
+              className="w-full bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-md pl-7 pr-3 py-1.5 text-xs font-mono text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame"
+            />
+          </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-hidden grid" style={{ gridTemplateColumns: 'minmax(280px, 340px) 1fr' }}>
-        <aside className="border-r border-line dark:border-[#2A241D] overflow-y-auto">
+        <aside className="border-r border-line dark:border-[#2A241D] overflow-y-auto print:hidden">
           {folders.map((folder) => {
             const entries = byFolder.get(folder) ?? [];
             if (entries.length === 0) return null;

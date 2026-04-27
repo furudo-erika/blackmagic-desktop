@@ -30,6 +30,7 @@ import { api } from '../lib/api';
 import { Markdown } from './markdown';
 import { AgentIcon } from './agent-icon';
 import { Composer } from './composer';
+import { ExportPDFButton } from './export-pdf-button';
 
 export type ChatScenario = { title: string; prompt: string };
 
@@ -358,6 +359,8 @@ export function ChatSurface({
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContentRef = useRef<HTMLDivElement>(null);
+  const autoScrollUntilRef = useRef(0);
 
   // When the picker changes which agent routes the conversation, also
   // switch the persisted thread. Each agent keeps its own history under
@@ -562,21 +565,41 @@ export function ChatSurface({
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    if (pendingInstantScrollRef.current) {
-      const pin = () => { container.scrollTop = container.scrollHeight; };
-      const raf = requestAnimationFrame(pin);
-      const timers = [50, 150, 300, 600].map((ms) => setTimeout(pin, ms));
-      pendingInstantScrollRef.current = false;
+    const pin = (behavior: ScrollBehavior = 'auto') => {
+      container.scrollTo({ top: container.scrollHeight, behavior });
+    };
+    const schedulePin = (behavior: ScrollBehavior = 'auto') => {
+      pin(behavior);
+      const raf = requestAnimationFrame(() => pin(behavior));
+      const timers = [50, 150, 300, 600, 1000, 2000].map((ms) => setTimeout(() => pin(behavior), ms));
       return () => {
         cancelAnimationFrame(raf);
         timers.forEach(clearTimeout);
       };
+    };
+    if (pendingInstantScrollRef.current) {
+      autoScrollUntilRef.current = Date.now() + 2500;
+      pendingInstantScrollRef.current = false;
+      return schedulePin('auto');
     }
-    const raf = requestAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    autoScrollUntilRef.current = Math.max(autoScrollUntilRef.current, Date.now() + 1200);
+    return schedulePin('smooth');
+  }, [messages, activity, sendMut.isPending, threadId]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    const content = scrollContentRef.current;
+    if (!container || !content || typeof ResizeObserver === 'undefined') return;
+    const pinIfActive = () => {
+      if (!sendPendingRef.current && Date.now() > autoScrollUntilRef.current) return;
+      container.scrollTop = container.scrollHeight;
+    };
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(pinIfActive);
     });
-    return () => cancelAnimationFrame(raf);
-  }, [messages, sendMut.isPending, threadId]);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     sendPendingRef.current = sendMut.isPending;
@@ -585,6 +608,7 @@ export function ChatSurface({
   function send(override?: string) {
     const text = (override ?? input).trim();
     if (!text || sendMut.isPending) return;
+    autoScrollUntilRef.current = Date.now() + 2500;
     const next: Msg[] = [...messages, { role: 'user', content: text }];
     setMessages(next);
     if (!override) setInput('');
@@ -634,6 +658,18 @@ export function ChatSurface({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {/* Auto-attached Export PDF — covers /chat AND /team/<slug> in
+              one go since both render through ChatSurface. Falls back to
+              chat-<date>.pdf when threadId hasn't been allocated yet (very
+              brief, only on first paint of an empty thread). */}
+          <ExportPDFButton
+            filename={
+              threadId
+                ? `chat-${threadId}-${new Date().toISOString().slice(0, 10)}.pdf`
+                : `chat-${new Date().toISOString().slice(0, 10)}.pdf`
+            }
+            sectionTitle={title}
+          />
           {headerRight}
         </div>
       </header>
@@ -674,7 +710,7 @@ export function ChatSurface({
             )}
           </div>
         )}
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div ref={scrollContentRef} className="max-w-3xl mx-auto space-y-4">
           {messages.map((m, i) => {
             if (m.role === 'assistant' && !m.content) return null;
             const isLastAssistant = m.role === 'assistant' && i === messages.length - 1;
@@ -973,4 +1009,3 @@ function ProfilerOnboardingBanner({
     </div>
   );
 }
-

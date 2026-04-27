@@ -2,6 +2,32 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.46 — 2026-04-27
+
+### Added
+- **Export PDF on /runs/&lt;runId&gt;, /chat, /team/&lt;slug&gt;, and
+  /context.** Until now the "Export PDF" button only lived on
+  /geo, so the highest-leverage agent outputs (Final answer in a
+  run, a chat thread with an agent, any markdown report under
+  `signals/` or `drafts/`) had no one-click PDF path. The IPC
+  handler (`bm:export-pdf`) and the print stylesheet that
+  powered /geo's button are entirely generic — extracted the
+  click handler + bridge feature-detection + loading state into
+  a reusable `<ExportPDFButton />` component and dropped it into
+  the runs detail drawer, the shared `ChatSurface` header (which
+  covers both /chat and /team/&lt;slug&gt; for free), and the
+  context markdown viewer header.
+- Filename patterns: `run-&lt;agent&gt;-&lt;runId&gt;.pdf` (or
+  `run-&lt;runId&gt;-&lt;date&gt;.pdf` if the run has no agent),
+  `chat-&lt;threadId&gt;-&lt;date&gt;.pdf`, and
+  `&lt;basename&gt;-&lt;date&gt;.pdf` for context files. Every
+  PDF lands in `~/BlackMagic/vault/exports/` and auto-opens in
+  Preview.
+- Future pages add the same button with a single line:
+  `<ExportPDFButton filename="…" sectionTitle="…" />`. The
+  component feature-detects the Electron preload bridge and
+  hides itself in pure-web contexts.
+
 ## 0.5.45 — 2026-04-27
 
 ### Fixed

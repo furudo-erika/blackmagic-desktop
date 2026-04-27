@@ -16,6 +16,7 @@ import {
   type StatusTone,
 } from '../../components/ui/primitives';
 import { SkeletonList } from '../../components/ui/skeleton';
+import { ExportPDFButton } from '../../components/export-pdf-button';
 
 function timeAgo(iso: string | undefined): string {
   if (!iso) return '';
@@ -52,8 +53,19 @@ function runStarted(runId: string): string | undefined {
 
 function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () => void }) {
   const run = useQuery({ queryKey: ['run', runId], queryFn: () => api.getRun(runId) });
+  // Filename prefers the agent slug when present so a folder of exports is
+  // self-explanatory (run-researcher-2026-…pdf vs a wall of opaque ids).
+  const today = new Date().toISOString().slice(0, 10);
+  const rawAgent = String((run.data?.meta as any)?.agent ?? '');
+  const agentSlug = rawAgent.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '');
+  const filename = agentSlug
+    ? `run-${agentSlug}-${runId}.pdf`
+    : `run-${runId}-${today}.pdf`;
   return (
     <DetailDrawer eyebrow="Run" title={runId} onClose={onClose}>
+      <div className="px-5 pt-3 pb-0 print:hidden">
+        <ExportPDFButton filename={filename} sectionTitle={`Run ${runId}`} />
+      </div>
       {run.isLoading && <div className="p-5 text-sm text-muted dark:text-[#8C837C]">loading…</div>}
       {run.data && (
         <div className="p-5 space-y-5">
@@ -190,7 +202,7 @@ export default function RunsPage() {
                       </span>
                     }
                     trailing={
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 print:hidden">
                         {(r.status === 'running' || (!r.status && !r.done)) && (
                           <span
                             onClick={(e) => e.stopPropagation()}

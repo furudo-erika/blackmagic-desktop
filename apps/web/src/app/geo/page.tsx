@@ -4,12 +4,13 @@
 // every daily run under signals/geo/runs/<date>/<model>/ and we aggregate
 // here on demand. Charts are hand-rolled SVG to avoid pulling in recharts.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Radar, Play, Plus, Trash2, RefreshCw, Loader2, FileDown } from 'lucide-react';
+import { Radar, Play, Plus, Trash2, Loader2 } from 'lucide-react';
 import { api, type GeoBrand, type GeoBrandRow, type GeoGapRow, type GeoDomainRow, type GeoPrompt, type GeoModel, type GeoBrandDeltaRow, type GeoDomainDeltaRow, type GeoTrendOverlay, type GeoDeltaMeta } from '../../lib/api';
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { PageShell, PageHeader, PageBody, Panel, Button } from '../../components/ui/primitives';
+import { ExportPDFButton } from '../../components/export-pdf-button';
 
 const MODEL_LABELS: Record<GeoModel, string> = {
   chatgpt: 'ChatGPT',
@@ -76,36 +77,7 @@ export default function GeoPage() {
   // run still in flight (covers the post-tab-switch remount case).
   const runActive = runMut.isPending || runProgress.data?.progress?.running === true;
 
-  // Feature-detect the Electron preload bridge after mount so the Export
-  // PDF button only appears when printToPDF is reachable. Pure web /
-  // browser runs (no preload) keep the button hidden.
-  const [canExport, setCanExport] = useState(false);
-  useEffect(() => {
-    if (typeof window !== 'undefined' && typeof window.bmBridge?.exportPDF === 'function') {
-      setCanExport(true);
-    }
-  }, []);
-  const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-
-  async function handleExportPDF() {
-    if (typeof window === 'undefined' || typeof window.bmBridge?.exportPDF !== 'function') return;
-    setExporting(true);
-    setExportError(null);
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      const res = await window.bmBridge.exportPDF({
-        filename: `geo-${today}.pdf`,
-        sectionTitle: 'GEO',
-      });
-      if (!res.ok) setExportError(res.error || 'Export failed');
-    } catch (err) {
-      setExportError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setExporting(false);
-    }
-  }
-
+  const today = new Date().toISOString().slice(0, 10);
   const needsConfig = (cfg.data?.brands ?? []).length === 0;
   const latestRun = runs.data?.runs?.slice(-1)[0];
 
@@ -136,16 +108,7 @@ export default function GeoPage() {
               <option value="perplexity">Perplexity</option>
               <option value="google_ai_overview">AI Overview</option>
             </select>
-            {canExport && (
-              <Button variant="secondary" onClick={handleExportPDF} disabled={exporting}>
-                {exporting ? (
-                  <Loader2 className="w-3 h-3 mr-1 inline animate-spin" />
-                ) : (
-                  <FileDown className="w-3 h-3 mr-1 inline" />
-                )}
-                {exporting ? 'Exporting…' : 'Export PDF'}
-              </Button>
-            )}
+            <ExportPDFButton filename={`geo-${today}.pdf`} sectionTitle="GEO" />
             <Button variant="primary" onClick={() => runMut.mutate()} disabled={runActive}>
               {runActive ? (
                 <Loader2 className="w-3 h-3 mr-1 inline animate-spin" />
@@ -215,11 +178,6 @@ export default function GeoPage() {
                 ? 'Already running — see progress above'
                 : `Run failed: ${(runMut.error as Error)?.message ?? 'unknown error'}`}
             </div>
-          </Panel>
-        )}
-        {exportError && (
-          <Panel className="p-3 mb-4 border-flame/40 print:hidden">
-            <div className="text-xs font-semibold text-flame mb-1">Export PDF failed: {exportError}</div>
           </Panel>
         )}
         {runMut.data?.errors && runMut.data.errors.length > 0 && (
