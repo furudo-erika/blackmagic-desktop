@@ -25,7 +25,7 @@ import {
 import { runAgent } from './agent.js';
 import { notifyEvent, notificationSettings, extractReportPaths } from './notify-mac.js';
 import { listPlaybooks, runPlaybook } from './playbooks.js';
-import { triggerList, fireTrigger, loadCronTriggers, lastShellRuns } from './triggers.js';
+import { triggerList, fireTrigger, loadCronTriggers, lastShellRuns, runningTriggers } from './triggers.js';
 import { listSequences, listEnrollments, enrollContact, stopEnrollment } from './sequences.js';
 import { startSequenceCron, walkSequencesOnce } from './sequence-cron.js';
 import { listDrafts, approveDraft, rejectDraft } from './drafts.js';
@@ -574,14 +574,24 @@ async function main() {
     return c.json({ ok: removed });
   });
   app.post('/api/geo/run', async (c) => {
-    const body = await c.req.json<{ date?: string; models?: geo.GeoModel[]; concurrency?: number }>().catch(() => ({}));
+    const body = await c.req.json<{ date?: string; models?: geo.GeoModel[]; concurrency?: number }>().catch(() => ({} as { date?: string; models?: geo.GeoModel[]; concurrency?: number }));
+    notifyEvent(config, 'agent_started', 'GEO sweep started', `${(body.models ?? []).length || 'all'} models`);
     try {
       const summary = await geo.runDaily(config, body);
+      notifyEvent(
+        config,
+        'agent_completed',
+        'GEO sweep finished',
+        `${(summary as any)?.brandsTracked ?? '?'} brands · ${(summary as any)?.promptsRun ?? '?'} prompts`,
+      );
       return c.json(summary);
     } catch (err) {
       if (err && typeof err === 'object' && (err as { code?: string }).code === 'GEO_RUN_LOCKED') {
+        // Concurrency lock — don't fire a "failed" notification, the user
+        // didn't actually start a new run.
         return c.json({ error: (err as Error).message, code: 'GEO_RUN_LOCKED' }, 409);
       }
+      notifyEvent(config, 'agent_completed', 'GEO sweep failed', err instanceof Error ? err.message : String(err));
       throw err;
     }
   });
@@ -834,7 +844,7 @@ async function main() {
   app.get('/api/triggers', async (c) => {
     const [triggers, lastRuns] = await Promise.all([triggerList(), lastShellRuns()]);
     pushTriggers(config).catch(() => {});
-    return c.json({ triggers, lastRuns });
+    return c.json({ triggers, lastRuns, running: runningTriggers() });
   });
   app.post('/api/triggers/:name/fire', async (c) => {
     const name = c.req.param('name');

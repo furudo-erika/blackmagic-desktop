@@ -23,6 +23,14 @@ interface TriggerSpec {
 
 const scheduled: Map<string, cron.ScheduledTask> = new Map();
 
+// In-flight triggers — populated by fireTrigger so the sidebar can show a
+// breathing dot on the Triggers nav row while a cron/manual trigger is
+// executing. Cleared when fireTrigger returns (success or failure).
+const inflight: Set<string> = new Set();
+export function runningTriggers(): string[] {
+  return Array.from(inflight);
+}
+
 // 30-minute timeout for shell triggers. After that the child is killed and
 // the run is marked failed. Keep the rest of the pipeline moving.
 const SHELL_TIMEOUT_MS = 30 * 60 * 1000;
@@ -224,7 +232,9 @@ export async function fireTrigger(name: string, config: Config, input: Record<st
   if (!spec) throw new Error(`trigger not found: ${name}`);
   if (!spec.enabled) throw new Error(`trigger disabled: ${name}`);
   notifyEvent(config, 'trigger_fired', `Trigger fired: ${name}`, spec.schedule ? `cron ${spec.schedule}` : 'manual or webhook run');
+  inflight.add(name);
   const finish = (ok: boolean, detail: string) => {
+    inflight.delete(name);
     notifyEvent(config, 'trigger_completed', `Trigger ${ok ? 'completed' : 'failed'}: ${name}`, detail);
   };
   // Shell triggers win over playbook ones — they're complete pipelines and

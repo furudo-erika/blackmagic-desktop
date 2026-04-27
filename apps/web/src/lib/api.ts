@@ -371,6 +371,7 @@ export const api = {
         body: string;
       }>;
       lastRuns?: Record<string, { log: string; exit: number | null; finishedAt: string | null }>;
+      running?: string[];
     }>('/api/triggers'),
   fireTrigger: (name: string, input: Record<string, unknown> = {}) =>
     request<{ runId?: string; final?: string; error?: string }>(

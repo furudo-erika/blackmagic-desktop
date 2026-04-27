@@ -2,6 +2,28 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.47 — 2026-04-27
+
+### Added
+- **Sidebar breathing dot for GEO + Triggers.** GEO and
+  Triggers nav rows now pulse red while a sweep / cron is in
+  flight, matching the existing per-agent indicator. Switch to
+  any tab and you can still see at a glance that background work
+  is running.
+- **macOS notifications for GEO sweeps.** Hitting Run on the
+  GEO page fires "GEO sweep started" + "GEO sweep finished"
+  via the existing `agent_started` / `agent_completed`
+  Notifications toggle (Settings → Notifications). The 409
+  concurrency-lock case stays silent so re-clicking Run while
+  a sweep is in flight doesn't spam a fake "failed" ping.
+
+### Fixed
+- `/api/triggers` now returns `running: string[]`, populated by
+  an in-memory inflight set in `fireTrigger`. The sidebar polls
+  this every 5s to drive the Triggers row breathing dot —
+  previously there was no way to know from outside the Triggers
+  page whether a cron was actually executing.
+
 ## 0.5.46 — 2026-04-27
 
 ### Added

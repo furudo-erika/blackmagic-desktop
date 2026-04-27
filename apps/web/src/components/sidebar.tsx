@@ -197,6 +197,23 @@ export function Sidebar() {
     return s;
   }, [runs.data]);
 
+  // GEO + Triggers breathing indicators — so users can switch tabs and
+  // still see at a glance that a sweep / cron is in flight. Slow poll
+  // by default; the GEO progress endpoint already returns null fast
+  // when nothing is running.
+  const geoProgress = useQuery({
+    queryKey: ['sidebar-geo-progress'],
+    queryFn: api.geoRunProgress,
+    refetchInterval: 5_000,
+  });
+  const geoBreathing = geoProgress.data?.progress?.running === true;
+  const triggersList = useQuery({
+    queryKey: ['sidebar-triggers'],
+    queryFn: api.listTriggers,
+    refetchInterval: 5_000,
+  });
+  const triggersBreathing = (triggersList.data?.running ?? []).length > 0;
+
   // Cmd+K command palette
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
@@ -256,7 +273,7 @@ export function Sidebar() {
           agents={teamAgents.data ?? []}
           liveSlugs={liveAgentSlugs}
         />
-        <NavRow icon={Zap}             label="Triggers"  href="/triggers"  pathname={pathname} />
+        <NavRow icon={Zap}             label="Triggers"  href="/triggers"  pathname={pathname} breathing={triggersBreathing} />
         <HistorySidebarRow pathname={pathname} router={router} />
         <NavRow icon={Inbox}           label="Drafts"    href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
 
@@ -265,7 +282,7 @@ export function Sidebar() {
         <NavRow icon={Users}           label="Contacts"  href="/contacts"  pathname={pathname} />
         <NavRow icon={Briefcase}       label="Deals"     href="/deals"     pathname={pathname} />
         <NavRow icon={Workflow}        label="Pipeline"  href="/pipeline"  pathname={pathname} />
-        <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} />
+        <NavRow icon={Radar}           label="GEO"       href="/geo"       pathname={pathname} breathing={geoBreathing} />
         <KnowledgeSidebarRow pathname={pathname} />
         <NavRow icon={Send}            label="Sequences" href="/sequences" pathname={pathname} />
 
