@@ -2,6 +2,23 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.45 — 2026-04-27
+
+### Fixed
+- **Export PDF now captures the full page, not just the first
+  screen.** 0.5.43's print stylesheet only neutralized
+  `<main>`'s overflow, but the actual scroll container is the
+  flex-1 / overflow-y-auto wrapper inside `PageBody` — and the
+  whole layout sits inside `h-screen`. printToPDF rendered
+  only the visible viewport and clipped everything below the
+  fold. The `@media print` block now forces every height
+  constraint (`html`, `body`, `#__next`, `h-full`, `h-screen`,
+  `min-h-*`) to `auto` and every overflow utility
+  (`overflow-hidden|auto|y-auto|x-auto`) to `visible`, so the
+  full document lays out vertically and paginates correctly.
+  Tables get `break-inside: avoid` so SoV / domain rows don't
+  split mid-cell.
+
 ## 0.5.44 — 2026-04-27
 
 ### Fixed

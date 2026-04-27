@@ -128,8 +128,34 @@ html.dark input::placeholder {
 @media print {
   .bm-titlebar { display: none !important; }
   .bm-print-hide { display: none !important; }
-  /* Pages use overflow:hidden on <main> to keep the sidebar pinned on
-     screen — for print we need the full content visible, not clipped. */
-  main { overflow: visible !important; }
+
+  /* The viewport on every page is a chain of fixed-height + overflow-auto
+     containers (h-screen → flex-1 → PageBody overflow-y-auto). On screen
+     this keeps the sidebar pinned and the body scrollable. For print this
+     means printToPDF only renders the visible viewport — the rest of the
+     scrollable content gets clipped (the "only first screen" bug from
+     0.5.43). Neutralize every height + overflow constraint so the
+     document lays out at its natural full height and paginates correctly. */
+  html, body, #__next, main {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .h-full, .h-screen, .min-h-screen, .min-h-full {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  .overflow-hidden, .overflow-auto, .overflow-y-auto, .overflow-y-scroll,
+  .overflow-x-auto, .overflow-x-scroll {
+    overflow: visible !important;
+  }
+  /* flex-1 in a no-longer-constrained parent collapses to 0 — let it size
+     to content instead. Same for grid rows that used 1fr to fill height. */
+  .flex-1 { flex: 0 1 auto !important; }
+
   html, body { background: #fff !important; }
+
+  /* Avoid mid-row page breaks in tables and panels where readable. */
+  table, .bm-print-keep { break-inside: avoid; }
 }
