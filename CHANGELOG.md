@@ -2,6 +2,34 @@
 
 All notable changes to BlackMagic AI. Dates in UTC.
 
+## 0.5.44 — 2026-04-27
+
+### Fixed
+- **GEO no longer reports fake "+31.5pp" deltas when the prior
+  period has no data.** With only two sweeps in the system the
+  prior 14-day window was empty, so every brand looked
+  brand-new, every domain looked new, no losses were ever
+  reported, and every "0.0% → X%" mover card was simply the
+  current value minus zero dressed up as a trend. `reportDelta`
+  and `sovTrendWithPrior` now detect an empty prior window and
+  auto-shrink the comparison to "latest run vs previous run",
+  returning a `meta` field describing what was actually
+  compared.
+- **Honest section headers on /geo.** The "Share of Voice — 14d,
+  Δ vs prior 14d" title is now driven by the meta field. When
+  the fallback kicks in it reads "most recent run vs previous
+  run (R0 vs R1)"; when only one run exists ever it reads
+  "no prior data — run again to see deltas". The "New / Lost
+  domains this period" panels relabel to "Domains added /
+  dropped since last run", and the Movers row swaps "Biggest
+  SoV gain" for "SoV gain since last run". An informational
+  banner above the SoV chart explains why deltas are narrower
+  than the selected window.
+- **Insufficient-data placeholders.** When a single sweep has
+  ever run, the citation-gain / loss / new / lost panels render
+  a "Run again to see what changed" placeholder instead of
+  fake numbers. The mover cards collapse to a single quiet line.
+
 ## 0.5.43 — 2026-04-27
 
 ### Added

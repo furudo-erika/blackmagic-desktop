@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Radar, Play, Plus, Trash2, RefreshCw, Loader2, FileDown } from 'lucide-react';
-import { api, type GeoBrand, type GeoBrandRow, type GeoGapRow, type GeoDomainRow, type GeoPrompt, type GeoModel, type GeoBrandDeltaRow, type GeoDomainDeltaRow, type GeoTrendOverlay } from '../../lib/api';
+import { api, type GeoBrand, type GeoBrandRow, type GeoGapRow, type GeoDomainRow, type GeoPrompt, type GeoModel, type GeoBrandDeltaRow, type GeoDomainDeltaRow, type GeoTrendOverlay, type GeoDeltaMeta } from '../../lib/api';
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { PageShell, PageHeader, PageBody, Panel, Button } from '../../components/ui/primitives';
 
@@ -231,50 +231,109 @@ export default function GeoPage() {
           </Panel>
         )}
 
-        {delta.data?.movers && <MoversRow movers={delta.data.movers} />}
+        {(() => {
+          const meta = delta.data?.meta;
+          const fallback = meta?.fallback_applied ?? 'none';
+          const sovTitle =
+            fallback === 'shrink_to_latest_pair' && meta
+              ? `Share of Voice — most recent run vs previous run (${meta.window_actual.current.start} vs ${meta.window_actual.prior?.start ?? '—'})`
+              : fallback === 'no_prior_data'
+                ? `Share of Voice — ${windowDays}d (no prior data — run again to see deltas)`
+                : `Share of Voice — ${windowDays}d, Δ vs prior ${windowDays}d`;
+          const showInsufficientBanner = !!meta && meta.runs_in_prior === 0;
+          const newHeader = fallback === 'shrink_to_latest_pair' ? 'Domains added since last run' : 'New domains this period';
+          const lostHeader = fallback === 'shrink_to_latest_pair' ? 'Domains dropped since last run' : 'Lost domains this period';
+          const gainsHeader = fallback === 'shrink_to_latest_pair' ? 'Citation gains since last run' : 'Biggest citation gains';
+          const lossesHeader = fallback === 'shrink_to_latest_pair' ? 'Citation losses since last run' : 'Biggest citation losses';
+          return (
+            <>
+              {delta.data?.movers && <MoversRow movers={delta.data.movers} fallback={fallback} />}
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <Panel className="p-4">
-            <SectionTitle>Share of Voice — {windowDays}d, Δ vs prior {windowDays}d</SectionTitle>
-            <BrandsBarChart rows={delta.data?.brands ?? []} />
-          </Panel>
-          <Panel className="p-4">
-            <SectionTitle>Your SoV — current vs prior period</SectionTitle>
-            {!usBrand ? (
-              <div className="text-xs text-muted dark:text-[#8C837C] py-8 text-center">
-                Mark a brand with <code>is_us: true</code> to see your trend.
+              {showInsufficientBanner && (
+                <Panel className="p-3 mb-4 border-flame/30">
+                  <div className="text-xs text-ink dark:text-[#E6E0D8]">
+                    Only {meta!.runs_in_current} run{meta!.runs_in_current === 1 ? '' : 's'} in the last {windowDays} days.
+                    {fallback === 'shrink_to_latest_pair'
+                      ? ' Deltas compare your latest run to the previous run instead.'
+                      : ' Run GEO again to see what changed.'}
+                    {' '}{windowDays}-day trends start once you&apos;ve run on at least 3 different days in each window.
+                  </div>
+                </Panel>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <Panel className="p-4">
+                  <SectionTitle>{sovTitle}</SectionTitle>
+                  <BrandsBarChart rows={delta.data?.brands ?? []} />
+                </Panel>
+                <Panel className="p-4">
+                  <SectionTitle>Your SoV — current vs prior period</SectionTitle>
+                  {!usBrand ? (
+                    <div className="text-xs text-muted dark:text-[#8C837C] py-8 text-center">
+                      Mark a brand with <code>is_us: true</code> to see your trend.
+                    </div>
+                  ) : (
+                    <SovOverlayChart overlay={sov.data} />
+                  )}
+                </Panel>
               </div>
-            ) : (
-              <SovOverlayChart overlay={sov.data} />
-            )}
-          </Panel>
-        </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <Panel className="p-4">
-            <SectionTitle>Biggest citation gains</SectionTitle>
-            <DomainDeltaTable rows={delta.data?.domains_top_up ?? []} />
-          </Panel>
-          <Panel className="p-4">
-            <SectionTitle>Biggest citation losses</SectionTitle>
-            <DomainDeltaTable rows={delta.data?.domains_top_down ?? []} />
-          </Panel>
-        </div>
+              {fallback === 'no_prior_data' ? (
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <Panel className="p-4">
+                    <SectionTitle>Run again to see what changed</SectionTitle>
+                    <div className="text-xs text-muted dark:text-[#8C837C] py-8 text-center">
+                      Citation gains and losses appear after a second sweep.
+                    </div>
+                  </Panel>
+                  <Panel className="p-4">
+                    <SectionTitle>Run again to see what changed</SectionTitle>
+                    <div className="text-xs text-muted dark:text-[#8C837C] py-8 text-center">
+                      Domain churn appears after a second sweep.
+                    </div>
+                  </Panel>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <Panel className="p-4">
+                    <SectionTitle>{gainsHeader}</SectionTitle>
+                    <DomainDeltaTable rows={delta.data?.domains_top_up ?? []} />
+                  </Panel>
+                  <Panel className="p-4">
+                    <SectionTitle>{lossesHeader}</SectionTitle>
+                    <DomainDeltaTable rows={delta.data?.domains_top_down ?? []} />
+                  </Panel>
+                </div>
+              )}
 
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <Panel className="p-4">
-            <SectionTitle>New domains this period</SectionTitle>
-            <DomainDeltaTable rows={delta.data?.domains_new ?? []} compact />
-          </Panel>
-          <Panel className="p-4">
-            <SectionTitle>Lost domains this period</SectionTitle>
-            <DomainDeltaTable rows={delta.data?.domains_lost ?? []} compact />
-          </Panel>
-          <Panel className="p-4">
-            <SectionTitle>Gap sources (competitors cited, you&apos;re not)</SectionTitle>
-            <GapTable rows={gap.data?.rows ?? []} />
-          </Panel>
-        </div>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                {fallback === 'no_prior_data' ? (
+                  <Panel className="p-4 col-span-2">
+                    <SectionTitle>Run again to see what changed</SectionTitle>
+                    <div className="text-xs text-muted dark:text-[#8C837C] py-8 text-center">
+                      New and lost domains require at least two sweeps to compare.
+                    </div>
+                  </Panel>
+                ) : (
+                  <>
+                    <Panel className="p-4">
+                      <SectionTitle>{newHeader}</SectionTitle>
+                      <DomainDeltaTable rows={delta.data?.domains_new ?? []} compact />
+                    </Panel>
+                    <Panel className="p-4">
+                      <SectionTitle>{lostHeader}</SectionTitle>
+                      <DomainDeltaTable rows={delta.data?.domains_lost ?? []} compact />
+                    </Panel>
+                  </>
+                )}
+                <Panel className="p-4">
+                  <SectionTitle>Gap sources (competitors cited, you&apos;re not)</SectionTitle>
+                  <GapTable rows={gap.data?.rows ?? []} />
+                </Panel>
+              </div>
+            </>
+          );
+        })()}
 
         <Panel className="p-4 mb-4">
           <SectionTitle>Brands</SectionTitle>
@@ -339,13 +398,25 @@ function BrandsBarChart({ rows }: { rows: GeoBrandDeltaRow[] }) {
   );
 }
 
-function MoversRow({ movers }: { movers: NonNullable<ReturnType<typeof api.geoDelta> extends Promise<infer R> ? R extends { movers: infer M } ? M : never : never> }) {
+function MoversRow({ movers, fallback }: { movers: NonNullable<ReturnType<typeof api.geoDelta> extends Promise<infer R> ? R extends { movers: infer M } ? M : never : never>; fallback: GeoDeltaMeta['fallback_applied'] }) {
+  const shrunk = fallback === 'shrink_to_latest_pair';
+  const noPrior = fallback === 'no_prior_data';
+  if (noPrior) {
+    return (
+      <div className="grid grid-cols-1 gap-3 mb-4">
+        <Panel className="px-4 py-3">
+          <div className="text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#6B625C]">Change since last run</div>
+          <div className="text-xs text-muted dark:text-[#8C837C]">Run again to see what changed.</div>
+        </Panel>
+      </div>
+    );
+  }
   return (
     <div className="grid grid-cols-4 gap-3 mb-4">
-      <MoverCard label="Biggest SoV gain" brand={movers.brand_sov_up} tone="up" />
-      <MoverCard label="Biggest SoV drop" brand={movers.brand_sov_down} tone="down" />
-      <DomainMoverCard label="Top new domain" domain={movers.new_domain} tone="up" />
-      <DomainMoverCard label="Top lost domain" domain={movers.lost_domain} tone="down" />
+      <MoverCard label={shrunk ? 'SoV gain since last run' : 'Biggest SoV gain'} brand={movers.brand_sov_up} tone="up" />
+      <MoverCard label={shrunk ? 'SoV drop since last run' : 'Biggest SoV drop'} brand={movers.brand_sov_down} tone="down" />
+      <DomainMoverCard label={shrunk ? 'Top domain added' : 'Top new domain'} domain={movers.new_domain} tone="up" />
+      <DomainMoverCard label={shrunk ? 'Top domain dropped' : 'Top lost domain'} domain={movers.lost_domain} tone="down" />
     </div>
   );
 }

@@ -582,6 +582,17 @@ export type GeoDomainRow = { domain: string; citation_count: number; prompt_coun
 export type GeoGapRow = GeoDomainRow & { cited_for_brands: string[] };
 export type GeoBrandDeltaRow = GeoBrandRow & { sov_prev: number; sov_delta: number; mention_delta: number };
 export type GeoDomainDeltaRow = GeoDomainRow & { prev_citation_count: number; delta: number; status: 'new' | 'lost' | 'up' | 'down' | 'flat' };
+export type GeoDeltaFallback = 'none' | 'shrink_to_latest_pair' | 'no_prior_data';
+export type GeoDeltaMeta = {
+  window_actual: {
+    current: { start: string; end: string; days: number };
+    prior: { start: string; end: string; days: number } | null;
+  };
+  prior_data_available: boolean;
+  fallback_applied: GeoDeltaFallback;
+  runs_in_current: number;
+  runs_in_prior: number;
+};
 export type GeoDeltaReport = {
   window: { start: string; end: string; days: number };
   prev_window: { start: string; end: string };
@@ -596,12 +607,14 @@ export type GeoDeltaReport = {
     new_domain: GeoDomainDeltaRow | null;
     lost_domain: GeoDomainDeltaRow | null;
   };
+  meta: GeoDeltaMeta;
 };
 export type GeoTrendOverlay = {
   current: Array<{ day_index: number; date: string; sov: number; mentions: number }>;
   prior: Array<{ day_index: number; date: string; sov: number; mentions: number }>;
   window: { start: string; end: string; days: number };
   prev_window: { start: string; end: string };
+  meta: GeoDeltaMeta;
 };
 export type GeoRunSummary = {
   date: string;

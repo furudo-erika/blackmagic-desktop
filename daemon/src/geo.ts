@@ -832,6 +832,19 @@ export interface DomainDeltaRow extends DomainReportRow {
   status: 'new' | 'lost' | 'up' | 'down' | 'flat';
 }
 
+export type DeltaFallback = 'none' | 'shrink_to_latest_pair' | 'no_prior_data';
+
+export interface DeltaMeta {
+  window_actual: {
+    current: { start: string; end: string; days: number };
+    prior: { start: string; end: string; days: number } | null;
+  };
+  prior_data_available: boolean;
+  fallback_applied: DeltaFallback;
+  runs_in_current: number;
+  runs_in_prior: number;
+}
+
 export interface DeltaReport {
   window: { start: string; end: string; days: number };
   prev_window: { start: string; end: string };
@@ -846,6 +859,7 @@ export interface DeltaReport {
     new_domain: DomainDeltaRow | null;
     lost_domain: DomainDeltaRow | null;
   };
+  meta: DeltaMeta;
 }
 
 function addDaysISO(iso: string, days: number): string {
@@ -855,17 +869,56 @@ function addDaysISO(iso: string, days: number): string {
 }
 
 export async function reportDelta(opts: { start_date?: string; end_date?: string; model?: GeoModel } = {}): Promise<DeltaReport> {
-  const end = opts.end_date ?? new Date().toISOString().slice(0, 10);
-  const start = opts.start_date ?? addDaysISO(end, -14);
-  const days = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1;
-  const prevEnd = addDaysISO(start, -1);
-  const prevStart = addDaysISO(prevEnd, -(days - 1));
+  const requestedEnd = opts.end_date ?? new Date().toISOString().slice(0, 10);
+  const requestedStart = opts.start_date ?? addDaysISO(requestedEnd, -14);
+  const requestedDays = Math.round((new Date(requestedEnd).getTime() - new Date(requestedStart).getTime()) / 86400000) + 1;
+  const requestedPrevEnd = addDaysISO(requestedStart, -1);
+  const requestedPrevStart = addDaysISO(requestedPrevEnd, -(requestedDays - 1));
+
+  // Decide whether to honour the requested windows or shrink to the latest
+  // run-vs-previous-run pair. Shrink only when the prior window is empty
+  // but at least 2 distinct run-dates exist somewhere.
+  const allDates = await listRunDates();
+  const inWindow = (d: string, s: string, e: string) => d >= s && d <= e;
+  const runsInCurrent = allDates.filter((d) => inWindow(d, requestedStart, requestedEnd)).length;
+  const runsInPrior = allDates.filter((d) => inWindow(d, requestedPrevStart, requestedPrevEnd)).length;
+
+  let start = requestedStart;
+  let end = requestedEnd;
+  let days = requestedDays;
+  let prevStart = requestedPrevStart;
+  let prevEnd = requestedPrevEnd;
+  let fallback: DeltaFallback = 'none';
+  let priorAvailable = runsInPrior > 0;
+
+  if (runsInPrior === 0 && allDates.length >= 2) {
+    // Shrink: latest run vs previous run, both single-day windows.
+    const r0 = allDates[allDates.length - 1]!;
+    const r1 = allDates[allDates.length - 2]!;
+    start = r0;
+    end = r0;
+    days = 1;
+    prevStart = r1;
+    prevEnd = r1;
+    fallback = 'shrink_to_latest_pair';
+    priorAvailable = true;
+  } else if (runsInPrior === 0 && allDates.length < 2) {
+    // Only one run ever (or zero): no honest delta possible. Keep current
+    // window so the UI still has brands/domains for "current period only";
+    // prior window collapses to null in meta.
+    fallback = 'no_prior_data';
+    priorAvailable = false;
+  }
 
   const [brandsNow, brandsPrev, domainsNow, domainsPrev] = await Promise.all([
     reportBrands({ start_date: start, end_date: end, model: opts.model }),
-    reportBrands({ start_date: prevStart, end_date: prevEnd, model: opts.model }),
+    fallback === 'no_prior_data'
+      ? Promise.resolve([] as BrandReportRow[])
+      : reportBrands({ start_date: prevStart, end_date: prevEnd, model: opts.model }),
     reportDomains({ start_date: start, end_date: end, model: opts.model }),
-    reportDomains({ start_date: prevStart, end_date: prevEnd, model: opts.model }),
+    fallback === 'no_prior_data'
+      ? Promise.resolve([] as DomainReportRow[])
+      : reportDomains({ start_date: prevStart, end_date: prevEnd, model: opts.model }),
   ]);
 
   const prevBrandMap = new Map(brandsPrev.map((b) => [b.brand_id, b]));
@@ -912,6 +965,18 @@ export async function reportDelta(opts: { start_date?: string; end_date?: string
   const sortedBrandsUp = [...brands].sort((a, b) => b.sov_delta - a.sov_delta);
   const sortedBrandsDown = [...brands].sort((a, b) => a.sov_delta - b.sov_delta);
 
+  const priorDays = Math.round((new Date(prevEnd).getTime() - new Date(prevStart).getTime()) / 86400000) + 1;
+  const meta: DeltaMeta = {
+    window_actual: {
+      current: { start, end, days },
+      prior: fallback === 'no_prior_data' ? null : { start: prevStart, end: prevEnd, days: priorDays },
+    },
+    prior_data_available: priorAvailable,
+    fallback_applied: fallback,
+    runs_in_current: runsInCurrent,
+    runs_in_prior: runsInPrior,
+  };
+
   return {
     window: { start, end, days },
     prev_window: { start: prevStart, end: prevEnd },
@@ -926,6 +991,7 @@ export async function reportDelta(opts: { start_date?: string; end_date?: string
       new_domain: newRows[0] ?? null,
       lost_domain: lostRows[0] ?? null,
     },
+    meta,
   };
 }
 
@@ -936,27 +1002,69 @@ export interface TrendOverlay {
   prior: Array<{ day_index: number; date: string; sov: number; mentions: number }>;
   window: { start: string; end: string; days: number };
   prev_window: { start: string; end: string };
+  meta: DeltaMeta;
 }
 
 export async function sovTrendWithPrior(opts: { brand_id: string; start_date?: string; end_date?: string; model?: GeoModel }): Promise<TrendOverlay> {
-  const end = opts.end_date ?? new Date().toISOString().slice(0, 10);
-  const start = opts.start_date ?? addDaysISO(end, -14);
-  const days = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1;
-  const prevEnd = addDaysISO(start, -1);
-  const prevStart = addDaysISO(prevEnd, -(days - 1));
+  const requestedEnd = opts.end_date ?? new Date().toISOString().slice(0, 10);
+  const requestedStart = opts.start_date ?? addDaysISO(requestedEnd, -14);
+  const requestedDays = Math.round((new Date(requestedEnd).getTime() - new Date(requestedStart).getTime()) / 86400000) + 1;
+  const requestedPrevEnd = addDaysISO(requestedStart, -1);
+  const requestedPrevStart = addDaysISO(requestedPrevEnd, -(requestedDays - 1));
+
+  // Same fallback rules as reportDelta so the chart label stays in sync.
+  const allDates = await listRunDates();
+  const inWindow = (d: string, s: string, e: string) => d >= s && d <= e;
+  const runsInCurrent = allDates.filter((d) => inWindow(d, requestedStart, requestedEnd)).length;
+  const runsInPrior = allDates.filter((d) => inWindow(d, requestedPrevStart, requestedPrevEnd)).length;
+
+  let start = requestedStart;
+  let end = requestedEnd;
+  let days = requestedDays;
+  let prevStart = requestedPrevStart;
+  let prevEnd = requestedPrevEnd;
+  let fallback: DeltaFallback = 'none';
+  let priorAvailable = runsInPrior > 0;
+
+  if (runsInPrior === 0 && allDates.length >= 2) {
+    const r0 = allDates[allDates.length - 1]!;
+    const r1 = allDates[allDates.length - 2]!;
+    start = r0; end = r0; days = 1;
+    prevStart = r1; prevEnd = r1;
+    fallback = 'shrink_to_latest_pair';
+    priorAvailable = true;
+  } else if (runsInPrior === 0 && allDates.length < 2) {
+    fallback = 'no_prior_data';
+    priorAvailable = false;
+  }
+
   const [now, prev] = await Promise.all([
     sovTrend({ brand_id: opts.brand_id, start_date: start, end_date: end, model: opts.model }),
-    sovTrend({ brand_id: opts.brand_id, start_date: prevStart, end_date: prevEnd, model: opts.model }),
+    fallback === 'no_prior_data'
+      ? Promise.resolve([] as SovTrendPoint[])
+      : sovTrend({ brand_id: opts.brand_id, start_date: prevStart, end_date: prevEnd, model: opts.model }),
   ]);
   const toDayIdx = (windowStart: string) => (p: { date: string; sov: number; mentions: number }) => ({
     day_index: Math.round((new Date(p.date).getTime() - new Date(windowStart).getTime()) / 86400000),
     ...p,
   });
+  const priorDays = Math.round((new Date(prevEnd).getTime() - new Date(prevStart).getTime()) / 86400000) + 1;
+  const meta: DeltaMeta = {
+    window_actual: {
+      current: { start, end, days },
+      prior: fallback === 'no_prior_data' ? null : { start: prevStart, end: prevEnd, days: priorDays },
+    },
+    prior_data_available: priorAvailable,
+    fallback_applied: fallback,
+    runs_in_current: runsInCurrent,
+    runs_in_prior: runsInPrior,
+  };
   return {
     current: now.map(toDayIdx(start)),
     prior: prev.map(toDayIdx(prevStart)),
     window: { start, end, days },
     prev_window: { start: prevStart, end: prevEnd },
+    meta,
   };
 }
 
