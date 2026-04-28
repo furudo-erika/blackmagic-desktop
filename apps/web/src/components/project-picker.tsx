@@ -284,7 +284,7 @@ export function ProjectPicker({
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Apidog"
+            placeholder="Acme Corp"
             autoFocus
             style={{
               width: '100%',

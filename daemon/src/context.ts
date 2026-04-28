@@ -40,7 +40,7 @@ const SKELETON_DIRS = [
   'signals/geo/actions',
   'signals/geo/alerts',
   // ── who WE are ─────────────────────────────────────────
-  // Borrowed from the apidog-team /org/ + /marketing/branding/ pattern.
+  // Standard /org/ + /marketing/branding/ directory pattern.
   // Each subdirectory is one facet so the agent can page in only what it
   // needs — e.g. an outbound draft reads brand/ + customers/, but
   // qualification reads market/.
@@ -1456,11 +1456,10 @@ temperature: 0.2
 
 You are the Brand Monitor Agent. Own **every brand-name mention of
 our product across Reddit and X** — scan, classify, write a daily
-signal file, and escalate the urgent ones to the team. Modelled on
-the pattern Apidog runs internally: their team monitors \`apidog\`
-mentions daily across Reddit + X so product / marketing never miss
-a negative review, an integration request, or a comparison thread
-with Postman.
+signal file, and escalate the urgent ones to the team. The pattern:
+monitor every brand-name mention daily across Reddit + X so
+product / marketing never miss a negative review, an integration
+request, or a comparison thread with a competitor.
 
 ## Mission
 
@@ -1472,8 +1471,8 @@ and \`notify\` the team for anything urgent.
 
 ## Inputs
 
-- \`us/company.md\` → brand name + aliases (e.g. "Apidog",
-  "apidog.com", "@apidogHQ"). If aliases are missing, use the
+- \`us/company.md\` → brand name + aliases (canonical name, primary
+  domain, X handle, common typos). If aliases are missing, use the
   company name + domain stem as defaults and note the fallback in
   the signal file.
 - \`us/market/competitors.md\` (optional) → when a post mentions us
@@ -1568,16 +1567,14 @@ temperature: 0.4
 You are the **X Account Agent**. Run the company's X (Twitter)
 presence: draft product-builder-voice tweets, flag reply
 opportunities, watch competitors, and escalate urgent incoming
-mentions. Modelled on the Apidog team playbook at
-\`~/apidog-team/marketing/social-media/twitter/twitter-strategy.md\`:
-four content pillars (product updates / dev insights / engagement /
-amplification), 1–2 original tweets/day, 3–5 engagements/day,
-1 thread/week.
+mentions. Cadence: four content pillars (product updates / dev
+insights / engagement / amplification), 1–2 original tweets/day,
+3–5 engagements/day, 1 thread/week.
 
 ## Inputs
 
 - \`us/company.md\` — brand voice (tone), product one-liner,
-  canonical handle (\`@apidogHQ\` shape).
+  canonical X handle.
 - \`us/brand/voice.md\` (optional) — extended voice guide if present.
 - \`us/market/competitors.md\` — competitor handles to watch
   (fallback to a default list if missing: @getpostman, @SwaggerApi,
@@ -1854,46 +1851,141 @@ inputs:
   - { name: domain, required: true }
   - { name: docs_url, required: false }
   - { name: extra_urls, required: false }
+optional_integrations: [apify, gsc, ga4, hubspot, attio, salesforce, pipedrive, metabase, supabase, github_oauth]
 ---
 
-Build the user's own company knowledge pack from their website.
+First-run onboarding. Build a high-fidelity \`us/\` knowledge pack
+from real data sources, not just the home page. The richer the pack,
+the less generic every downstream agent's output is.
 
-## Steps
+## Step 0 — Data interface inventory
 
-1. Fetch the domain's home page via \`web_fetch({{domain}})\`. If the user
-   provided \`{{docs_url}}\` or \`{{extra_urls}}\` (comma-separated), fetch
-   those too. Also use built-in web_search for "{{domain}} funding",
-   "{{domain}} competitors", "{{domain}} pricing", "{{domain}} customers"
-   to fill gaps.
-2. If \`{{docs_url}}\` was provided, run \`deep_research\` once with
-   focus "technical" against it to extract a product feature map.
-3. Populate the following files (overwrite only if still at the seed
-   template — never clobber user edits):
-     - \`us/company.md\` — frontmatter (name, domain, one_liner, stage,
-       founded, hq, employee_count, founders, website, blog, docs,
-       linkedin, twitter) + one-paragraph narrative
-     - \`us/product/overview.md\` — offer + 3 differentiators
-     - \`us/product/pricing.md\` — public plan table (if listed)
-     - \`us/product/features.md\` — capability areas (from /features or
-       from the docs if provided)
-     - \`us/product/integrations.md\` — tools they list
-     - \`us/market/icp.md\` — inferred from customer logos + case
-       studies + testimonials; call out unknowns explicitly
-     - \`us/market/segments.md\` — SMB vs mid-market vs enterprise if
-       pricing tiers suggest segmentation
-     - \`us/market/positioning.md\` — category + positioning statement
-     - \`us/market/objections.md\` — pull from FAQ / comparison pages
-     - \`us/brand/voice.md\` — tone, sample phrases from blog + marketing
-       copy, forbidden words
-     - \`us/brand/messaging.md\` — per-audience lines
-     - \`us/competitors/landscape.md\` — top 3-5 with a row table
-     - \`us/customers/top.md\` — 5-10 named customers (if public)
-     - \`us/team/roster.md\` — founders + execs from /about
-     - \`us/strategy/north-star.md\` — skip unless evident from the site
-4. Cite sources inline (URLs) for every factual claim. Where the site
-   doesn't say, write \`unknown\` — never invent.
-5. Reply with: a 3-bullet summary of what's filled in, and the single
-   biggest gap the user should fill by hand.
+Before fetching anything, list which data interfaces are available
+this run:
+
+- \`web_fetch\` — always (built-in)
+- \`web_search\` — always (built-in)
+- \`enrich_company\` — always (proxied, no key needed)
+- \`scrape_apify_actor\` — if Apify key set (richer crawl + SERP)
+- \`gsc_*\` — if Google Search Console connected (real query/rank data)
+- \`ga4_*\` — if Google Analytics 4 connected (traffic + conversion mix)
+- \`hubspot_* / attio_* / salesforce_* / pipedrive_*\` — if a CRM
+  is connected (real customers, real deal stages)
+- \`metabase_*\` — if Metabase connected (existing dashboards)
+- \`github_*\` — if a GitHub OAuth is connected and the company has
+  public repos (open-source signal)
+
+Write the inventory to \`us/data/sources.md\` so future runs know
+what's wired up. Mark each as ✅ live or ⚠️ not configured.
+
+## Step 1 — Crawl & search
+
+1. \`web_fetch({{domain}})\` plus \`{{docs_url}}\` and any
+   \`{{extra_urls}}\` (comma-separated).
+2. If Apify is available, \`scrape_apify_actor({ actorId:
+   "apify/website-content-crawler", input: { startUrls: [{ url:
+   "https://{{domain}}" }], maxCrawlPages: 30 } })\` for a
+   broader site map. Otherwise web_fetch /pricing /features
+   /customers /about /careers individually.
+3. \`web_search\` (or Apify google-search-scraper):
+   - "{{domain}} funding"
+   - "{{domain}} competitors"
+   - "{{domain}} pricing"
+   - "{{domain}} customers"
+   - "{{domain}} reviews site:reddit.com OR site:news.ycombinator.com"
+   - "{{domain}} alternatives"
+4. \`enrich_company({ domain: "{{domain}}" })\` for firmographics
+   (employee count, HQ, funding total, public LinkedIn).
+5. If \`{{docs_url}}\` was provided, run \`deep_research\` once with
+   focus "technical" to extract a product feature map.
+
+## Step 2 — Real-data inference (don't ask, infer)
+
+- **ICP**: from customer logos + case studies + careers page tech
+  stack signals + pricing tier names. Do not ask the user; produce
+  a best-guess and label confidence.
+- **Geo footprint**: from pricing currency switcher (if present) +
+  /careers locations + blog language switcher.
+- **Competitors**: from the user's own comparison pages (/vs-*),
+  Reddit alternative threads, and SERP results for "{{domain}}
+  alternatives". Keep top 5.
+- **Voice/tone**: from 3 blog posts + the home page hero — pull
+  representative phrases.
+
+## Step 3 — Populate the standard \`us/\` knowledge pack
+
+Overwrite only if still at the seed template — never clobber user edits.
+
+- \`us/company.md\` — frontmatter (name, domain, one_liner, stage,
+  founded, hq, employee_count, founders, website, blog, docs,
+  linkedin, twitter) + one-paragraph narrative
+- \`us/product/overview.md\` — offer + 3 differentiators
+- \`us/product/pricing.md\` — public plan table (if listed)
+- \`us/product/features.md\` — capability areas
+- \`us/product/integrations.md\` — tools they list
+- \`us/market/icp.md\` — inferred buyer profile + confidence; explicit
+  list of \`ideal_signals\` (jobs-page keywords, tech stack tells,
+  team-size brackets) so downstream skills like doc-leads-discover
+  + qualify-icp can run on day 1
+- \`us/market/segments.md\` — SMB / mid-market / enterprise split
+- \`us/market/positioning.md\` — category + positioning statement
+- \`us/market/objections.md\` — from FAQ / comparison pages
+- \`us/brand/voice.md\` — tone + sample phrases + forbidden words
+- \`us/brand/messaging.md\` — per-audience lines
+- \`us/competitors/landscape.md\` — top 3-5 in a row table
+- \`us/customers/top.md\` — 5-10 named customers (if public)
+- \`us/team/roster.md\` — founders + execs from /about
+- \`us/strategy/north-star.md\` — skip unless evident
+
+## Step 4 — Distilled growth-pack scaffolding
+
+Initialize a set of files learned-the-hard-way from running B2B
+dev-tools growth at scale. These make the downstream skills
+(weekly-data-review, reverse-keyword-mine, kol-geo-audit,
+competitor-radar, onboarding-five-layer-audit, etc.) work on day 1.
+
+- \`signals/skills.md\` — running methodology log. Initialize with:
+  - Conventions section (what \`[U]/[L]/[H]/[I]\` source tags mean)
+  - Source map (BI card / dashboard ids as you discover them)
+  - Gotchas (cohort immaturity, WoW pts vs %)
+  - Corrected conclusions log (empty)
+- \`us/market/keywords/brand.md\` — own brand + spelling variants
+- \`us/market/keywords/category.md\` — top category phrases (red ocean)
+- \`us/market/keywords/competitor.md\` — competitor names + "alt" forms
+- \`us/market/keywords/pain.md\` — "how to fix X" phrases
+- \`us/market/keywords/long-tail-decision.md\` — "best X for <vertical>
+  team of <size>" — usually empty, flag as a P1 to fill
+- \`us/market/keywords/reverse.md\` — "why X is slow" / "problems with X"
+  for the top competitor — auto-seeded with 10-20 phrases mined this
+  run from Reddit/SO/HN (call \`reverse-keyword-mine\` if Apify is
+  set; otherwise leave a TODO with example phrases)
+- \`us/market/geos.md\` — language-circle × downstream-paying-market
+  mapping. Pre-fill with the inferred geo footprint from Step 2
+- \`us/market/onboarding-funnel.md\` — 5-layer template
+  (signup / value-moment / first-action / habit / paid). Empty rates
+  initially; will fill on first \`onboarding-five-layer-audit\` run
+- \`us/brand/forbidden-words.md\` — preset list (leverage / synergy /
+  empower / unlock / best-in-class / world-class / cutting-edge /
+  seamless / next-generation / disruptive / revolutionary /
+  game-changing / one-stop / mission-critical) — extends every
+  draft + audit downstream
+
+## Step 5 — Cite + fail-safe + reply
+
+- Cite sources inline (URLs) for every factual claim. Where the site
+  doesn't say, write \`unknown\` — never invent.
+- For every file written, also write its source URL list at the end
+  under \`_Sources:_\` so future readers can audit.
+- Reply with:
+  1. **What's filled** — three bullets covering the strongest sections
+  2. **Lowest-confidence sections** — flagged for the user to verify
+  3. **Biggest single gap** — usually \`us/strategy/north-star.md\`
+     or the long-tail-decision keyword class — and which downstream
+     skill unblocks once the gap is filled
+  4. **Suggested next 3 runs** — usually \`reverse-keyword-mine\` for
+     the top competitor, \`competitor-radar\` to start the diff log,
+     and \`onboarding-five-layer-audit\` once the user has 4+ weeks of
+     signups
 `,
 
   'import-legacy-org.md': `---
@@ -1904,7 +1996,7 @@ agent: researcher
 inputs: [{ name: source_dir, required: true }]
 ---
 
-Port a legacy apidog-team-style /org/ + /marketing/branding/ directory
+Port a legacy /org/ + /marketing/branding/ directory layout
 into this context's \`us/\` subfolder structure.
 
 ## Steps
@@ -2562,9 +2654,8 @@ Daily industry news scan.
 `,
 
   // === Apify-driven scans (heavier, BYOK) ==================================
-  // These five skills shipped from the apidog-team pipelines as
-  // vendor-neutral capabilities every context gets. They each call Apify
-  // actors via scrape_apify_actor (needs APIFY_API_TOKEN in
+  // Five vendor-neutral capabilities every context gets. They each call
+  // Apify actors via scrape_apify_actor (needs APIFY_API_TOKEN in
   // .bm/integrations.json → mirrored to <context>/.env), filter the raw
   // results, write a dated note under signals/, and call the channel-
   // agnostic `notify` tool which fans out to whatever messaging
@@ -2839,21 +2930,22 @@ inputs:
   - { name: auth_hint, required: false, description: "Auth scheme: 'bearer', 'basic user:pass', 'api-key X-Api-Key: …', or 'cookie'. Leave blank if endpoints are public." }
   - { name: routes_hint, required: false, description: "Optional: path to the routes/ folder or an openapi.yaml the skill should parse." }
 requires:
-  cli: [apidog-cli, node]
+  cli: [hurl]
 ---
 
 Generate and run a comprehensive API test suite against \`{{base_url}}\`
-using \`apidog-cli\` — a free, open-source CLI (\`npm install -g
-apidog-cli\`). No account, no platform account needed. Works against any
-REST/GraphQL backend.
+using \`hurl\` — a free, open-source HTTP testing CLI (Apache-2.0,
+written in Rust, install via \`brew install hurl\` /
+\`cargo install hurl\` / Linux package manager). No account, no
+platform required. Works against any REST/GraphQL backend.
 
 ## Pre-flight
 
 - Confirm with the user: base URL, auth scheme (Bearer / Basic / API
   key / cookie), and where the routes live (codebase path or OpenAPI
   spec). If \`{{auth_hint}}\` / \`{{routes_hint}}\` are set, use them.
-- Detect if \`apidog-cli\` is installed; if not, tell the user to run
-  \`npm install -g apidog-cli\` and stop.
+- Detect if \`hurl\` is installed (\`hurl --version\`); if not, tell the
+  user to install it (\`brew install hurl\` on macOS) and stop.
 
 ## Steps
 
@@ -2870,29 +2962,35 @@ REST/GraphQL backend.
    (missing required / invalid values), wrong method (405), not-found
    (404), happy path (200-2xx). Favor table-driven coverage over
    depth.
-3. **Emit scenarios.** Write JSON test files to
-   \`tests/api/<endpoint-slug>.json\` matching the apidog-cli schema.
-   One file per endpoint keeps diffs small. Include \`variables\` for
-   the base URL + auth so the same files work in dev/staging/prod.
-4. **Run.** Emit a shell command the user can execute:
+3. **Emit scenarios.** Write \`.hurl\` files to
+   \`tests/api/<endpoint-slug>.hurl\`, one file per endpoint. Each file
+   uses Hurl's plain-text DSL (HTTP request + \`HTTP <status>\` +
+   \`[Asserts]\` block). Reference variables as \`{{base_url}}\`,
+   \`{{token}}\`, etc. so the same files work in dev/staging/prod.
+4. **Emit env files.** Write \`tests/api/dev.env\` (and staging/prod
+   variants) with one \`key=value\` line per variable. \`hurl\` reads
+   these via \`--variables-file\`.
+5. **Run.** Emit a shell command the user can execute:
    \`\`\`
-   apidog-cli run tests/api/*.json --env dev --report html
+   hurl --variables-file tests/api/dev.env --test \\\\
+        --report-html report/ tests/api/*.hurl
    \`\`\`
    Capture the exit code + report path in your reply.
-5. **Summarize.** Table of: endpoint / scenarios run / passed / failed
-   / notes. If any scenario failed, name the specific expectation that
+6. **Summarize.** Table of: endpoint / scenarios run / passed / failed
+   / notes. If any scenario failed, name the specific assertion that
    missed.
 
 ## When to use
 Anytime the user says: "test my API", "generate API tests", "validate
 auth flows", "write a test suite", "check my endpoints", or has just
-finished a backend change. Don't limit to Apidog users — apidog-cli
-works against any HTTP API.
+finished a backend change. Hurl is single-binary and CI-friendly, so
+the same suite runs locally and in GitHub Actions / GitLab CI without
+extra glue.
 `,
 
   // === KOL discovery pipeline =============================================
-  // Creator-marketing loop generalized from the apidog-team kol-pipeline
-  // scripts. Three-step loop users can run end-to-end or piece by piece.
+  // Creator-marketing discover → score → draft loop. Three-step loop
+  // users can run end-to-end or piece by piece.
   'kol-discover.md': `---
 kind: skill
 name: kol-discover
@@ -4294,6 +4392,903 @@ is cheap.
 - The resource (prompts / playbook) is the actual product — the post
   is the distribution wrapper. Don't post without one.
 `,
+
+  // === Operations & data hygiene (distilled from a 13-month dev-tools growth playbook) ===
+
+  'weekly-data-review.md': `---
+kind: skill
+name: weekly-data-review
+group: building-blocks
+agent: researcher
+inputs:
+  - { name: period, required: false, description: "ISO week or date range. Default: last completed ISO week." }
+  - { name: dashboard, required: false, description: "Metabase dashboard id, BigQuery saved query, or path to a CSV in context. Default: us/market/data-sources.md primary." }
+requires:
+  optional_integrations: [metabase, bigquery, supabase]
+---
+
+Run the operational data review for {{period}}. Produce a report whose every section opens with a one-line **judgment**, not raw tables.
+
+## Pre-flight
+
+- Read \`us/market/data-sources.md\` (or the path in {{dashboard}}). It should describe the North-Star metric, the activation event, and the cohort definition.
+- Read \`signals/skills.md\` if present — sustained findings, source-id mappings, and previously-corrected conclusions live here.
+
+## Three-step anomaly diagnosis (do not skip a step)
+
+1. **Cohort maturity.** If part of the period hasn't finished its activation window, mark the read as immature. Default rule: a 3-day-active cohort run on Monday is missing the late-week backfill (~43% of the late-period cohort matures after the run date). Wait or note the upper-bound revision.
+2. **Single-week pulse.** If a channel spiked or dropped for an observable reason (campaign launch, holiday, outage, viral moment), tag it as a pulse and **exclude from baseline trend**.
+3. **Structural change.** Only after 1 + 2 are excluded. A structural verdict requires the move to persist 3+ weeks above noise.
+
+## Report format
+
+Each channel section follows:
+
+\\\`\\\`\\\`
+## Channel: <name>
+Verdict: <one sentence>
+Volume: <abs + WoW %>
+Effective rate: <abs + WoW pts>
+Action: <P0/P1/P2 — owner — by-when>
+\\\`\\\`\\\`
+
+## WoW arithmetic
+
+- Volume changes report as **percent**.
+- Rate changes report as **points** ("rate WoW = -2 pts"), never as percent-of-percent. Mixing the two is the most common mis-read.
+
+## Number-source annotation (mandatory)
+
+Every figure in the output is tagged:
+- \\\`[U]\\\` user-supplied
+- \\\`[L]\\\` live pull this run
+- \\\`[H]\\\` historical reference (give the run date)
+- \\\`[I]\\\` inferred — clearly marked
+
+## Loop back
+
+After delivering the report, append to \\\`signals/skills.md\\\`:
+- New source/card/dataset names used
+- Any gotcha encountered (e.g. a card mixes monthly + weekly grain)
+- Conclusions corrected from prior runs
+
+## Reply
+
+- One-sentence dashboard verdict
+- Top 3 actions ranked P0/P1/P2 with owner + by-when
+- Items deferred to next week's mature-cohort recheck
+`,
+
+  'attribution-five-field-scan.md': `---
+kind: skill
+name: attribution-five-field-scan
+group: building-blocks
+agent: researcher
+inputs:
+  - { name: keyword, required: true, description: "Partner/campaign/KOL slug to look for, e.g. 'partner-acme' or 'newsletter-q3'." }
+  - { name: since, required: false, description: "ISO date. Default: 90 days ago." }
+requires:
+  optional_integrations: [metabase, bigquery, supabase]
+---
+
+Measure the real reach of a partner/KOL/co-marketing push by scanning **five attribution fields**, not just utm_campaign. The most common mistake in partnership measurement is reading utm_campaign alone, which understates lift by 2-5x because referrer auto-stamps and landing-url paths capture traffic that never had a campaign tag set.
+
+## Steps
+
+1. Pull a SQL query against the user-tracking table since {{since}}. Match {{keyword}} (case-insensitive) against **all five** of:
+   - \\\`utm_campaign\\\`
+   - \\\`utm_source\\\`
+   - \\\`utm_medium\\\`
+   - \\\`referrer\\\`
+   - \\\`landing_url\\\`
+2. Dedupe by \\\`device_id\\\` (or user-id if device-id isn't tracked) before counting. Multi-touch should not double-count.
+3. Break down the result by:
+   - which field the match fired on (campaign vs referrer vs landing-url)
+   - country
+   - the activation event rate (if available)
+4. Compare to a utm_campaign-only count to expose the gap.
+
+## Report
+
+\\\`\\\`\\\`
+## Partner: {{keyword}}
+Five-field unique users: <n>  (utm_campaign-only would have shown: <m>)
+Field breakdown:
+  utm_campaign:  <n>
+  utm_source:    <n>
+  utm_medium:    <n>
+  referrer:      <n>
+  landing_url:   <n>
+Top countries: <list>
+Activation rate (if measurable): <%>
+\\\`\\\`\\\`
+
+## Why this matters
+
+A KOL or newsletter partner who got attributed only via referrer (because they shared a clean URL) will show as zero in a utm_campaign-only report. That's how teams accidentally kill upstream brand channels. Use this scan before any "this partner isn't working" decision.
+`,
+
+  'kol-geo-audit.md': `---
+kind: skill
+name: kol-geo-audit
+group: creator-marketing
+agent: researcher
+inputs:
+  - { name: kol, required: true, description: "KOL handle, channel URL, or contacts/<file>.md path." }
+  - { name: target_markets, required: false, description: "Comma-separated country codes that map to the team's high-paying markets. Default: us/market/icp.md target_geos." }
+---
+
+Pre-deal hard verification: confirm the KOL's **audience geography**, which is not the same as the **creator's** geography. The 2024+ trap on English-language YouTube/TikTok dev channels is that audiences skew heavily toward whichever country over-indexes on platform consumption, regardless of where the creator sits.
+
+## Steps
+
+1. Resolve {{kol}} to a profile + channel URL. Read \\\`us/market/icp.md\\\` for the high-paying market list (default: US, UK, DE, JP, KR, CA, AU).
+2. **Ask the KOL for** Top Countries + Top Languages from their analytics dashboard, last 90 days. Refusing to share = automatic pass.
+3. **Sample the comments**: pull the most recent 20 comments from 3 representative posts. Tag each commenter's apparent country/language. Compare against the analytics screenshot.
+4. **Pull historical attribution**: if we've seen any prior traffic from this KOL, run \\\`attribution-five-field-scan\\\` on their slug and check country distribution.
+
+## Three-tier geo SLA
+
+| Stage | Threshold (high-paying-7 combined) |
+|-------|-----------------------------------|
+| Entry filter | ≥ 30% — minimum to keep the conversation going |
+| Pre-sign hard | ≥ 40% with single-US ≥ 25% and single-IN ≤ 20% |
+| Renewal at 90 days | ≥ 50%, language-circle adjusted |
+
+## Decision
+
+- All three checks pass → proceed to evaluation.
+- Comment sample contradicts the analytics screenshot → pass; the analytics is curated.
+- Pre-sign hard threshold not met → pass with template-A rejection (see \\\`partner-evaluation-5day\\\` step 5).
+- Cannot get analytics → pass.
+
+## Reply
+
+\\\`\\\`\\\`
+## KOL: {{kol}}
+Audience top countries: <list with %>
+High-paying-7 share: <%>
+Single-US: <%>  Single-IN: <%>
+Comment sample agrees: yes / no
+Verdict: PROCEED / PASS / NEEDS-MORE-DATA
+Reason: <one sentence>
+\\\`\\\`\\\`
+`,
+
+  'partner-evaluation-5day.md': `---
+kind: skill
+name: partner-evaluation-5day
+group: creator-marketing
+agent: researcher
+inputs:
+  - { name: contact_path, required: true, description: "contacts/<file>.md path for the partner who pitched." }
+  - { name: ask_amount, required: false, description: "Their asking price (USD). If absent, ask the user." }
+---
+
+Evaluation flow for an inbound KOL/sponsorship/co-marketing pitch. **Never reply yes/no in under 5 working days.** Premature answers either commit money to a wrong fit or burn a relationship that might mature.
+
+## Day 1 — info collection
+
+Read \\\`{{contact_path}}\\\`. From the pitch + their site/profile, fill:
+- channel/audience size
+- content cadence
+- past brand collaborations (links to actual posts/videos)
+- ask: format (sponsored video / newsletter / banner / annual / package)
+- exclusivity asks
+- delivery timeline
+
+If past collabs are missing or hidden, ask once. No-answer in 48h = pass.
+
+## Day 2 — hard verification
+
+For non-English creators (audience tracks creator geography): comment-sample 20 + ask the user if the language ring has a downstream paying market.
+
+For English creators: run \\\`kol-geo-audit\\\` ({{contact_path}}). Default-pass anyone who can't or won't supply analytics.
+
+## Day 3 — historical scan
+
+Run \\\`attribution-five-field-scan\\\` against any past mentions of the partner (their slug, prior collab utm tags, their domain). If they've sent us measurable traffic before — even one or two converters — that's far stronger than a forecast.
+
+## Day 4 — CAC + touch-form
+
+Compute the worst-case CAC by their ask:
+- ask / lower-bound estimated registrations
+- ask / lower-bound activated users
+- compare to current paid-ads CPA at the same target audience
+
+Then judge by **touch form**, not by person:
+- newsletter sponsorship (active subscription) ≫ social-pkg (passive feed scroll)
+- sponsored deep-content (long-tail SEO) ≫ one-shot impression
+- annual lock-in = automatic pass on first deal
+
+## Day 5 — decision + draft
+
+Decide: **trial** (small one-off with SLA), **defer** (return when localization or product-fit catches up), or **decline**.
+
+Draft the reply via \\\`draft_create\\\`. For trials, attach the SLA template:
+- registration floor
+- 3-tier geo (30/40/50 — see kol-geo-audit)
+- 30-day retention floor
+- CAC cap (paid-ads CPA × 1.5)
+- independent utm_campaign naming
+- separate landing page if vertical-targeting
+- staged payment (50/50 or 30/30/40), tail withheld until SLA met
+
+For declines, use a relationship-warm template: cite a strategic shift, not a quality gap; offer a low-cost technical hook ("deep-dive technical collaboration") for future re-engagement; close with a personalized note about a recent piece of their work.
+
+## Reply
+
+A one-paragraph verdict + the draft path. Format the verdict as:
+> "<partner> — <verdict>. Reason: <data>. If trial, SLA: <thresholds>; if not met, no tail payment."
+`,
+
+  'upstream-brand-aware-track.md': `---
+kind: skill
+name: upstream-brand-aware-track
+group: signals
+agent: researcher
+inputs:
+  - { name: channel, required: true, description: "The upstream channel slug (e.g. 'blog', 'kol-anna', 'newsletter-q3') we're trying to attribute." }
+  - { name: language_circle, required: false, description: "Optional. ISO country codes that share the same brand awareness pool (e.g. 'EG,SA,AE,KW' for Arabic). Default: derive from us/market/geos.md." }
+requires:
+  optional_integrations: [metabase, bigquery, supabase, gsc]
+---
+
+Track an upstream brand-seeding channel by **brand-aware traffic share**, not by last-touch CAC. Last-touch underrates upstream channels because the user who first saw the brand on a podcast/blog often returns weeks later via direct/branded-search/invite — and that path attributes to direct, not to the podcast.
+
+## Steps
+
+1. Pull a 12-month monthly series for {{language_circle}} (or globally) of:
+   - direct share (\\\`utm_source = 'direct'\\\` or referrer empty)
+   - invite share (referrals from existing users)
+   - branded-search share (from GSC: queries containing the brand name)
+   - total absolute volume
+2. Plot the trio (direct + invite + branded-search) as a single brand-aware percentage stacked over total. Mark the run date of each upstream-channel investment on the timeline (when {{channel}} went live, when budget was bumped, when content shipped).
+3. Look for **lag effect**: brand-aware share typically responds 3-6 months after upstream investment, not the same month.
+4. Pay attention to **trough patience**: brand-aware share for any single language circle is seasonal. A 6-month trough does not mean the channel is dead. Don't kill on a trough.
+
+## Output
+
+\\\`\\\`\\\`
+## {{channel}} — brand-aware lag tracker
+Geo: {{language_circle}}
+12-month brand-aware %: <chart-style numbers, month-by-month>
+Channel investments overlay: <dates>
+Apparent lag: <N months>
+Trough patience: <N months observed>
+Verdict: COMPOUNDING / FLAT / TROUGH (do not cut) / DEAD (cut)
+\\\`\\\`\\\`
+
+## Kill criteria
+
+- Brand-aware share has been flat or falling for 12+ months despite continued investment, AND
+- No measurable spillover into a paying-market sub-circle, AND
+- The trough explanation is exhausted (we've waited a full season cycle)
+
+Otherwise: keep funding, even if last-touch CAC looks bad.
+`,
+
+  'reverse-keyword-mine.md': `---
+kind: skill
+name: reverse-keyword-mine
+group: content
+agent: researcher
+inputs:
+  - { name: competitor, required: true, description: "Competitor name to mine reverse-intent traffic against." }
+  - { name: count, required: false, description: "Number of articles to surface. Default 25." }
+requires:
+  integrations: [apify]
+  us_files: [us/market/competitors.md]
+---
+
+Mine **reverse-intent keywords** for {{competitor}} — phrases like "why <competitor> is slow", "problems with <competitor>", "<competitor> issues", "alternatives to <competitor>". Reverse-intent traffic typically converts at 3-5x the rate of generic top-of-funnel traffic because the searcher has already churned out of trust.
+
+## Steps
+
+1. Build the seed query bundle:
+   - "why {{competitor}} is slow"
+   - "{{competitor}} problems"
+   - "{{competitor}} not working"
+   - "alternatives to {{competitor}}"
+   - "{{competitor}} issues"
+   - "{{competitor}} migration"
+   - "moving off {{competitor}}"
+   - "{{competitor}} pricing too expensive"
+2. For each query, \\\`scrape_apify_actor({ actorId: "apify/google-search-scraper", input: { queries: [<q>], resultsPerPage: 30 } })\\\`. Add a complementary pass with site filters: \\\`site:reddit.com\\\`, \\\`site:stackoverflow.com\\\`, \\\`site:news.ycombinator.com\\\`.
+3. From the SERP results, extract genuine pain phrases (not marketing-page titles). Rank by:
+   - Reddit/SO/HN thread rank (community pain > marketing pain)
+   - Recency (pain from the last 90 days > old gripes)
+   - Specificity (a versioned bug is more actionable than a vague complaint)
+4. For each top pain, draft a 1-line article angle that solves the pain in our product without name-shaming. The structure: hook ("X drops on Y workload"), agitation ("here's why"), our path ("how we approach Y"), comp section ("vs <competitor> for Y").
+
+## Output
+
+A backlog table:
+
+\\\`\\\`\\\`
+| Pain phrase | Source | Rank | Angle |
+|-------------|--------|------|-------|
+| ...         | ...    | ...  | ...   |
+\\\`\\\`\\\`
+
+Saved to \\\`signals/seo/reverse-keywords-{{competitor}}-<YYYY-MM-DD>.md\\\` with {{count}} ranked rows.
+
+## Why this works
+
+Top-of-funnel keywords ("best X tool") are saturated and have low conversion because the searcher hasn't formed a preference yet. Reverse-intent keywords mean the searcher already has a preference and is actively shopping for an alternative — much higher conversion at much smaller volume.
+`,
+
+  'cta-repurpose-low-intent.md': `---
+kind: skill
+name: cta-repurpose-low-intent
+group: content
+agent: researcher
+inputs:
+  - { name: page_path, required: true, description: "Path or URL of the page to audit. Often a how-to or 'free X' page with high traffic but low conversion." }
+  - { name: variants, required: false, description: "Number of CTA variants to draft. Default 3." }
+requires:
+  optional_integrations: [gsc, ga4]
+---
+
+For a page with high traffic and low conversion (typically a how-to or "free X / unlock Y" page), **don't kill the page** — repurpose its CTA. The page earns the search ranking; redirecting or deleting it loses the ranking. Replacing the CTA captures a fraction of the traffic that was always going to convert.
+
+## Steps
+
+1. Fetch the current page content for {{page_path}}. Read its meta title, H1, intro, and existing CTA placements.
+2. Pull the page's GA4 / GSC stats if available: monthly sessions, average time on page, current CTA click rate.
+3. Identify the **dominant intent** of the visitor: 80% are likely there for the "free X" — they will not convert no matter what. The 20% remaining may be open to a paid solution if the CTA matches their actual problem.
+4. Draft {{variants}} mid-page CTA variants. Each must:
+   - Sit between the explanation of the free path and the limit of the free path
+   - Frame the paid solution as the next step when the free path runs out, not as the alternative
+   - Have a unique \\\`utm_content=cta_v<n>\\\` for split testing
+5. Draft a footer CTA that summarizes the upgrade path for the 20% who got value from the article and want more.
+
+## A/B plan
+
+- Split the traffic 33/33/33 across the three variants for a minimum of 14 days or until each variant has 200+ pageviews, whichever comes later.
+- Track \\\`utm_content\\\` through to activation, not just click.
+- Pick the winner on activation rate, not click rate. Click-bait CTAs win clicks but lose downstream.
+
+## Output
+
+\\\`\\\`\\\`
+## Page: {{page_path}}
+Current CTA performance: <click rate>, <activation rate>
+Variant A: <body> (utm_content=cta_v1)
+Variant B: <body> (utm_content=cta_v2)
+Variant C: <body> (utm_content=cta_v3)
+Test setup: 33/33/33, ≥14 days, judge on activation rate.
+\\\`\\\`\\\`
+`,
+
+  'new-competitor-7-angle-burst.md': `---
+kind: skill
+name: new-competitor-7-angle-burst
+group: content
+agent: researcher
+inputs:
+  - { name: competitor, required: true, description: "The new competitor name." }
+  - { name: domain, required: false, description: "Their domain. If absent, web_search to find it." }
+---
+
+When a brand-new competitor lands in {{period}} (Day 0 to Month 1 — they've just launched, posted on HN, hit Product Hunt), ship **7 SERP-position-defending articles** within one week. The window closes fast. After Month 3 the natural alternative-comparison searches are dominated by whichever blogger ranked first.
+
+The seven angles, in the order to ship them:
+
+1. **{{competitor}} review** — first-person, balanced, shipped within 72h
+2. **{{competitor}} alternatives** — listicle that includes us in position 1-3
+3. **{{competitor}} vs <us>** — head-to-head, no name-shaming
+4. **{{competitor}} vs <main competitor>** — positions us as the implicit third option
+5. **{{competitor}} limitations** — what their architecture can't do (verifiable)
+6. **migrate from {{competitor}} to <us>** — practical guide if early users want to leave
+7. **{{competitor}} pricing** — the real-cost analysis, especially per-seat at scale
+
+## Steps
+
+1. \\\`web_fetch\\\` {{competitor}}/pricing and the home page. Capture verifiable claims (price points, plan limits, supported integrations).
+2. \\\`scrape_apify_actor({ actorId: "apify/website-content-crawler", ... })\\\` to map their docs structure for the limitations and migration pieces.
+3. For each of the 7 angles, output a brief in \\\`signals/seo/{{competitor}}-burst/<n>-<slug>.md\\\` containing:
+   - Working H1 + meta
+   - Outline (5-8 H2s)
+   - Three concrete claims with sources
+   - The CTA hook (where do we land them in the funnel?)
+   - Estimated word count
+
+## Why the urgency
+
+Search engines reward the first decent answer to a new query class. Shipping 7 angles in the first week means we own the long-tail SERP for "{{competitor}} <anything>" queries before any third-party reviewer ranks. Ship-time matters more than polish here; iterate after.
+
+## Reply
+
+The 7 brief paths + the recommended ship order with dates.
+`,
+
+  'six-class-keyword-matrix.md': `---
+kind: skill
+name: six-class-keyword-matrix
+group: content
+agent: researcher
+inputs:
+  - { name: category, required: true, description: "The category we want to own (e.g. 'API design tool', 'B2B GTM platform')." }
+  - { name: depth, required: false, description: "How many keywords per class. Default 8." }
+requires:
+  integrations: [apify]
+---
+
+Build a six-class keyword backlog for {{category}}. The classes have very different conversion dynamics; treating them as a single SEO pile is the most common reason backlogs underperform. The expected effective rate is ordered:
+
+1. **Reverse-intent** ("why X is slow") — highest conversion, lowest volume per query
+2. **Long-tail decision** ("best X for <vertical> team of <size>") — high conversion, high research time
+3. **Pain-point** ("how to fix <competitor> Y error") — high conversion, repeatable template
+4. **Competitor** ("<competitor> alternatives") — saturated for big competitors, blue ocean for new ones
+5. **Brand** (own brand, competitor brand reviews) — high conversion, low volume, defensive
+6. **Category** ("best <category>") — highest volume, lowest conversion, mostly red ocean
+
+## Steps
+
+1. Read \\\`us/market/competitors.md\\\` to get the competitor list. Read \\\`us/market/icp.md\\\` for the verticals + team sizes that map to {{category}}.
+2. For each class, generate {{depth}} candidate phrases. Use \\\`web_search\\\` for class 5 + 6 to confirm volume; for classes 1-3, use \\\`reverse-keyword-mine\\\` and \\\`scrape_apify_actor\\\` against \\\`site:reddit.com\\\` and \\\`site:stackoverflow.com\\\`.
+3. Score each candidate on a P0/P1/P2 priority:
+   - Demand evidence (forum threads, search volume, GSC impressions)
+   - Our credibility to answer (do we have product, customer evidence, opinion?)
+   - SERP gap (are competitors already top-3?)
+4. Output a single backlog file at \\\`signals/seo/{{category}}-matrix-<YYYY-MM-DD>.md\\\` with the 6 class headers and rows like:
+
+\\\`\\\`\\\`
+| Class | Phrase | Priority | Demand evidence | Credibility | SERP gap |
+|-------|--------|----------|-----------------|-------------|----------|
+\\\`\\\`\\\`
+
+## Common mis-use
+
+Teams over-invest in class 6 (highest volume) and under-invest in classes 1-3 (highest conversion). The right ratio for a small team is roughly: 30% reverse + pain + long-tail decision, 40% competitor + brand, 30% category. Adjust by stage.
+`,
+
+  'weekly-skills-loop.md': `---
+kind: skill
+name: weekly-skills-loop
+group: building-blocks
+agent: researcher
+inputs: []
+---
+
+Meta-skill: maintain a running \\\`signals/skills.md\\\` file that captures every recoverable lesson from operations work. The principle: **making a mistake once is cheap; making the same mistake twice is the expensive part**.
+
+## When to call this
+
+- After every weekly-data-review run.
+- After every partner-evaluation-5day decision.
+- After every reverse-keyword-mine that produced a backlog.
+- Whenever the user says "we just learned that..." or "remind me next time..."
+
+## Read-then-write contract
+
+1. **Always read** \\\`signals/skills.md\\\` before writing. If it exists, the new entry is appended; existing entries are updated in place when the new finding refines an old one.
+2. **Always preserve** the structure: a Conventions section, a Card/Source mapping section, a Gotchas section, and a Corrected Conclusions section.
+
+## Entry format
+
+Each new entry includes:
+- Date the lesson was learned
+- One-line summary
+- The mistake it's preventing (so future readers can pattern-match)
+- The data that proves the lesson (link to the run, the dashboard, the decision)
+
+## Corrected-conclusions discipline
+
+When a previous conclusion turns out wrong, **don't delete it**. Add a "→" pointing at the new conclusion. Future readers benefit from seeing the path, not just the destination. Example:
+
+\\\`\\\`\\\`
+- 2025-01: "channel X has bad CAC, kill it" → 2025-04: "X is upstream brand-seeding; CAC was last-touch. Kept funded; brand-aware lifted 3 months later."
+\\\`\\\`\\\`
+
+## Reply
+
+A one-paragraph summary of what was appended this run, plus the line count of the resulting \\\`skills.md\\\` (so the user can see the file growing).
+`,
+
+  'touch-form-roi-check.md': `---
+kind: skill
+name: touch-form-roi-check
+group: creator-marketing
+agent: researcher
+inputs:
+  - { name: pitch, required: true, description: "Free-text description of the offer, or contacts/<file>.md path to the partner who pitched." }
+---
+
+Quick decision filter for any partnership/sponsorship pitch: judge by **touch form**, not by the person. Two pitches at the same dollar amount from the same creator can have order-of-magnitude different ROI depending on how the audience encounters the placement.
+
+## The hierarchy (best → worst)
+
+1. **Active subscription** — newsletter sponsorship, paid community placement. The audience opted in and is actively reading. Highest intent.
+2. **Search-discovered evergreen** — sponsored long-form (deep blog post, YouTube tutorial) that ranks for a real query for years. Compounds.
+3. **Product-relevant feed post on a topic-tight account** — niche Twitter/LinkedIn account where everyone follows for one specific thing.
+4. **Branded podcast read inside a relevant episode** — listener is paying attention but it's a passive moment.
+5. **Generic feed scroll** — Instagram/TikTok story, generalist creator's main feed. Audience is half-distracted, intent is near zero.
+6. **One-shot conference banner / hackathon swag** — high price, untrackable, audience is there for something else.
+
+## Steps
+
+1. Parse {{pitch}}. Identify the proposed touch form(s). If it's a package, list each component separately.
+2. For each component, classify into the tier above (1-6).
+3. Estimate audience intent on a 0-10 scale per component:
+   - Did they actively choose to consume? (subscription/search > algorithm push)
+   - Is the surrounding content topic-tight? (a niche newsletter > a generalist's roundup)
+   - Is the placement trackable? (CPC measurable > pure brand impression)
+4. Compute a weighted estimate: highest-tier components dominate the recommendation.
+5. Recommend trial / re-negotiate / pass:
+   - Tier 1-2 dominant: trial.
+   - Tier 3-4 dominant: re-negotiate to drop the lower-tier components, keep the upper-tier ones at their per-unit price.
+   - Tier 5-6 dominant: pass, regardless of total price.
+
+## Reply
+
+\\\`\\\`\\\`
+## Pitch: <one-line summary>
+Touch-form breakdown:
+  - <component>: tier <n>, intent score <0-10>
+Recommendation: TRIAL / RENEGOTIATE / PASS
+Reasoning: <one sentence>
+If renegotiate: drop <list>, keep <list> at <per-unit estimate>
+\\\`\\\`\\\`
+
+## Why this matters
+
+Most "this KOL didn't perform" post-mortems are actually "this **touch form** didn't perform" stories. The same creator's newsletter and feed post deliver radically different conversion rates; treating them as one thing produces wrong learnings.
+`,
+
+  'language-circle-targeting.md': `---
+kind: skill
+name: language-circle-targeting
+group: research
+agent: researcher
+inputs:
+  - { name: candidate_language, required: true, description: "Language we're considering investing content/KOL in (e.g. 'pt', 'ar', 'ko')." }
+requires:
+  us_files: [us/market/icp.md, us/market/geos.md]
+---
+
+Decide whether {{candidate_language}} is worth investing in for content + KOL seeding. The trap: language reach is not the same as paying-customer reach. Some languages have a downstream paying market, others are self-contained, others have no paying market at all.
+
+## Steps
+
+1. Read \\\`us/market/icp.md\\\` and \\\`us/market/geos.md\\\` for current paying-market footprint.
+2. Map {{candidate_language}} to its **downstream paying markets** (the countries/segments where speakers convert at price-point parity, not just where they exist):
+   - Arabic → high-paying GCC sub-circle (Saudi Arabia, UAE, Qatar, Kuwait), even though source content tends to come from Egypt.
+   - Spanish → Spain + Mexico tier 1, broader LatAm tier 2 with caveats on payment infrastructure.
+   - Portuguese → Brazil dominates volume; Portugal is small but high-paying.
+   - Korean → Korea + sizable expat communities in Southeast Asia + US tech.
+   - Japanese → mostly self-contained (Japan); high pricing, low spillover.
+   - French → France + Maghreb diaspora + Quebec.
+   - German → DACH (Germany, Austria, Switzerland), self-contained, very high pricing.
+   - Smaller / single-country languages (e.g. Polish, Czech, Vietnamese, Indonesian) → self-contained; treat investment ROI as bounded by that one market's TAM.
+3. Score the candidate on three axes:
+   - **TAM** of the downstream paying market(s) (1-5)
+   - **Spillover effect** to a high-paying-market sub-circle (0-3)
+   - **Localization cost** (product UI, billing, support) on a 1-5 scale (lower is cheaper)
+4. Compute investment ROI = (TAM + spillover) / localization-cost. > 2.0 = invest, 1.0-2.0 = pilot, < 1.0 = skip.
+
+## Reply
+
+\\\`\\\`\\\`
+## Language: {{candidate_language}}
+Downstream paying markets: <list>
+TAM score: <1-5>  Spillover score: <0-3>  Localization cost: <1-5>
+Investment ROI: <decimal>  Verdict: INVEST / PILOT / SKIP
+Recommended seeding move: <KOL / blog / community>, <region/persona>
+\\\`\\\`\\\`
+
+## Anti-pattern
+
+Investing heavily in content/KOLs in language circles whose speakers don't convert at our price point. The cheap traffic looks great in dashboards and ruins the activation/conversion mix. Better to skip a language entirely than to pollute the funnel with non-payers.
+`,
+
+  'onboarding-five-layer-audit.md': `---
+kind: skill
+name: onboarding-five-layer-audit
+group: building-blocks
+agent: researcher
+inputs:
+  - { name: cohort, required: false, description: "ISO date range to scope the cohort. Default: signups in the last 4 weeks." }
+requires:
+  optional_integrations: [metabase, bigquery, supabase, mixpanel, amplitude, posthog]
+---
+
+Audit the activation funnel through five layers. Most teams optimize whichever layer is loudest in dashboards; the right move is to find the **worst** layer per dollar of fix-it effort and start there.
+
+## The five layers
+
+1. **Signup → Value moment seen.** User reached the point where the product's promise is visible (saw the first generated artifact / dashboard / output). Common kill: account creation → email verification → blank state with no example.
+2. **Value moment → First action.** User actually clicked / typed / uploaded / connected something. Kill: no obvious next step, "what do I do here?".
+3. **First action → Aha (functional success).** First action returned the real outcome the user wanted, not a demo. Kill: feature works on toy data, fails on real data.
+4. **Aha → Habit checkpoint (D7 / D14 active).** User comes back. Kill: nothing pulls them back — no email, no notification, no scheduled output.
+5. **Habit → Paid conversion.** User upgrades. Kill: pricing surprise, missing enterprise feature, no champion in their org.
+
+## Steps
+
+1. Pull the cohort {{cohort}}. For each user, mark which of the five layers they reached (highest layer cleared).
+2. Compute the layer-to-layer transition rates. Compare to whatever benchmark exists in \\\`signals/skills.md\\\` from prior audits.
+3. Identify the worst transition (largest drop relative to its prior-audit baseline). Don't pick the absolute lowest rate — pick the **regression**.
+4. For the worst transition, generate three hypotheses for the cause:
+   - Product (something changed in the flow)
+   - Acquisition mix (new channel brings worse-fit users)
+   - Seasonal (industry-wide effect)
+5. Propose the cheapest hypothesis-test for each, in priority order.
+
+## Reply
+
+\\\`\\\`\\\`
+## Onboarding audit — cohort {{cohort}}
+Transition rates:
+  L1 → L2: <%> (vs prior audit <%>, delta <pts>)
+  L2 → L3: ...
+  ...
+Worst regression: L<n> → L<n+1>, delta <pts>
+Hypotheses:
+  1. <product / mix / season> — testable by: <cheapest experiment>
+  2. ...
+Recommended first move: <one-sentence>
+\\\`\\\`\\\`
+
+## Loop
+
+Append the layer transition rates to \\\`signals/skills.md\\\` so the next audit has a baseline to regress against.
+`,
+
+  'pricing-by-purchasing-power.md': `---
+kind: skill
+name: pricing-by-purchasing-power
+group: research
+agent: researcher
+inputs:
+  - { name: target_country, required: true, description: "ISO country code we're considering local pricing for." }
+  - { name: home_price_usd, required: true, description: "The home-market USD list price for the SKU." }
+requires:
+  us_files: [us/product/pricing.md]
+---
+
+Generate a localized price recommendation for {{target_country}} that respects local purchasing power without inviting VPN arbitrage.
+
+## Reference points
+
+- World Bank GNI-per-capita (PPP-adjusted) ratios are the cleanest baseline. A country at 30% of US PPP can typically support 30-40% of US list price for software.
+- Stripe / Paddle have published ratios per market; cross-check.
+- Local competitor pricing in {{target_country}}: if local SaaS is at 25% of US prices, you have ceiling evidence.
+
+## Steps
+
+1. \\\`web_search\\\` for the latest GNI-per-capita PPP ratio of {{target_country}} relative to the US (or whichever market {{home_price_usd}} is set in).
+2. \\\`web_search\\\` for "<category> pricing in <country>" to find local competitors. List the cheapest credible local alternative.
+3. Compute three candidate prices:
+   - **PPP-anchored**: home_price × PPP_ratio
+   - **Competitor-anchored**: cheapest local credible competitor + 20% (assuming we're better positioned)
+   - **Round-down**: pick the lower of the two, round down to a clean local-currency increment
+4. Evaluate VPN-arbitrage risk:
+   - If the discount is > 50%, payment must be gated (local card BIN check, local billing address verification, geo-IP at signup that survives later).
+   - Annual plans price closer to home; the cross-market spread on monthly plans is the arbitrage target.
+
+## Reply
+
+\\\`\\\`\\\`
+## Pricing recommendation — {{target_country}}
+PPP ratio vs home: <%>
+PPP-anchored monthly: <local currency + USD-equivalent>
+Competitor-anchored monthly: <same>
+Round-down recommendation: <same>
+Annual recommendation: <same>
+VPN-arbitrage risk: LOW / MEDIUM / HIGH
+Required gating if not LOW: <list>
+\\\`\\\`\\\`
+
+## Anti-pattern
+
+Pricing at 100% of the home-market USD price in low-PPP markets and assuming the conversion rate explains the gap. The real cause is usually that the price is wrong, not that the audience is unfit.
+`,
+
+  'linkedin-team-scorecard.md': `---
+kind: skill
+name: linkedin-team-scorecard
+group: linkedin-intent
+agent: researcher
+inputs:
+  - { name: window_days, required: false, description: "Lookback in days. Default 28." }
+requires:
+  integrations: [apify]
+  us_files: [us/team.md]
+---
+
+Score every team member's LinkedIn activity for the last {{window_days}} days. The diagnostic split: **personal posts** (about the person, the craft, opinion) vs **branded posts** (about the company / product / launch). Most B2B SaaS teams over-index on branded posts; engagement falls off; team morale follows.
+
+## Pre-flight
+
+\\\`us/team.md\\\` should list each team member's LinkedIn URL.
+
+## Steps
+
+1. For each team member, \\\`scrape_apify_actor({ actorId: "apimaestro/linkedin-profile-scraper", input: { profileUrls: [<url>], includePosts: true } })\\\`.
+2. For each post in the window:
+   - Classify as **personal** (first-person opinion, anecdote, "what I learned"), **branded** (product launch, customer win, hiring), or **shared** (reposted someone else's content).
+   - Capture engagement (likes + 5×comments + 10×reposts as a single number).
+3. Per team member, compute:
+   - posts/week
+   - personal:branded:shared ratio
+   - median engagement on personal vs branded
+4. Flag the team-level patterns:
+   - Cadence drought: anyone with < 1 post/week.
+   - Branded-only: anyone whose personal ratio is < 30%.
+   - Engagement collapse: median branded engagement is < 30% of median personal engagement (over-posting branded content tanks the algorithm reach for everyone).
+
+## Reply
+
+\\\`\\\`\\\`
+## LinkedIn team scorecard — last {{window_days}} days
+
+| Person | Posts/wk | Personal:Branded:Shared | Median eng (personal / branded) | Flags |
+|--------|----------|-------------------------|--------------------------------|-------|
+| ...    | ...      | ...                     | ...                            | ...   |
+
+Team patterns:
+  - Cadence drought: <names>
+  - Branded-only: <names>
+  - Engagement collapse: <yes/no>
+
+Recommended next 2 weeks:
+  1. <person>: <specific personal-post angle>
+  2. <person>: <specific personal-post angle>
+\\\`\\\`\\\`
+
+## Why personal > branded
+
+The LinkedIn algorithm rewards original first-person content because the dwell + comment signal is stronger. Branded launch posts can burst reach but degrade baseline engagement if they dominate. The healthiest cadence is roughly 4 personal : 1 branded, with the branded post seeded by the strongest personal poster on the team.
+`,
+
+  'evergreen-content-quarterly-audit.md': `---
+kind: skill
+name: evergreen-content-quarterly-audit
+group: content
+agent: researcher
+inputs:
+  - { name: quarter, required: false, description: "ISO quarter (e.g. '2025-Q4'). Default: previous quarter." }
+requires:
+  optional_integrations: [gsc, ga4]
+---
+
+Audit the entire blog/content portfolio every quarter. Most content libraries have ~20% of pages driving 80% of traffic, ~30% silently dying, and the rest in a dormant middle. The dormant middle is where quarterly refresh wins compound.
+
+## Steps
+
+1. Pull a list of every published article URL with: monthly sessions, 90-day impression trend, conversion to activation (if measurable).
+2. Bucket each article:
+   - **Compounders** (top 20% sessions, flat-or-up trend) — leave alone, schedule a content-update only when factually stale.
+   - **Decliners** (top 50% sessions, declining trend) — refresh: update facts, refresh code/screenshots, expand the H2 that's losing search visibility per GSC.
+   - **Dormant** (middle 30% sessions, steady or up trend) — repurpose: extract a Twitter thread, a LinkedIn post, a newsletter excerpt, a YouTube short.
+   - **Sunset candidates** (bottom 20%, no traffic, no conversion in 12 months) — redirect to the closest live article, or de-index if there's no destination.
+3. For each Decliner, run a focused refresh brief:
+   - The drop angle (what query lost share?)
+   - Three specific updates (data, screenshot, structure)
+   - Estimated effort (1-3 hours)
+4. For each Dormant, queue 2 repurposes per article into the social calendar.
+
+## Reply
+
+\\\`\\\`\\\`
+## Content audit — {{quarter}}
+Total articles: <n>
+Compounders: <count>  | Decliners: <count> | Dormant: <count> | Sunset: <count>
+
+Top 5 decliners (refresh this month):
+  1. <slug> — drop: <query>, fix: <bullet>
+  ...
+
+Top 5 dormant (repurpose this month):
+  1. <slug> → Twitter thread + LinkedIn post
+
+Sunset list: <count> URLs — redirect map saved to signals/seo/redirects-{{quarter}}.md
+\\\`\\\`\\\`
+
+## Why quarterly, not annually
+
+A 12-month gap is too long for SEO drift. A quarterly cadence catches Decliners while the fix-cost is still small (a paragraph) rather than after the article fell out of top 20 (a full rewrite).
+`,
+
+  'forbidden-words-audit.md': `---
+kind: skill
+name: forbidden-words-audit
+group: content
+agent: researcher
+inputs:
+  - { name: target, required: true, description: "Path or glob — e.g. drafts/, blog/, us/brand/messaging.md." }
+requires:
+  us_files: [us/brand/voice.md]
+---
+
+Audit drafts/content for marketing-speak that hollows out the voice. The standard offenders: leverage / synergy / empower / unlock / best-in-class / enable / streamline / robust / world-class / cutting-edge / seamless / next-generation / disruptive / innovative / revolutionary / game-changing / one-stop / mission-critical.
+
+## Pre-flight
+
+Read \\\`us/brand/voice.md\\\`. If it has a project-specific forbidden list, merge it with the standard list above. The standard list is the floor; voice.md can extend, never weaken.
+
+## Steps
+
+1. Walk {{target}} (file or directory). For each markdown/MDX/text file:
+   - Find every occurrence of a forbidden word (case-insensitive, whole-word).
+   - For each, capture the surrounding 10 words for context.
+2. Per file, output:
+   - Count of offenses
+   - Density (offenses per 100 words)
+   - The single worst sentence (most marketing-speak per word)
+3. For the worst 10 sentences across all files, propose a rewrite:
+   - Strip the forbidden word
+   - Replace with the concrete thing the original word was hiding (what does "leverage" actually mean here? "use"? "build on"? "rely on"?)
+   - Keep the rewrite shorter than the original
+
+## Reply
+
+\\\`\\\`\\\`
+## Forbidden-words audit — {{target}}
+Files scanned: <n>
+Total offenses: <n>
+Worst-density file: <path> (<density>/100 words)
+
+Top rewrites:
+  - <file>:<line>
+    Before: "<original>"
+    After:  "<rewrite>"
+\\\`\\\`\\\`
+
+## Loop
+
+If the same forbidden word appears 5+ times across the corpus, propose adding it to a project-specific blocklist in \\\`us/brand/voice.md\\\` so future drafts get caught at write time, not at audit time.
+`,
+
+  'metabase-question-runner.md': `---
+kind: skill
+name: metabase-question-runner
+group: building-blocks
+agent: researcher
+inputs:
+  - { name: question, required: true, description: "Either a Metabase question/card id (number) or a saved question slug." }
+  - { name: parameters, required: false, description: "JSON object of parameter overrides for the question (date filters, segment ids, etc.)." }
+requires:
+  integrations: [metabase]
+---
+
+Run a Metabase question against the user's configured Metabase instance and return the result inline. The configured Metabase URL + API key live in the user's local config; this skill never embeds either.
+
+## Pre-flight
+
+The user must have set \\\`metabase_site_url\\\` and \\\`metabase_api_key\\\` in their config. If neither is set, stop with: "Metabase isn't connected. Set it up under Integrations first."
+
+## Steps
+
+1. Look up the question in the user's Metabase: GET /api/card/{{question}}. If {{question}} is a slug, search via /api/search?q=<slug> and pick the highest-scoring exact match.
+2. If {{parameters}} is set, validate that each key matches one of the question's declared parameters. Drop unknown keys.
+3. Execute via POST /api/card/<id>/query/json with the parameter set.
+4. Format the result:
+   - For ≤ 50 rows × ≤ 8 cols: render as a markdown table inline.
+   - For larger results: save to \\\`signals/metabase/<question-slug>-<YYYY-MM-DD>.csv\\\` and inline the first 20 rows + a row count.
+5. Annotate the result with the run-time and the Metabase question URL (so the user can click through to verify in their browser).
+
+## Reply
+
+\\\`\\\`\\\`
+## Question: <name> (#<id>)
+Run at: <timestamp>
+Parameters: <list, or "default">
+Rows: <n>
+
+| col | col | col |
+|-----|-----|-----|
+| ... | ... | ... |
+
+[View in Metabase](<url>)
+Saved (if large): signals/metabase/<slug>-<date>.csv
+\\\`\\\`\\\`
+
+## Why a runner skill
+
+The user already has questions saved in their Metabase. Re-deriving them in SQL inside a chat session loses the named, reviewed, version-controlled query. Calling the existing question by id gets the canonical answer with the canonical caveats.
+`,
 };
 
 // Multi-touch drip sequences. A sequence is an ordered list of touches with
@@ -4553,8 +5548,7 @@ next-steps, and at-risk ARR. Writes a dated report under
   // LinkedIn outreach — runs the full intel → pick → enrich → draft
   // loop every weekday morning. Drives \`li-campaign-loop\`, which
   // writes drafts under \`drafts/\` and a summary under
-  // \`signals/linkedin/<date>-loop.md\`. Universal across projects; no
-  // Apidog-specific wiring.
+  // \`signals/linkedin/<date>-loop.md\`. Universal across projects.
   'linkedin-daily-outreach.md': `---
 kind: trigger
 name: linkedin-daily-outreach

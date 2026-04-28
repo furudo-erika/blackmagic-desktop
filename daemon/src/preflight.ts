@@ -9,7 +9,7 @@
 //   requires:
 //     integrations: [apify, amazon_ses]
 //     us_files:    [us/market/competitors.md]
-//     cli:         [apidog-cli]
+//     cli:         [hurl]
 //     optional_integrations: [feishu, slack, discord, telegram]
 //
 // All four lists are optional; anything absent = "no requirement of
@@ -136,8 +136,9 @@ async function cliAvailable(name: string): Promise<boolean> {
 }
 
 function cliInstallHint(name: string): string {
-  const npm = ['apidog-cli', 'apify-cli', 'vercel', 'wrangler'];
+  const npm = ['apify-cli', 'vercel', 'wrangler'];
   if (npm.includes(name)) return `npm install -g ${name}`;
+  if (name === 'hurl') return `brew install hurl  (or: cargo install hurl)`;
   return `install "${name}" and make sure it's on your PATH`;
 }
 

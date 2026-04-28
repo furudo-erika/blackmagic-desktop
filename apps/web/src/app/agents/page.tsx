@@ -63,6 +63,12 @@ const AGENT_SLUG_ICON: Record<string, LucideIcon> = {
   'reply-guy':           MessageCircleReply,
 };
 
+const AGENT_TAGLINE_OVERRIDES: Record<string, string> = {
+  outbound: 'Take an outbound goal from discovery through enrichment, scoring, drafting, sending, and notification.',
+  'reply-guy': 'Scans Reddit and X for relevant mentions, then drafts helpful on-brand replies.',
+  'geo-analyst': 'Tracks how the product appears across ChatGPT, Google AI Overview, and Perplexity.',
+};
+
 type AgentMeta = {
   slug: string;
   name: string;
@@ -112,7 +118,14 @@ function deriveTagline(fm: Record<string, unknown>, body: string, fallbackName: 
   text = text.replace(/^Your\s+(job|role|task)\s+is\s+to\s+/i, '');
   const firstSentence = text.split(/(?<=[.?!])\s+/)[0] ?? '';
   const trimmed = firstSentence.replace(/[`*_#]/g, '').trim();
-  if (trimmed.length > 0 && trimmed.length < 200) return trimmed;
+  if (
+    trimmed.length > 0 &&
+    trimmed.length < 200 &&
+    trimmed !== `${fallbackName} agent` &&
+    !/^Scope is English only\.?$/i.test(trimmed)
+  ) {
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
   return `${fallbackName} agent`;
 }
 
@@ -289,6 +302,7 @@ function AgentsInner() {
   // the frontmatter icon name — several agents' icons were mislabeled
   // or missing from the map, producing generic Bot fallbacks.
   const HeaderIcon = AGENT_SLUG_ICON[agent.slug] ?? AGENT_ICON_MAP[agent.icon] ?? Bot;
+  const tagline = AGENT_TAGLINE_OVERRIDES[agent.slug] ?? agent.tagline;
 
   // Derive the three panels' contents from the latest run.
   const startedMs = latestRun ? runStartedMs(latestRun.runId) : null;
@@ -341,9 +355,9 @@ function AgentsInner() {
               </button>
             )}
           </div>
-          {agent.tagline && (
+          {tagline && (
             <p className="text-[12px] text-muted dark:text-[#8C837C] leading-snug mt-1.5">
-              {agent.tagline}
+              {tagline}
             </p>
           )}
         </div>
@@ -453,7 +467,13 @@ function AgentsInner() {
           >
             {outputPaths.length === 0 ? (
               <p className="text-[12px] text-muted dark:text-[#8C837C]">
-                {isLive ? 'Nothing written yet — agent is still gathering input.' : 'This run did not write any files.'}
+                {!latestRun
+                  ? 'No outputs yet.'
+                  : isLive
+                    ? 'Nothing written yet — agent is still gathering input.'
+                    : runDetail.data?.final
+                      ? 'No files were written. See the final answer below.'
+                      : 'This run did not write any files.'}
               </p>
             ) : (
               <ul className="space-y-1">
@@ -619,10 +639,12 @@ function stripMarkdown(s: string): string {
 
 function InputPreview({ source }: { source: string }) {
   const [open, setOpen] = useState(false);
+  const plain = useMemo(() => stripMarkdown(source), [source]);
+  const canExpand = source.trim() !== plain || plain.length > 140;
   const summary = useMemo(() => {
-    const flat = stripMarkdown(source);
+    const flat = plain;
     return flat.length > 140 ? flat.slice(0, 140) + '…' : flat;
-  }, [source]);
+  }, [plain]);
 
   return (
     <div>
@@ -635,17 +657,19 @@ function InputPreview({ source }: { source: string }) {
           <Markdown source={source} />
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="mt-2 inline-flex items-center gap-1 text-[11px] font-mono text-muted dark:text-[#8C837C] hover:text-flame"
-      >
-        {open ? (
-          <>Hide <ChevronDown className="w-3 h-3 rotate-180" /></>
-        ) : (
-          <>Show full prompt <ChevronDown className="w-3 h-3" /></>
-        )}
-      </button>
+      {canExpand && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="mt-2 inline-flex items-center gap-1 text-[11px] font-mono text-muted dark:text-[#8C837C] hover:text-flame"
+        >
+          {open ? (
+            <>Hide <ChevronDown className="w-3 h-3 rotate-180" /></>
+          ) : (
+            <>Show full prompt <ChevronDown className="w-3 h-3" /></>
+          )}
+        </button>
+      )}
     </div>
   );
 }

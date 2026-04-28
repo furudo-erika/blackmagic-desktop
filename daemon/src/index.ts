@@ -128,6 +128,14 @@ function consumeOAuthState(s: string): boolean {
   return fresh;
 }
 
+function chatPreview(input: unknown): string {
+  return String(input ?? '')
+    .replace(/([^\s])([A-Z][a-z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
+
 async function pickPort(preferred?: number): Promise<number> {
   if (preferred) return preferred;
   return new Promise((res, rej) => {
@@ -1068,7 +1076,7 @@ async function main() {
 
   // Pre-flight readiness for an agent or skill. Called by the UI before
   // the user fires a run, so we can put up a modal listing "connect
-  // Apify", "fill us/market/competitors.md", "install apidog-cli" etc.
+  // Apify", "fill us/market/competitors.md", "install hurl" etc.
   // instead of letting the agent spawn and fail halfway through.
   app.get('/api/preflight/:kind/:slug', async (c) => {
     const kind = c.req.param('kind');
@@ -1504,7 +1512,7 @@ async function main() {
                 threadId: j.threadId,
                 agent: j.agent,
                 updatedAt: j.updatedAt,
-                preview: String(first).slice(0, 80),
+                preview: chatPreview(first),
                 count: j.messages?.length ?? 0,
                 starred: Boolean(j.starred),
               };

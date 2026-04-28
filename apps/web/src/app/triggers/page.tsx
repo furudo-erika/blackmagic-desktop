@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { getBridge } from '../../lib/bridge';
-import { Zap, Play, Search } from 'lucide-react';
+import { Zap, Play, Search, FileText } from 'lucide-react';
 import {
   PageShell,
   PageHeader,
@@ -42,6 +42,7 @@ export default function TriggersPage() {
   // Map of trigger name → last fire result, so we can show a "view log" link
   // per-trigger after shell runs finish.
   const [lastFire, setLastFire] = useState<Record<string, FireResult>>({});
+  const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
 
   const triggers = useQuery({
     queryKey: ['triggers'],
@@ -239,86 +240,116 @@ export default function TriggersPage() {
               else if (agentName) subtitleParts.push(`agent: ${agentName}`);
               else subtitleParts.push('⚠ no binding');
               const broken = !isShell && !playbookName && !agentName;
+              const isOpen = openDetails[t.path] === true;
               return (
-                <EntityRow
-                  key={t.path}
-                  asButton={false}
-                  leading={
-                    <span
-                      className={
-                        'relative flex h-2.5 w-2.5 rounded-full ' +
-                        (enabled ? 'bg-flame' : 'bg-muted/40')
-                      }
-                    />
-                  }
-                  title={
-                    <span className="flex items-center gap-2">
-                      <span>{name || t.path}</span>
-                      {isShell && (
-                        <span
-                          title={String(fm.shell)}
-                          className="inline-flex items-center h-4 px-1.5 rounded border border-line dark:border-[#2A241D] text-[9px] font-mono uppercase tracking-wide text-muted dark:text-[#8C837C]"
-                        >
-                          shell
-                        </span>
-                      )}
-                    </span>
-                  }
-                  subtitle={<span className="font-mono">{subtitleParts.join(' · ')}</span>}
-                  trailing={
-                    <div className="flex items-center gap-3 flex-wrap justify-end">
-                      {(() => {
-                        // In-session fire wins (most recent signal). Otherwise
-                        // fall back to the persisted last-run from disk so the
-                        // link survives reloads and cron fires.
-                        const log = sessionFire?.ok ? sessionFire.log : persisted?.log;
-                        const exit = sessionFire?.ok ? sessionFire.exit : persisted?.exit;
-                        const finishedAt = persisted?.finishedAt ?? null;
-                        if (sessionFire?.ok && !log) {
-                          return <span className="text-[11px] text-[#7E8C67]">queued ✓</span>;
+                <div key={t.path}>
+                  <EntityRow
+                    asButton={false}
+                    onClick={() => setOpenDetails((prev) => ({ ...prev, [t.path]: !prev[t.path] }))}
+                    leading={
+                      <span
+                        className={
+                          'relative flex h-2.5 w-2.5 rounded-full ' +
+                          (enabled ? 'bg-flame' : 'bg-muted/40')
                         }
-                        if (!log) return null;
-                        return (
-                          <a
-                            href={`/context?path=${encodeURIComponent(log)}`}
-                            className="text-[11px] text-muted dark:text-[#8C837C] hover:text-flame underline underline-offset-2"
-                            title={finishedAt ? `finished ${finishedAt}` : undefined}
+                      />
+                    }
+                    title={
+                      <span className="flex items-center gap-2">
+                        <span>{name || t.path}</span>
+                        {isShell && (
+                          <span
+                            title={String(fm.shell)}
+                            className="inline-flex items-center h-4 px-1.5 rounded border border-line dark:border-[#2A241D] text-[9px] font-mono uppercase tracking-wide text-muted dark:text-[#8C837C]"
                           >
-                            {finishedAt && !sessionFire?.ok ? `last run ${relTime(finishedAt)}` : 'view log'}
-                            {typeof exit === 'number' ? (
-                              <span
-                                className={
-                                  exit === 0 ? 'text-[#7E8C67] ml-1' : 'text-flame ml-1'
-                                }
-                              >
-                                (exit {exit})
-                              </span>
-                            ) : null}
-                          </a>
-                        );
-                      })()}
-                      <label className="flex items-center gap-1.5 text-[11px]">
-                        <input
-                          type="checkbox"
-                          checked={enabled}
-                          onChange={() => toggle.mutate(t)}
-                          className="accent-flame"
-                        />
-                        <span>{enabled ? 'enabled' : 'disabled'}</span>
-                      </label>
-                      <span title={broken ? 'Trigger has no playbook/agent/shell binding — edit the .md' : undefined}>
-                        <Button
-                          variant="secondary"
-                          onClick={() => fire.mutate(name)}
-                          disabled={fire.isPending || broken}
-                        >
-                          <Play className="w-3 h-3" />
-                          {fire.isPending && fire.variables === name ? 'Firing…' : 'Fire now'}
-                        </Button>
+                            shell
+                          </span>
+                        )}
                       </span>
+                    }
+                    subtitle={<span className="font-mono">{subtitleParts.join(' · ')}</span>}
+                    trailing={
+                      <div className="flex items-center gap-3 flex-wrap justify-end">
+                        {(() => {
+                          // In-session fire wins (most recent signal). Otherwise
+                          // fall back to the persisted last-run from disk so the
+                          // link survives reloads and cron fires.
+                          const log = sessionFire?.ok ? sessionFire.log : persisted?.log;
+                          const exit = sessionFire?.ok ? sessionFire.exit : persisted?.exit;
+                          const finishedAt = persisted?.finishedAt ?? null;
+                          if (sessionFire?.ok && !log) {
+                            return <span className="text-[11px] text-[#7E8C67]">queued ✓</span>;
+                          }
+                          if (!log) return null;
+                          return (
+                            <a
+                              href={`/context?path=${encodeURIComponent(log)}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[11px] text-muted dark:text-[#8C837C] hover:text-flame underline underline-offset-2"
+                              title={finishedAt ? `finished ${finishedAt}` : undefined}
+                            >
+                              {finishedAt && !sessionFire?.ok ? `last run ${relTime(finishedAt)}` : 'view log'}
+                              {typeof exit === 'number' ? (
+                                <span
+                                  className={
+                                    exit === 0 ? 'text-[#7E8C67] ml-1' : 'text-flame ml-1'
+                                  }
+                                >
+                                  (exit {exit})
+                                </span>
+                              ) : null}
+                            </a>
+                          );
+                        })()}
+                        <label className="flex items-center gap-1.5 text-[11px]" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            onChange={() => toggle.mutate(t)}
+                            className="accent-flame"
+                          />
+                          <span>{enabled ? 'enabled' : 'disabled'}</span>
+                        </label>
+                        <span
+                          title={broken ? 'Trigger has no playbook/agent/shell binding — edit the .md' : undefined}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Button
+                            variant="secondary"
+                            onClick={() => fire.mutate(name)}
+                            disabled={fire.isPending || broken}
+                          >
+                            <Play className="w-3 h-3" />
+                            {fire.isPending && fire.variables === name ? 'Firing…' : 'Fire now'}
+                          </Button>
+                        </span>
+                      </div>
+                    }
+                  />
+                  {isOpen && (
+                    <div className="border-x border-b border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] px-4 py-3 text-[12px] text-ink dark:text-[#E6E0D8]">
+                      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] mb-2">
+                        <FileText className="w-3 h-3" />
+                        Trigger details
+                      </div>
+                      <dl className="grid grid-cols-[88px_1fr] gap-x-3 gap-y-1">
+                        <dt className="text-muted dark:text-[#8C837C]">File</dt>
+                        <dd className="font-mono">
+                          <a
+                            href={`/context?path=${encodeURIComponent(t.path)}`}
+                            className="text-flame hover:underline"
+                          >
+                            {t.path}
+                          </a>
+                        </dd>
+                        <dt className="text-muted dark:text-[#8C837C]">Schedule</dt>
+                        <dd className="font-mono">{schedule || 'manual/webhook'}</dd>
+                        <dt className="text-muted dark:text-[#8C837C]">Binding</dt>
+                        <dd className="font-mono">{subtitleParts.slice(1).join(' · ')}</dd>
+                      </dl>
                     </div>
-                  }
-                />
+                  )}
+                </div>
               );
             })}
           </EntityList>

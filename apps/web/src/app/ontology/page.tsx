@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import * as THREE from 'three';
 import { api, type OntologyNode, type OntologyEdge } from '../../lib/api';
 
-// 3D force-directed knowledge graph — adapted from apidog-team/portal.
+// 3D force-directed knowledge graph.
 // Three.js renders nodes as glowing spheres (icosahedrons for "MOC" /
 // hub nodes), edges as faint lines, with a continuous force simulation
 // in JS. Hover dims everything except the 1-hop neighborhood; click

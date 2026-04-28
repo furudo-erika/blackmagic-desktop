@@ -95,7 +95,7 @@ export default function OnboardingBootstrapPage() {
           <form onSubmit={submit} className="flex flex-col gap-4">
             <Field
               label="Domain"
-              hint={showDomainError ? 'Enter a valid domain like apidog.com — no scheme, no path.' : 'Your marketing site. e.g. apidog.com'}
+              hint={showDomainError ? 'Enter a valid domain like acme.com — no scheme, no path.' : 'Your marketing site. e.g. acme.com'}
               required
               error={showDomainError}
             >
@@ -104,7 +104,7 @@ export default function OnboardingBootstrapPage() {
                 <input
                   value={domain}
                   onChange={(e) => setDomain(e.target.value)}
-                  placeholder="apidog.com"
+                  placeholder="acme.com"
                   autoFocus
                   disabled={phase === 'running'}
                   className="w-full pl-9 pr-3 h-9 rounded-md border border-line dark:border-[#2A241D] bg-transparent text-sm text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame disabled:opacity-50"
@@ -119,7 +119,7 @@ export default function OnboardingBootstrapPage() {
               <input
                 value={docsUrl}
                 onChange={(e) => setDocsUrl(e.target.value)}
-                placeholder="https://docs.apidog.com"
+                placeholder="https://docs.acme.com"
                 disabled={phase === 'running'}
                 className="w-full px-3 h-9 rounded-md border border-line dark:border-[#2A241D] bg-transparent text-sm text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame disabled:opacity-50"
               />
@@ -132,7 +132,7 @@ export default function OnboardingBootstrapPage() {
               <input
                 value={extraUrls}
                 onChange={(e) => setExtraUrls(e.target.value)}
-                placeholder="https://apidog.com/pricing, https://apidog.com/about"
+                placeholder="https://acme.com/pricing, https://acme.com/about"
                 disabled={phase === 'running'}
                 className="w-full px-3 h-9 rounded-md border border-line dark:border-[#2A241D] bg-transparent text-sm text-ink dark:text-[#E6E0D8] focus:outline-none focus:border-flame disabled:opacity-50"
               />

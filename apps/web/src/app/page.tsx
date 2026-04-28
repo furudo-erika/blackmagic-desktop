@@ -29,7 +29,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Inbox, Activity, MessageSquare, ChevronRight, RotateCw } from 'lucide-react';
 import { api } from '../lib/api';
-import { Composer } from '../components/composer';
+import { Composer, normalizeAgentMentions } from '../components/composer';
 
 function newThreadId(): string {
   const d = new Date();
@@ -195,7 +195,7 @@ export default function HomePage() {
   const orgName = projects.data?.projects.find((p) => p.id === projects.data?.active)?.name ?? 'BlackMagic';
 
   function send(textArg?: string) {
-    const text = (textArg ?? draft).trim();
+    const text = normalizeAgentMentions((textArg ?? draft).trim());
     if (!text) {
       router.push('/chat');
       return;

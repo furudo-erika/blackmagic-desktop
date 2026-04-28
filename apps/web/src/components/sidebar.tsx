@@ -221,7 +221,11 @@ export function Sidebar() {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setPaletteOpen((v) => !v);
+        setPaletteOpen((v) => {
+          const next = !v;
+          if (next) setPaletteQuery('');
+          return next;
+        });
       } else if (e.key === 'Escape') {
         setPaletteOpen(false);
       }
@@ -260,7 +264,7 @@ export function Sidebar() {
           introducing an extra click. */}
       <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-3 pt-1">
         <NavRow icon={LayoutDashboard} label="Home" href="/" pathname={pathname} exact />
-        <ActionRow icon={Search} label="Search" kbd="⌘K" onClick={() => setPaletteOpen(true)} />
+        <ActionRow icon={Search} label="Search" kbd="⌘K" onClick={() => { setPaletteQuery(''); setPaletteOpen(true); }} />
 
         <div className="h-px bg-line dark:bg-[#2A241D] my-2 mx-2" />
 

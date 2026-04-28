@@ -26,6 +26,22 @@ export type ComposerAgent = {
   tagline?: string;
 };
 
+function displayAgentSlug(slug: string, name: string): string {
+  if (slug === 'ae' && name.toLowerCase() === 'deal manager') return 'deal-manager';
+  return slug;
+}
+
+export function normalizeAgentMentionToken(token: string): string {
+  return token === 'deal-manager' ? 'ae' : token;
+}
+
+export function normalizeAgentMentions(text: string): string {
+  return text.replace(/@([a-z0-9][a-z0-9-]{1,40})/gi, (whole, token: string) => {
+    const normalized = normalizeAgentMentionToken(token.toLowerCase());
+    return normalized === token.toLowerCase() ? whole : `@${normalized}`;
+  });
+}
+
 export type ComposerSlashCommand = {
   name: string;      // "/clear"
   hint: string;      // short description
@@ -67,6 +83,7 @@ export function Composer({
   autoFocus?: boolean;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const popoverListRef = useRef<HTMLUListElement>(null);
   const [popover, setPopover] = useState<PopoverState>(null);
 
   useEffect(() => {
@@ -106,14 +123,23 @@ export function Composer({
       const q = popover.query.toLowerCase();
       return agents
         .filter((a) => !q || a.slug.toLowerCase().includes(q) || a.name.toLowerCase().includes(q))
-        .slice(0, 8)
-        .map((a) => ({ label: a.name, sublabel: a.slug, insert: `@${a.slug}` }));
+        .map((a) => {
+          const displaySlug = displayAgentSlug(a.slug, a.name);
+          return { label: a.name, sublabel: displaySlug, insert: `@${displaySlug}` };
+        });
     }
     const q = popover.query.toLowerCase();
     return slashCommands
       .filter((c) => c.name.slice(1).toLowerCase().includes(q))
       .map((c) => ({ label: c.name, sublabel: c.hint, insert: c.name + ' ', action: c.action }));
   }, [popover, agents, slashCommands]);
+
+  useEffect(() => {
+    const list = popoverListRef.current;
+    if (!list || !popover) return;
+    const active = list.querySelector<HTMLElement>('[data-active="true"]');
+    active?.scrollIntoView({ block: 'nearest' });
+  }, [popover?.index, popoverItems.length, popover]);
 
   function applyChoice(choice: { insert: string; action?: string }) {
     if (!popover) return;
@@ -141,9 +167,11 @@ export function Composer({
 
   function submit() {
     const text = value.trim();
-    if (!text || disabled) return;
+    if (!canSubmit || disabled) return;
     onSubmit(text);
   }
+
+  const canSubmit = value.trim().length > 0 && value.trim() !== '/' && value.trim() !== '@';
 
   return (
     <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-2xl shadow-sm overflow-visible relative">
@@ -152,11 +180,12 @@ export function Composer({
           <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-mono text-muted dark:text-[#8C837C] border-b border-line dark:border-[#2A241D]">
             {popover.kind === 'mention' ? 'Loop in agent' : 'Slash commands'}
           </div>
-          <ul className="max-h-[260px] overflow-y-auto py-1">
+          <ul ref={popoverListRef} className="max-h-[260px] overflow-y-auto py-1">
             {popoverItems.map((it, i) => (
               <li key={it.label}>
                 <button
                   type="button"
+                  data-active={i === popover.index}
                   onMouseDown={(e) => { e.preventDefault(); applyChoice(it); }}
                   onMouseEnter={() => setPopover((p) => (p ? { ...p, index: i } : p))}
                   className={
@@ -280,7 +309,7 @@ export function Composer({
           <button
             type="button"
             onClick={submit}
-            disabled={disabled || !value.trim()}
+            disabled={disabled || !canSubmit}
             className="inline-flex items-center gap-1.5 bg-flame text-white text-[13px] font-medium px-4 py-1.5 rounded-md hover:opacity-90 transition-opacity disabled:opacity-40"
           >
             {submitLabel} <ArrowRight className="w-3.5 h-3.5" />

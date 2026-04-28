@@ -524,7 +524,7 @@ function ChangelogBlock() {
   if (changelog.isError) {
     return <div className="text-[12px] text-flame">Failed to load changelog.</div>;
   }
-  const content = changelog.data?.content ?? '';
+  const content = (changelog.data?.content ?? '').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
   return (
     <div className="max-h-[420px] overflow-y-auto pr-2 prose prose-sm dark:prose-invert max-w-none text-[12.5px]">
       <Markdown source={content} />

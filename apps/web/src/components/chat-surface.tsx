@@ -29,7 +29,7 @@ import {
 import { api } from '../lib/api';
 import { Markdown } from './markdown';
 import { AgentIcon } from './agent-icon';
-import { Composer } from './composer';
+import { Composer, normalizeAgentMentions } from './composer';
 import { ExportPDFButton } from './export-pdf-button';
 
 export type ChatScenario = { title: string; prompt: string };
@@ -606,7 +606,7 @@ export function ChatSurface({
   }, [sendMut.isPending]);
 
   function send(override?: string) {
-    const text = (override ?? input).trim();
+    const text = normalizeAgentMentions((override ?? input).trim());
     if (!text || sendMut.isPending) return;
     autoScrollUntilRef.current = Date.now() + 2500;
     const next: Msg[] = [...messages, { role: 'user', content: text }];

@@ -164,9 +164,16 @@ export async function setAssignee(entityPath: string, next: Assignee, actor: Act
 
 const MENTION_RE = /@([a-z0-9][a-z0-9-]{1,40})/gi;
 
+function normalizeMentionSlug(slug: string): string {
+  return slug === 'deal-manager' ? 'ae' : slug;
+}
+
 export function extractMentions(body: string): string[] {
   const out = new Set<string>();
-  body.replace(MENTION_RE, (_, slug) => { out.add(String(slug).toLowerCase()); return _; });
+  body.replace(MENTION_RE, (_, slug) => {
+    out.add(normalizeMentionSlug(String(slug).toLowerCase()));
+    return _;
+  });
   return Array.from(out);
 }
 

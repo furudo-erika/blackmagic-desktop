@@ -3691,7 +3691,7 @@ const enrich_score_route: ToolDef = {
 //   bearer_token   — app-only auth, used for search + user lookup
 //   access_token   — user-context OAuth 2.0 token, required to post/reply
 //   user_id        — numeric id of the authenticated account (cached)
-//   handle         — display-only ("@apidogHQ")
+//   handle         — display-only ("@example")
 // ---------------------------------------------------------------------------
 async function xCreds(): Promise<{
   bearer: string; access: string; userId?: string; handle?: string;
@@ -3746,7 +3746,7 @@ const x_post_tweet: ToolDef = {
 const x_search_tweets: ToolDef = {
   name: 'x_search_tweets',
   description:
-    'Search X for recent tweets (last 7 days) matching a v2-syntax query — e.g. `apidog -is:retweet lang:en`, `from:getpostman apidog`, `(apidog OR postman) -is:reply`. Returns id / text / author / created_at / public_metrics per hit.',
+    'Search X for recent tweets (last 7 days) matching a v2-syntax query — e.g. `<your-brand> -is:retweet lang:en`, `from:<competitor-handle> <your-brand>`, `(<your-brand> OR <competitor>) -is:reply`. Returns id / text / author / created_at / public_metrics per hit.',
   parameters: {
     type: 'object',
     properties: {

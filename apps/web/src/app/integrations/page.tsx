@@ -616,13 +616,13 @@ function IntegrationCard({
             rows={def.provider === 'amazon_ses' || def.provider === 'gsc' || def.provider === 'google_analytics' || def.provider === 'x' ? 8 : 3}
             placeholder={
               def.provider === 'amazon_ses'
-                ? '{\n  "access_key_id": "AKIA…",\n  "secret_access_key": "…",\n  "region": "us-east-1",\n  "from": "Lynn <lynn@inc.apidog.com>"\n}'
+                ? '{\n  "access_key_id": "AKIA…",\n  "secret_access_key": "…",\n  "region": "us-east-1",\n  "from": "Lynn <lynn@example.com>"\n}'
                 : def.provider === 'gsc'
                   ? '{\n  "service_account_json": "<paste the whole JSON key file>",\n  "site_url": "sc-domain:example.com"\n}'
                   : def.provider === 'google_analytics'
                     ? '{\n  "service_account_json": "<paste the whole JSON key file>",\n  "property_id": "123456789"\n}'
                     : def.provider === 'x'
-                      ? '{\n  "bearer_token": "AAAA…",\n  "access_token": "<OAuth 2.0 user access token>",\n  "user_id": "123456789",\n  "handle": "apidogHQ"\n}'
+                      ? '{\n  "bearer_token": "AAAA…",\n  "access_token": "<OAuth 2.0 user access token>",\n  "user_id": "123456789",\n  "handle": "your_x_handle"\n}'
                       : def.provider === 'ghost'
                         ? 'GHOST_ADMIN_API_KEY format: <id>:<secret>'
                         : def.provider === 'wordpress'

@@ -216,7 +216,8 @@ export default function OutreachPage() {
             {items.map((d) => {
               const isEditing = editing === d.path;
               const badge = STATUS_BADGE[d.status] ?? STATUS_BADGE.pending;
-              const isPending = d.status === 'pending' || d.status === 'approved';
+              const canApprove = d.status === 'pending' || d.status === 'approved';
+              const canEdit = d.status === 'pending';
               return (
                 <Panel key={d.path}>
                   <div className="flex items-start justify-between gap-3">
@@ -275,35 +276,44 @@ export default function OutreachPage() {
                           <X className="w-3 h-3" /> Cancel
                         </Button>
                       </>
-                    ) : (
+                    ) : canApprove || canEdit ? (
                       <>
-                        <Button
-                          variant="primary"
-                          disabled={!isPending || approve.isPending}
-                          onClick={() => approve.mutate(d)}
-                        >
-                          <Send className="w-3 h-3" />
-                          {approve.isPending ? 'Sending…' : d.status === 'approved' ? 'Retry send' : 'Approve & send'}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={!isPending || reject.isPending}
-                          onClick={() => reject.mutate(d)}
-                        >
-                          Reject
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={!isPending}
-                          onClick={() => {
-                            setEditing(d.path);
-                            setEditBody(d.body);
-                            setEditSubject(d.subject ?? '');
-                          }}
-                        >
-                          <Pencil className="w-3 h-3" /> Edit
-                        </Button>
+                        {canApprove && (
+                          <Button
+                            variant="primary"
+                            disabled={approve.isPending}
+                            onClick={() => approve.mutate(d)}
+                          >
+                            <Send className="w-3 h-3" />
+                            {approve.isPending ? 'Sending…' : d.status === 'approved' ? 'Retry send' : 'Approve & send'}
+                          </Button>
+                        )}
+                        {canEdit && (
+                          <>
+                            <Button
+                              variant="secondary"
+                              disabled={reject.isPending}
+                              onClick={() => reject.mutate(d)}
+                            >
+                              Reject
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              onClick={() => {
+                                setEditing(d.path);
+                                setEditBody(d.body);
+                                setEditSubject(d.subject ?? '');
+                              }}
+                            >
+                              <Pencil className="w-3 h-3" /> Edit
+                            </Button>
+                          </>
+                        )}
                       </>
+                    ) : (
+                      <span className="text-[11px] text-muted dark:text-[#8C837C]">
+                        {d.status === 'sent' ? 'Sent draft is read-only.' : 'No actions available.'}
+                      </span>
                     )}
                   </div>
                 </Panel>

@@ -80,19 +80,6 @@ const DOMAIN_FALLBACKS: Record<string, Partial<Slots>> = {
     icp_stack: 'Next.js',
     icp_pain: 'self-hosted Next.js on ECS that became a full-time ops job',
   },
-  'apidog.com': {
-    competitor_a: 'Postman',
-    competitor_b: 'Bruno',
-    competitor_c: 'Insomnia',
-    top_customer: 'a Postman-migration team',
-    top_customer_b: 'an OpenAPI-spec-first team',
-    product_a: 'Apidog',
-    product_b: 'Apidog CLI',
-    category: 'API development platform',
-    icp_industry: 'API-first SaaS',
-    icp_stack: 'OpenAPI / REST',
-    icp_pain: 'Postman licensing costs + sync-with-spec drift',
-  },
 };
 
 export async function extractSlots(): Promise<Slots> {

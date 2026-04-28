@@ -29,6 +29,14 @@ type RuntimeRow = {
   status: 'online' | 'offline';
 };
 
+type DashboardRun = {
+  runId: string;
+  tokensIn: number;
+  tokensOut: number;
+  costCents: number;
+  done?: boolean;
+};
+
 export default function DashboardPage() {
   const health = useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 15_000 });
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.listProjects });
@@ -165,7 +173,7 @@ function RuntimeDetail({
   onWindowChange,
 }: {
   runtime: RuntimeRow | undefined;
-  runs: Array<{ runId: string; tokensIn: number; tokensOut: number; costCents: number; done?: boolean }>;
+  runs: DashboardRun[];
   windowDays: 7 | 30 | 90;
   onWindowChange: (n: 7 | 30 | 90) => void;
 }) {
@@ -176,10 +184,15 @@ function RuntimeDetail({
   // daemon side, so the "This Mac" row gets the full count. Cloud and
   // project rows render zeros until the daemon surfaces a `runtime:` tag
   // on each run (batch 2).
+  const windowedRuns = useMemo(
+    () => runs.filter((r) => isRunInWindow(r.runId, windowDays)),
+    [runs, windowDays],
+  );
+
   const agg = useMemo(() => {
     let tokensIn = 0, tokensOut = 0, costCents = 0, total = 0, ok = 0;
     if (runtime.id === 'local') {
-      for (const r of runs) {
+      for (const r of windowedRuns) {
         tokensIn += r.tokensIn || 0;
         tokensOut += r.tokensOut || 0;
         costCents += r.costCents || 0;
@@ -188,7 +201,7 @@ function RuntimeDetail({
       }
     }
     return { tokensIn, tokensOut, costCents, total, ok };
-  }, [runs, runtime.id]);
+  }, [runtime.id, windowedRuns]);
 
   // Build a 7×N heatmap grid from run timestamps. runId format:
   // <ISO-with-dashes>-<agent>  — e.g. 2026-04-21T09-17-21-931Z-geo-analyst
@@ -446,6 +459,17 @@ function buildDailyCost(
     if (bucket.has(k)) bucket.set(k, bucket.get(k)! + (r.costCents || 0));
   }
   return Array.from(bucket.entries()).map(([date, cents]) => ({ date, cents }));
+}
+
+function isRunInWindow(runId: string, days: number): boolean {
+  const d = parseRunTimestamp(runId);
+  if (!d) return false;
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(end);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (days - 1));
+  return d >= start && d <= end;
 }
 
 function formatNum(n: number): string {
