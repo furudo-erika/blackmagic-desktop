@@ -7,6 +7,8 @@ migration. The goal is not to keep adding features to the old daemon. The goal
 is to preserve Black Magic product value while moving orchestration into
 Paperclip.
 
+Current slice status lives in `docs/codex/PAPERCLIP_MIGRATION_STATUS.md`.
+
 ## Principles
 
 1. Humans steer; agents execute.

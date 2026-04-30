@@ -20,7 +20,8 @@ sequences, integrations, and markdown workspaces.
 
 1. `README.md`
 2. `docs/codex/HARNESS_ENGINEERING.md`
-3. Paperclip migration docs in
+3. `docs/codex/PAPERCLIP_MIGRATION_STATUS.md`
+4. Paperclip migration docs in
    `/Users/bill/Desktop/paperclip-master/doc/blackmagic/BLACKMAGIC_ON_PAPERCLIP.md`
 
 ## Repo Map
