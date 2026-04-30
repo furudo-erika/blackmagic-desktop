@@ -8,7 +8,7 @@
  * frontmatter values Black Magic already uses: `name`, `team`, `face_seed`.
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -187,6 +187,7 @@ function buildOrgChart(teams: ReadonlyArray<readonly [string, Employee[]]>): {
 
 export default function CompanyPage() {
   const qc = useQueryClient();
+  const viewportRef = useRef<HTMLElement | null>(null);
   const [addTeamOpen, setAddTeamOpen] = useState(false);
   const [pendingTeam, setPendingTeam] = useState<string | null>(null);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
@@ -216,6 +217,34 @@ export default function CompanyPage() {
 
   const selected = selectedSlug ? employees.find((employee) => employee.slug === selectedSlug) ?? null : null;
   const chart = useMemo(() => buildOrgChart(teams), [teams]);
+
+  const fitChart = () => {
+    const viewport = viewportRef.current;
+    if (!viewport || chart.width === 0 || chart.height === 0) return;
+    const padding = 48;
+    const availableW = Math.max(240, viewport.clientWidth - padding);
+    const availableH = Math.max(240, viewport.clientHeight - padding);
+    const nextZoom = Math.min(1.05, Math.max(0.28, Math.min(availableW / chart.width, availableH / chart.height)));
+    setZoom(Number(nextZoom.toFixed(3)));
+    setPan({
+      x: Math.round((viewport.clientWidth - chart.width * nextZoom) / 2),
+      y: Math.round((viewport.clientHeight - chart.height * nextZoom) / 2),
+    });
+  };
+
+  useEffect(() => {
+    fitChart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chart.width, chart.height]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const observer = new ResizeObserver(() => fitChart());
+    observer.observe(viewport);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chart.width, chart.height]);
 
   const invalidateOrg = () => {
     qc.invalidateQueries({ queryKey: ['company-employees'] });
@@ -269,8 +298,7 @@ export default function CompanyPage() {
             <button
               type="button"
               onClick={() => {
-                setZoom(0.92);
-                setPan({ x: 24, y: 24 });
+                fitChart();
               }}
               className="w-8 h-8 rounded-md border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] flex items-center justify-center text-muted hover:text-ink dark:hover:text-[#F5F1EA]"
               title="Reset zoom"
@@ -300,6 +328,7 @@ export default function CompanyPage() {
       <div className="flex-1 min-h-0 overflow-hidden px-6 py-5">
         <div className="h-full max-w-7xl mx-auto grid grid-cols-[minmax(0,1fr)_320px] gap-4">
           <section
+            ref={viewportRef}
             className="min-h-0 overflow-hidden bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl relative"
             style={{ cursor: panning ? 'grabbing' : 'grab' }}
             onMouseDown={(event) => {
