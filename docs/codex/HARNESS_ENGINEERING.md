@@ -59,3 +59,20 @@ For each slice:
 6. Commit the slice.
 
 If verification fails repeatedly, improve the harness before continuing.
+
+## Current Migration Invariants
+
+- `/company` is the single Black Magic organization surface.
+- `/chart` may redirect to `/company`, but it must not grow a second org UI.
+- The company surface must remain a real node-link organization chart:
+  SVG connector edges, absolute-positioned nodes, pan/zoom viewport, and a
+  fit-to-screen control. Do not regress it into a team grid or kanban board.
+- Black Magic agent files remain the compatibility source during migration.
+  Editable org metadata is stored in `agents/*.md` frontmatter:
+  - `name`
+  - `team`
+  - `reports_to: team:<TeamName>` as the bridge toward Paperclip `reportsTo`
+  - `face_seed`
+- Paperclip is still the long-term control plane. The markdown fields above
+  are import/export compatibility and should map to Paperclip agents, org
+  hierarchy, and plugin metadata during cutover.
