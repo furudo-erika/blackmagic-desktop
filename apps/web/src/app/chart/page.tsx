@@ -21,17 +21,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Network,
-  Users,
-  Briefcase,
-  Code2,
-  HeartHandshake,
-  Wallet,
-  UserPlus2,
-  Scale,
-  type LucideIcon,
-} from 'lucide-react';
+import { Network } from 'lucide-react';
 import { api } from '../../lib/api';
 import { EmployeeFace } from '../../components/employee-face';
 import { PageShell, PageHeader, PageBody } from '../../components/ui/primitives';
@@ -43,21 +33,6 @@ type Employee = {
   team: string;
   faceSeed: string;
 };
-
-const TEAM_ICON: Record<string, LucideIcon> = {
-  GTM: Briefcase,
-  Engineering: Code2,
-  'Customer Success': HeartHandshake,
-  'Finance & Ops': Wallet,
-  Finance: Wallet,
-  People: UserPlus2,
-  Legal: Scale,
-  Product: Briefcase,
-};
-
-function teamIcon(name: string): LucideIcon {
-  return TEAM_ICON[name] ?? Users;
-}
 
 function roleFromName(name: string): string {
   return name.replace(/\s*Agent$/i, '').trim() || name;
@@ -361,8 +336,7 @@ function TeamCard({
   isOpen: boolean;
   onToggle: () => void;
 }) {
-  const Icon = teamIcon(name);
-  const stack = members.slice(0, 4);
+  const stack = members.slice(0, 3);
   const more = Math.max(0, members.length - stack.length);
   return (
     <button
@@ -371,29 +345,26 @@ function TeamCard({
       onClick={onToggle}
       aria-expanded={isOpen}
       className={
-        'w-full text-left rounded-xl px-3 py-2.5 transition-colors flex flex-col gap-2 ' +
+        'w-full text-left rounded-xl px-3.5 py-3 transition-colors flex flex-col gap-2.5 ' +
         (isOpen
           ? 'border border-flame/40 bg-flame/[0.06]'
           : 'border border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] hover:border-flame/30')
       }
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="w-6 h-6 shrink-0 rounded-md bg-flame/10 border border-flame/20 flex items-center justify-center">
-          <Icon className="w-3.5 h-3.5 text-flame" />
-        </span>
-        <span className="text-[12.5px] font-semibold text-ink dark:text-[#F5F1EA] truncate">
+      <div className="flex items-baseline gap-2 min-w-0">
+        <span className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate leading-tight">
           {name}
         </span>
-        <span className="ml-auto text-[10px] font-mono text-muted dark:text-[#8C837C] shrink-0 px-1.5 py-px rounded bg-white/60 dark:bg-[#0F0D0A]/60 border border-line/60 dark:border-[#2A241D]">
+        <span className="ml-auto text-[10.5px] font-mono text-muted dark:text-[#8C837C] shrink-0 leading-tight">
           {members.length}
         </span>
       </div>
-      <div className="flex items-center -space-x-1.5 min-h-[24px]">
+      <div className="flex items-center gap-1.5 min-h-[28px]">
         {stack.map((m) => (
-          <EmployeeFace key={m.slug} seed={m.faceSeed} name={m.name} size="xs" ring />
+          <EmployeeFace key={m.slug} seed={m.faceSeed} name={m.name} size="sm" />
         ))}
         {more > 0 && (
-          <span className="ml-2 text-[10px] font-mono text-muted dark:text-[#8C837C]">
+          <span className="text-[10.5px] font-mono text-muted dark:text-[#8C837C]">
             +{more}
           </span>
         )}
