@@ -12,7 +12,10 @@ const required = [
   ['zoomTowardPoint', 'Zoom must track the pointer/gesture origin'],
   ['suppressNextCardClick', 'Dragged chart gestures must not select org cards'],
   ['data-org-node', 'Absolute org node marker is missing'],
-  ['reports_to: `team:', 'Paperclip reports_to bridge is missing'],
+  ['reportsToEmployeeSlug', 'Paperclip employee reports_to parser is missing'],
+  ['wouldCreateReportsCycle', 'Reports-to cycle guard is missing'],
+  ['reportsTo: `employee:', 'Drag-to-manager reports_to write is missing'],
+  ['reportsTo ?? `team:', 'Team reports_to fallback is missing'],
 ];
 
 const failures = [];

@@ -21,16 +21,17 @@ Implemented:
   pan/pinch zoom.
 - Employee cards can be selected and edited.
 - Employee cards can be dragged between teams.
+- Employee cards can be dragged onto another employee to write
+  `reports_to: employee:<slug>` with a cycle guard.
 - Editable compatibility metadata remains in `agents/*.md` frontmatter:
-  `name`, `team`, `reports_to: team:<TeamName>`, and `face_seed`.
+  `name`, `team`, `reports_to`, and `face_seed`.
 - `scripts/check-org-chart-harness.mjs` protects the Paperclip-style layout and
   interaction invariants.
 
 Still to migrate:
 
-- Replace the team bridge with true Paperclip `reportsTo` manager hierarchy.
-- Add cycle checks matching Paperclip's agent service before allowing arbitrary
-  employee-to-employee reporting edits.
+- Replace the markdown-backed reports-to bridge with Paperclip agent APIs.
+- Add an inspector picker for manager/reporting edits, not only drag-and-drop.
 - Import/export `reports_to` into Paperclip agent `reportsTo` fields during
   cutover.
 - Back the org chart with Paperclip agent APIs instead of markdown files once

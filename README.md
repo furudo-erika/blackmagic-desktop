@@ -4,7 +4,7 @@
 
 <p>
   <a href="https://github.com/blackmagic-ai/blackmagic-desktop/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/blackmagic-ai/blackmagic-desktop/releases"><img src="https://img.shields.io/badge/version-0.5.47-green.svg" alt="Version"></a>
+  <a href="https://github.com/blackmagic-ai/blackmagic-desktop/releases"><img src="https://img.shields.io/badge/version-0.5.55-green.svg" alt="Version"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/node-%3E%3D20.9-brightgreen.svg" alt="Node">
 </p>

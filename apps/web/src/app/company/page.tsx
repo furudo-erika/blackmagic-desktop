@@ -33,6 +33,7 @@ type Employee = {
   name: string;
   role: string;
   team: string;
+  reportsTo: string;
   faceSeed: string;
   frontmatter: Record<string, unknown>;
   body: string;
@@ -102,7 +103,48 @@ function sortTeams(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
-function orgTreeFromTeams(teams: ReadonlyArray<readonly [string, Employee[]]>): OrgNode[] {
+function reportsToEmployeeSlug(reportsTo: string): string | null {
+  return reportsTo.startsWith('employee:') ? reportsTo.slice('employee:'.length) : null;
+}
+
+function wouldCreateReportsCycle(employees: Employee[], slug: string, managerSlug: string): boolean {
+  if (slug === managerSlug) return true;
+  const bySlug = new Map(employees.map((employee) => [employee.slug, employee]));
+  const seen = new Set<string>();
+  let cursor: string | null = managerSlug;
+  while (cursor) {
+    if (cursor === slug) return true;
+    if (seen.has(cursor)) return true;
+    seen.add(cursor);
+    const next = bySlug.get(cursor);
+    cursor = next ? reportsToEmployeeSlug(next.reportsTo) : null;
+  }
+  return false;
+}
+
+function orgTreeFromTeams(teams: ReadonlyArray<readonly [string, Employee[]]>, employees: Employee[]): OrgNode[] {
+  const employeeNodes = new Map<string, OrgNode>();
+  for (const employee of employees) {
+    employeeNodes.set(employee.slug, {
+      kind: 'employee',
+      id: `employee:${employee.slug}`,
+      name: employee.name,
+      employee,
+      reports: [],
+    });
+  }
+
+  const attached = new Set<string>();
+  for (const employee of employees) {
+    const managerSlug = reportsToEmployeeSlug(employee.reportsTo);
+    if (!managerSlug || wouldCreateReportsCycle(employees, employee.slug, managerSlug)) continue;
+    const manager = employeeNodes.get(managerSlug);
+    const report = employeeNodes.get(employee.slug);
+    if (!manager || !report) continue;
+    manager.reports.push(report);
+    attached.add(employee.slug);
+  }
+
   return [{
     kind: 'company',
     id: 'company',
@@ -113,13 +155,10 @@ function orgTreeFromTeams(teams: ReadonlyArray<readonly [string, Employee[]]>): 
       name: team,
       team,
       members,
-      reports: members.map((employee) => ({
-        kind: 'employee' as const,
-        id: `employee:${employee.slug}`,
-        name: employee.name,
-        employee,
-        reports: [],
-      })),
+      reports: members
+        .filter((employee) => !attached.has(employee.slug))
+        .map((employee) => employeeNodes.get(employee.slug))
+        .filter((node): node is OrgNode => Boolean(node)),
     })),
   }];
 }
@@ -216,6 +255,7 @@ export default function CompanyPage() {
   const [pendingTeam, setPendingTeam] = useState<string | null>(null);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [dropTeam, setDropTeam] = useState<string | null>(null);
+  const [dropManagerSlug, setDropManagerSlug] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0.92);
   const [pan, setPan] = useState({ x: 24, y: 24 });
   const [panning, setPanning] = useState(false);
@@ -251,7 +291,7 @@ export default function CompanyPage() {
   }, [employees]);
 
   const selected = selectedSlug ? employees.find((employee) => employee.slug === selectedSlug) ?? null : null;
-  const orgTree = useMemo(() => orgTreeFromTeams(teams), [teams]);
+  const orgTree = useMemo(() => orgTreeFromTeams(teams, employees), [teams, employees]);
   const layout = useMemo(() => layoutForest(orgTree), [orgTree]);
   const allNodes = useMemo(() => flattenLayout(layout), [layout]);
   const edges = useMemo(() => collectEdges(layout), [layout]);
@@ -433,10 +473,20 @@ export default function CompanyPage() {
   });
 
   const moveEmployee = useMutation({
-    mutationFn: async ({ slug, team }: { slug: string; team: string }) => {
+    mutationFn: async ({ slug, team, reportsTo }: { slug: string; team: string; reportsTo?: string }) => {
       const employee = employees.find((row) => row.slug === slug);
-      if (!employee || employee.team === team) return;
-      await saveEmployee({ employee, patch: { team } });
+      if (!employee) return;
+      await saveEmployee({ employee, patch: { team, reportsTo: reportsTo ?? `team:${team}` } });
+    },
+    onSuccess: invalidateOrg,
+  });
+
+  const assignManager = useMutation({
+    mutationFn: async ({ slug, managerSlug }: { slug: string; managerSlug: string }) => {
+      const employee = employees.find((row) => row.slug === slug);
+      const manager = employees.find((row) => row.slug === managerSlug);
+      if (!employee || !manager || wouldCreateReportsCycle(employees, slug, managerSlug)) return;
+      await saveEmployee({ employee, patch: { team: manager.team, reportsTo: `employee:${manager.slug}` } });
     },
     onSuccess: invalidateOrg,
   });
@@ -597,6 +647,19 @@ export default function CompanyPage() {
                         key={node.id}
                         node={node}
                         selected={node.source.kind === 'employee' && selectedSlug === node.source.employee.slug}
+                        activeDrop={node.source.kind === 'employee' && dropManagerSlug === node.source.employee.slug}
+                        onDragEnter={() => {
+                          if (node.source.kind === 'employee') setDropManagerSlug(node.source.employee.slug);
+                        }}
+                        onDragLeave={() => setDropManagerSlug((current) =>
+                          node.source.kind === 'employee' && current === node.source.employee.slug ? null : current,
+                        )}
+                        onDrop={(slug) => {
+                          setDropManagerSlug(null);
+                          if (node.source.kind === 'employee') {
+                            assignManager.mutate({ slug, managerSlug: node.source.employee.slug });
+                          }
+                        }}
                         onSelect={() => {
                           if (suppressNextCardClick.current) {
                             suppressNextCardClick.current = false;
@@ -736,10 +799,18 @@ function TeamNode({
 function EmployeeNode({
   node,
   selected,
+  activeDrop,
+  onDragEnter,
+  onDragLeave,
+  onDrop,
   onSelect,
 }: {
   node: LayoutNode;
   selected: boolean;
+  activeDrop: boolean;
+  onDragEnter: () => void;
+  onDragLeave: () => void;
+  onDrop: (slug: string) => void;
   onSelect: () => void;
 }) {
   if (node.source.kind !== 'employee') return null;
@@ -753,10 +824,23 @@ function EmployeeNode({
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', employee.slug);
       }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+      }}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDrop={(event) => {
+        event.preventDefault();
+        const slug = event.dataTransfer.getData('text/plain');
+        if (slug && slug !== employee.slug) onDrop(slug);
+      }}
       onClick={onSelect}
       className={
         'absolute text-left rounded-xl border px-2.5 py-2 flex items-center gap-2 transition-colors shadow-sm ' +
-        (selected
+        (activeDrop
+          ? 'border-flame/70 bg-flame/[0.06]'
+          : selected
           ? 'border-flame/50 bg-white dark:bg-[#1F1B15]'
           : 'border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] hover:border-flame/30')
       }
@@ -784,7 +868,7 @@ function Inspector({
   teams: string[];
   saving: boolean;
   error: string | null;
-  onSave: (patch: Partial<Pick<Employee, 'name' | 'team' | 'faceSeed'>>) => void;
+  onSave: (patch: Partial<Pick<Employee, 'name' | 'team' | 'faceSeed' | 'reportsTo'>>) => void;
 }) {
   const [draft, setDraft] = useState({ name: '', team: '', faceSeed: '' });
   const [loadedSlug, setLoadedSlug] = useState<string | null>(null);
@@ -1055,6 +1139,7 @@ async function loadEmployees(): Promise<Employee[]> {
     const slug = file.path.replace(/^agents\//, '').replace(/\.md$/, '');
     const name = String(fm.name ?? slug);
     const team = String(fm.team ?? 'GTM');
+    const reportsTo = String(fm.reports_to ?? `team:${team}`);
     const faceSeed = String(fm.face_seed ?? slug);
     return {
       slug,
@@ -1062,6 +1147,7 @@ async function loadEmployees(): Promise<Employee[]> {
       name,
       role: roleFromName(name),
       team,
+      reportsTo,
       faceSeed,
       frontmatter: fm,
       body: record.body,
@@ -1075,13 +1161,14 @@ async function saveEmployee({
   patch,
 }: {
   employee: Employee;
-  patch: Partial<Pick<Employee, 'name' | 'team' | 'faceSeed'>>;
+  patch: Partial<Pick<Employee, 'name' | 'team' | 'faceSeed' | 'reportsTo'>>;
 }): Promise<void> {
+  const team = patch.team ?? employee.team;
   const frontmatter = {
     ...employee.frontmatter,
     name: patch.name ?? employee.name,
-    team: patch.team ?? employee.team,
-    reports_to: `team:${patch.team ?? employee.team}`,
+    team,
+    reports_to: patch.reportsTo ?? (patch.team && patch.team !== employee.team ? `team:${team}` : employee.reportsTo),
     face_seed: patch.faceSeed ?? employee.faceSeed,
   };
   await api.writeFile(employee.path, serializeMarkdown(frontmatter, employee.body));
