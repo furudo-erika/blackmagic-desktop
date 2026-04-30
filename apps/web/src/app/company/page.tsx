@@ -8,7 +8,7 @@
  * frontmatter values Black Magic already uses: `name`, `team`, `face_seed`.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -16,14 +16,12 @@ import {
   Building2,
   Check,
   ChevronRight,
-  GripVertical,
   Maximize2,
   Minus,
   Network,
   Plus,
   Sparkles,
   UserPlus,
-  Users,
   X,
 } from 'lucide-react';
 import { api } from '../../lib/api';
@@ -39,6 +37,51 @@ type Employee = {
   frontmatter: Record<string, unknown>;
   body: string;
 };
+
+type ChartNode =
+  | {
+      kind: 'company';
+      id: 'company';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    }
+  | {
+      kind: 'team';
+      id: string;
+      team: string;
+      members: Employee[];
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    }
+  | {
+      kind: 'employee';
+      id: string;
+      employee: Employee;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    };
+
+type ChartEdge = {
+  id: string;
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+};
+
+const COMPANY_W = 300;
+const COMPANY_H = 84;
+const TEAM_W = 190;
+const TEAM_H = 88;
+const EMPLOYEE_W = 156;
+const EMPLOYEE_H = 66;
+const COL_GAP = 30;
+const ROW_GAP = 72;
+const CHART_PAD = 80;
 
 const TEAM_BLURBS: Record<string, string> = {
   GTM: 'Pipeline, outbound, research, brand.',
@@ -66,13 +109,92 @@ function sortTeams(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
+function buildOrgChart(teams: ReadonlyArray<readonly [string, Employee[]]>): {
+  width: number;
+  height: number;
+  nodes: ChartNode[];
+  edges: ChartEdge[];
+} {
+  const columnWidths = teams.map(([, members]) => Math.max(TEAM_W, members.length * EMPLOYEE_W + Math.max(0, members.length - 1) * 14));
+  const contentWidth = Math.max(
+    COMPANY_W,
+    columnWidths.reduce((sum, width) => sum + width, 0) + Math.max(0, teams.length - 1) * COL_GAP,
+  );
+  const width = contentWidth + CHART_PAD * 2;
+  const maxMembers = Math.max(0, ...teams.map(([, members]) => members.length));
+  const height = CHART_PAD + COMPANY_H + ROW_GAP + TEAM_H + ROW_GAP + EMPLOYEE_H + (maxMembers > 0 ? CHART_PAD : 0);
+  const companyX = (width - COMPANY_W) / 2;
+  const companyY = CHART_PAD;
+  const teamY = companyY + COMPANY_H + ROW_GAP;
+  const employeeY = teamY + TEAM_H + ROW_GAP;
+
+  const nodes: ChartNode[] = [{
+    kind: 'company',
+    id: 'company',
+    x: companyX,
+    y: companyY,
+    w: COMPANY_W,
+    h: COMPANY_H,
+  }];
+  const edges: ChartEdge[] = [];
+
+  let x = CHART_PAD + (contentWidth - columnWidths.reduce((sum, width) => sum + width, 0) - Math.max(0, teams.length - 1) * COL_GAP) / 2;
+  for (let i = 0; i < teams.length; i++) {
+    const [team, members] = teams[i]!;
+    const colW = columnWidths[i] ?? TEAM_W;
+    const teamX = x + (colW - TEAM_W) / 2;
+    const teamNode: ChartNode = {
+      kind: 'team',
+      id: `team:${team}`,
+      team,
+      members,
+      x: teamX,
+      y: teamY,
+      w: TEAM_W,
+      h: TEAM_H,
+    };
+    nodes.push(teamNode);
+    edges.push({
+      id: `company:${team}`,
+      from: { x: companyX + COMPANY_W / 2, y: companyY + COMPANY_H },
+      to: { x: teamX + TEAM_W / 2, y: teamY },
+    });
+
+    let employeeX = x;
+    for (const employee of members) {
+      const empNode: ChartNode = {
+        kind: 'employee',
+        id: `employee:${employee.slug}`,
+        employee,
+        x: employeeX,
+        y: employeeY,
+        w: EMPLOYEE_W,
+        h: EMPLOYEE_H,
+      };
+      nodes.push(empNode);
+      edges.push({
+        id: `${team}:${employee.slug}`,
+        from: { x: teamX + TEAM_W / 2, y: teamY + TEAM_H },
+        to: { x: employeeX + EMPLOYEE_W / 2, y: employeeY },
+      });
+      employeeX += EMPLOYEE_W + 14;
+    }
+    x += colW + COL_GAP;
+  }
+
+  return { width, height, nodes, edges };
+}
+
 export default function CompanyPage() {
   const qc = useQueryClient();
   const [addTeamOpen, setAddTeamOpen] = useState(false);
   const [pendingTeam, setPendingTeam] = useState<string | null>(null);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [dropTeam, setDropTeam] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.92);
+  const [pan, setPan] = useState({ x: 24, y: 24 });
+  const [panning, setPanning] = useState(false);
+  const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
   const employeesQ = useQuery({
     queryKey: ['company-employees'],
@@ -93,6 +215,7 @@ export default function CompanyPage() {
   }, [employees]);
 
   const selected = selectedSlug ? employees.find((employee) => employee.slug === selectedSlug) ?? null : null;
+  const chart = useMemo(() => buildOrgChart(teams), [teams]);
 
   const invalidateOrg = () => {
     qc.invalidateQueries({ queryKey: ['company-employees'] });
@@ -137,7 +260,7 @@ export default function CompanyPage() {
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setZoom((value) => Math.max(0.75, Number((value - 0.1).toFixed(2))))}
+              onClick={() => setZoom((value) => Math.max(0.45, Number((value - 0.1).toFixed(2))))}
               className="w-8 h-8 rounded-md border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] flex items-center justify-center text-muted hover:text-ink dark:hover:text-[#F5F1EA]"
               title="Zoom out"
             >
@@ -145,7 +268,10 @@ export default function CompanyPage() {
             </button>
             <button
               type="button"
-              onClick={() => setZoom(1)}
+              onClick={() => {
+                setZoom(0.92);
+                setPan({ x: 24, y: 24 });
+              }}
               className="w-8 h-8 rounded-md border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] flex items-center justify-center text-muted hover:text-ink dark:hover:text-[#F5F1EA]"
               title="Reset zoom"
             >
@@ -153,7 +279,7 @@ export default function CompanyPage() {
             </button>
             <button
               type="button"
-              onClick={() => setZoom((value) => Math.min(1.3, Number((value + 0.1).toFixed(2))))}
+              onClick={() => setZoom((value) => Math.min(1.6, Number((value + 0.1).toFixed(2))))}
               className="w-8 h-8 rounded-md border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] flex items-center justify-center text-muted hover:text-ink dark:hover:text-[#F5F1EA]"
               title="Zoom in"
             >
@@ -173,7 +299,31 @@ export default function CompanyPage() {
 
       <div className="flex-1 min-h-0 overflow-hidden px-6 py-5">
         <div className="h-full max-w-7xl mx-auto grid grid-cols-[minmax(0,1fr)_320px] gap-4">
-          <section className="min-h-0 overflow-auto bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl">
+          <section
+            className="min-h-0 overflow-hidden bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl relative"
+            style={{ cursor: panning ? 'grabbing' : 'grab' }}
+            onMouseDown={(event) => {
+              if (event.button !== 0) return;
+              const target = event.target as HTMLElement;
+              if (target.closest('[data-org-node]')) return;
+              setPanning(true);
+              panStart.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y };
+            }}
+            onMouseMove={(event) => {
+              if (!panning) return;
+              setPan({
+                x: panStart.current.panX + event.clientX - panStart.current.x,
+                y: panStart.current.panY + event.clientY - panStart.current.y,
+              });
+            }}
+            onMouseUp={() => setPanning(false)}
+            onMouseLeave={() => setPanning(false)}
+            onWheel={(event) => {
+              event.preventDefault();
+              const next = event.deltaY < 0 ? zoom * 1.08 : zoom * 0.92;
+              setZoom(Math.min(1.6, Math.max(0.45, Number(next.toFixed(3)))));
+            }}
+          >
             {employeesQ.isLoading ? (
               <div className="text-[13px] text-muted dark:text-[#8C837C] py-12 text-center">loading the org...</div>
             ) : teams.length === 0 ? (
@@ -181,41 +331,64 @@ export default function CompanyPage() {
                 No employees yet. Add a team to get started.
               </div>
             ) : (
-              <div className="min-w-[920px] p-6" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
-                <div className="flex justify-center">
-                  <div className="rounded-xl border border-flame/30 bg-gradient-to-br from-flame/12 to-flame/[0.04] flex items-center gap-3 px-4 py-2.5 max-w-[300px]">
-                    <EmployeeFace seed="ceo" name="CEO" size="md" />
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate leading-tight">
-                        The Company
-                      </div>
-                      <div className="text-[10.5px] font-mono text-muted dark:text-[#8C837C] truncate leading-tight mt-0.5">
-                        {teams.length} teams · {totalEmployees} employees
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="h-8 flex items-center justify-center">
-                  <div className="w-px h-full bg-line dark:bg-[#2A241D]" />
-                </div>
-                <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(teams.length, 6)}, minmax(150px, 1fr))` }}>
-                  {teams.map(([teamName, members]) => (
-                    <TeamColumn
-                      key={teamName}
-                      name={teamName}
-                      members={members}
-                      activeDrop={dropTeam === teamName}
-                      selectedSlug={selectedSlug}
-                      onAddEmployee={() => setPendingTeam(teamName)}
-                      onSelect={setSelectedSlug}
-                      onDragEnter={() => setDropTeam(teamName)}
-                      onDragLeave={() => setDropTeam((current) => current === teamName ? null : current)}
-                      onDrop={(slug) => {
-                        setDropTeam(null);
-                        moveEmployee.mutate({ slug, team: teamName });
-                      }}
-                    />
-                  ))}
+              <div
+                className="absolute inset-0"
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  transformOrigin: '0 0',
+                }}
+              >
+                <div className="relative" style={{ width: chart.width, height: chart.height }}>
+                  <svg className="absolute inset-0 pointer-events-none" width={chart.width} height={chart.height} aria-hidden>
+                    {chart.edges.map((edge) => {
+                      const midY = (edge.from.y + edge.to.y) / 2;
+                      return (
+                        <path
+                          key={edge.id}
+                          d={`M ${edge.from.x} ${edge.from.y} L ${edge.from.x} ${midY} L ${edge.to.x} ${midY} L ${edge.to.x} ${edge.to.y}`}
+                          fill="none"
+                          stroke="rgba(55,50,47,0.24)"
+                          strokeWidth={1.5}
+                        />
+                      );
+                    })}
+                  </svg>
+                  {chart.nodes.map((node) => {
+                    if (node.kind === 'company') {
+                      return (
+                        <CompanyNode
+                          key={node.id}
+                          node={node}
+                          teamsCount={teams.length}
+                          employeesCount={totalEmployees}
+                        />
+                      );
+                    }
+                    if (node.kind === 'team') {
+                      return (
+                        <TeamNode
+                          key={node.id}
+                          node={node}
+                          activeDrop={dropTeam === node.team}
+                          onAddEmployee={() => setPendingTeam(node.team)}
+                          onDragEnter={() => setDropTeam(node.team)}
+                          onDragLeave={() => setDropTeam((current) => current === node.team ? null : current)}
+                          onDrop={(slug) => {
+                            setDropTeam(null);
+                            moveEmployee.mutate({ slug, team: node.team });
+                          }}
+                        />
+                      );
+                    }
+                    return (
+                      <EmployeeNode
+                        key={node.id}
+                        node={node}
+                        selected={selectedSlug === node.employee.slug}
+                        onSelect={() => setSelectedSlug(node.employee.slug)}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -259,29 +432,52 @@ export default function CompanyPage() {
   );
 }
 
-function TeamColumn({
-  name,
-  members,
+function CompanyNode({
+  node,
+  teamsCount,
+  employeesCount,
+}: {
+  node: Extract<ChartNode, { kind: 'company' }>;
+  teamsCount: number;
+  employeesCount: number;
+}) {
+  return (
+    <div
+      data-org-node
+      className="absolute rounded-xl border border-flame/30 bg-gradient-to-br from-flame/12 to-flame/[0.04] flex items-center gap-3 px-4 py-2.5 shadow-sm"
+      style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
+    >
+      <EmployeeFace seed="ceo" name="CEO" size="md" />
+      <div className="min-w-0">
+        <div className="text-[14px] font-semibold text-ink dark:text-[#F5F1EA] truncate leading-tight">
+          The Company
+        </div>
+        <div className="text-[10.5px] font-mono text-muted dark:text-[#8C837C] truncate leading-tight mt-0.5">
+          {teamsCount} teams · {employeesCount} employees
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamNode({
+  node,
   activeDrop,
-  selectedSlug,
   onAddEmployee,
-  onSelect,
   onDragEnter,
   onDragLeave,
   onDrop,
 }: {
-  name: string;
-  members: Employee[];
+  node: Extract<ChartNode, { kind: 'team' }>;
   activeDrop: boolean;
-  selectedSlug: string | null;
   onAddEmployee: () => void;
-  onSelect: (slug: string) => void;
   onDragEnter: () => void;
   onDragLeave: () => void;
   onDrop: (slug: string) => void;
 }) {
   return (
-    <section
+    <div
+      data-org-node
       onDragOver={(event) => event.preventDefault()}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
@@ -291,16 +487,17 @@ function TeamColumn({
         if (slug) onDrop(slug);
       }}
       className={
-        'rounded-xl border p-3 min-h-[220px] transition-colors ' +
+        'absolute rounded-xl border px-3 py-2.5 transition-colors shadow-sm ' +
         (activeDrop
           ? 'border-flame/60 bg-flame/[0.06]'
           : 'border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F]')
       }
+      style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{name}</div>
-          <div className="text-[10.5px] font-mono text-muted dark:text-[#8C837C]">{members.length} employees</div>
+          <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{node.team}</div>
+          <div className="text-[10.5px] font-mono text-muted dark:text-[#8C837C]">{node.members.length} employees</div>
         </div>
         <button
           type="button"
@@ -312,36 +509,47 @@ function TeamColumn({
           add
         </button>
       </div>
-      <p className="text-[11px] text-muted dark:text-[#8C837C] leading-snug min-h-[34px] mb-3">{blurbFor(name)}</p>
-      <div className="space-y-2">
-        {members.map((member) => (
-          <button
-            key={member.slug}
-            type="button"
-            draggable
-            onDragStart={(event) => {
-              event.dataTransfer.effectAllowed = 'move';
-              event.dataTransfer.setData('text/plain', member.slug);
-            }}
-            onClick={() => onSelect(member.slug)}
-            className={
-              'w-full text-left rounded-lg border px-2.5 py-2 flex items-center gap-2 transition-colors ' +
-              (selectedSlug === member.slug
-                ? 'border-flame/50 bg-white dark:bg-[#1F1B15]'
-                : 'border-transparent bg-white/70 dark:bg-[#1F1B15]/70 hover:border-flame/30')
-            }
-          >
-            <GripVertical className="w-3.5 h-3.5 text-muted/60 dark:text-[#6B625C] shrink-0" />
-            <EmployeeFace seed={member.faceSeed} name={member.name} size="sm" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[12px] font-medium text-ink dark:text-[#E6E0D8] truncate">{member.name}</div>
-              <div className="text-[10px] font-mono text-muted dark:text-[#8C837C] truncate">{member.role}</div>
-            </div>
-            <ChevronRight className="w-3 h-3 text-muted/60 dark:text-[#6B625C]" />
-          </button>
-        ))}
+      <p className="text-[11px] text-muted dark:text-[#8C837C] leading-snug line-clamp-2">{blurbFor(node.team)}</p>
+    </div>
+  );
+}
+
+function EmployeeNode({
+  node,
+  selected,
+  onSelect,
+}: {
+  node: Extract<ChartNode, { kind: 'employee' }>;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const employee = node.employee;
+  return (
+    <button
+      data-org-node
+      type="button"
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', employee.slug);
+      }}
+      onClick={onSelect}
+      className={
+        'absolute text-left rounded-xl border px-2.5 py-2 flex items-center gap-2 transition-colors shadow-sm ' +
+        (selected
+          ? 'border-flame/50 bg-white dark:bg-[#1F1B15]'
+          : 'border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] hover:border-flame/30')
+      }
+      style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
+      title={`${employee.name} · ${employee.team}`}
+    >
+      <EmployeeFace seed={employee.faceSeed} name={employee.name} size="sm" />
+      <div className="min-w-0 flex-1">
+        <div className="text-[12px] font-medium text-ink dark:text-[#E6E0D8] truncate">{employee.name}</div>
+        <div className="text-[10px] font-mono text-muted dark:text-[#8C837C] truncate">{employee.role}</div>
       </div>
-    </section>
+      <ChevronRight className="w-3 h-3 text-muted/60 dark:text-[#6B625C] shrink-0" />
+    </button>
   );
 }
 
