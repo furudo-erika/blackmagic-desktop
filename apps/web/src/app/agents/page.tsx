@@ -22,46 +22,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PreflightModal } from '../../components/preflight-modal';
 import {
-  Bot, Sparkles, Search, Briefcase, Globe, Linkedin,
-  CalendarClock, Copy as CopyIcon, RotateCcw, Activity, Radar, Send,
   Play, ChevronRight, ChevronDown, FileOutput, FileInput, Loader2, Check, AlertCircle,
-  Target, MessageCircle, Eye, MessageCircleReply,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../../lib/api';
-import { AgentIcon, hasAgentTheme } from '../../components/agent-icon';
+import { EmployeeFace } from '../../components/employee-face';
 import { Markdown } from '../../components/markdown';
 import { Composer } from '../../components/composer';
-
-const AGENT_ICON_MAP: Record<string, LucideIcon> = {
-  Bot, Globe, Linkedin, CalendarClock, Copy: CopyIcon, RotateCcw,
-  Activity, Radar, Search, Briefcase, Send, Sparkles,
-  Target, MessageCircle, Eye, MessageCircleReply,
-};
-
-// Per-slug Lucide override so every seeded agent shows a distinct
-// thematic glyph across sidebar + agent-page hero + starter cards.
-// Mirrors the table in components/sidebar.tsx — kept duplicated
-// rather than shared because a shared module would drag lucide into
-// the starter-tint lookup too. Both tables must move together.
-const AGENT_SLUG_ICON: Record<string, LucideIcon> = {
-  'company-profiler':    Sparkles,
-  'researcher':          Search,
-  'sdr':                 Send,
-  'ae':                  Briefcase,
-  'website-visitor':     Globe,
-  'linkedin-outreach':   Linkedin,
-  'meeting-prep':        CalendarClock,
-  'lookalike-discovery': CopyIcon,
-  'closed-lost-revival': RotateCcw,
-  'pipeline-ops':        Activity,
-  'geo-analyst':         Radar,
-  'outbound':            Target,
-  'brand-monitor':       Eye,
-  'content-studio':      Sparkles,
-  'x-account':           MessageCircle,
-  'reply-guy':           MessageCircleReply,
-};
 
 const AGENT_TAGLINE_OVERRIDES: Record<string, string> = {
   outbound: 'Take an outbound goal from discovery through enrichment, scoring, drafting, sending, and notification.',
@@ -75,6 +42,8 @@ type AgentMeta = {
   icon: string;
   tagline: string;
   starters: string[];
+  team: string;
+  faceSeed: string;
 };
 
 type Run = {
@@ -205,6 +174,8 @@ function AgentsInner() {
           icon: typeof fm.icon === 'string' ? fm.icon : 'Bot',
           tagline: deriveTagline(fm, r.body, name),
           starters,
+          team: typeof fm.team === 'string' ? fm.team : 'GTM',
+          faceSeed: typeof fm.face_seed === 'string' ? fm.face_seed : s,
         };
       }));
       rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -298,10 +269,6 @@ function AgentsInner() {
     );
   }
 
-  // Prefer the per-slug Lucide override (consistent with sidebar) over
-  // the frontmatter icon name — several agents' icons were mislabeled
-  // or missing from the map, producing generic Bot fallbacks.
-  const HeaderIcon = AGENT_SLUG_ICON[agent.slug] ?? AGENT_ICON_MAP[agent.icon] ?? Bot;
   const tagline = AGENT_TAGLINE_OVERRIDES[agent.slug] ?? agent.tagline;
 
   // Derive the three panels' contents from the latest run.
@@ -334,13 +301,16 @@ function AgentsInner() {
           three stacked concerns. */}
       <header className="shrink-0 border-b border-line dark:border-[#2A241D] px-6 py-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-flame/10 border border-flame/20 flex items-center justify-center shrink-0">
-              <HeaderIcon className="w-4 h-4 text-flame" />
+          <div className="flex items-center gap-3">
+            <EmployeeFace seed={agent.faceSeed} name={agent.name} size="lg" ring />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[18px] leading-tight font-semibold tracking-tight text-ink dark:text-[#F5F1EA] truncate">
+                {agent.name}
+              </h1>
+              <div className="text-[11px] font-mono text-muted dark:text-[#8C837C] mt-0.5">
+                {agent.team} team · employee
+              </div>
             </div>
-            <h1 className="text-[18px] leading-tight font-semibold tracking-tight text-ink dark:text-[#F5F1EA] truncate">
-              {agent.name}
-            </h1>
             <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-mono text-muted dark:text-[#8C837C]">
               <span className={'w-1.5 h-1.5 rounded-full ' + (isLive ? 'bg-flame animate-pulse' : 'bg-muted/40 dark:bg-[#6B625C]')} />
               {isLive ? `running · ${elapsedShort(startedMs)}` : 'idle'}

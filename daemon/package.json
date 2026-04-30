@@ -1,6 +1,6 @@
 {
   "name": "@bm/daemon",
-  "version": "0.5.26",
+  "version": "0.5.49",
   "private": true,
   "type": "module",
   "main": "dist/index.js",

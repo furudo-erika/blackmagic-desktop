@@ -44,6 +44,7 @@ import {
   Activity,
   Radar,
   Workflow,
+  Network,
   Send,
   Wrench,
   ChevronRight,
@@ -58,6 +59,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { api, type Project } from '../lib/api';
+import { EmployeeFace } from './employee-face';
 
 // Icon string (from agent frontmatter `icon:`) → lucide component.
 // Mirrors the names seeded in daemon/src/context.ts DEFAULT_AGENTS. Falls
@@ -175,7 +177,9 @@ export function Sidebar() {
         const name = typeof fm.name === 'string' ? fm.name : slug;
         const icon = typeof fm.icon === 'string' ? fm.icon : '';
         const pin = typeof fm.pin === 'string' ? fm.pin : '';
-        return { slug, name, icon, pin };
+        const team = typeof fm.team === 'string' ? fm.team : 'GTM';
+        const faceSeed = typeof fm.face_seed === 'string' ? fm.face_seed : slug;
+        return { slug, name, icon, pin, team, faceSeed };
       }));
       rows.sort((a, b) => {
         const aPin = a.pin === 'first' ? 0 : 1;
@@ -272,11 +276,15 @@ export function Sidebar() {
             point, and the Agents section below owns per-agent threads.
             The /chat route still works by direct URL. */}
 
+        <NavRow icon={Users}           label="Company"   href="/company"   pathname={pathname} />
+        <NavRow icon={Network}         label="Chart"     href="/chart"     pathname={pathname} />
+        <NavRow icon={Briefcase}       label="Team"      href="/team"      pathname={pathname} />
         <AgentsSidebarRow
           pathname={pathname}
           agents={teamAgents.data ?? []}
           liveSlugs={liveAgentSlugs}
         />
+        <NavRow icon={Sparkles}        label="Skills"    href="/skills"    pathname={pathname} />
         <NavRow icon={Zap}             label="Triggers"  href="/triggers"  pathname={pathname} breathing={triggersBreathing} />
         <HistorySidebarRow pathname={pathname} router={router} />
         <NavRow icon={Inbox}           label="Drafts"    href="/outreach"  pathname={pathname} badge={pendingDraftCount} />
@@ -406,16 +414,31 @@ function AgentsSidebarRow({
   liveSlugs,
 }: {
   pathname: string;
-  agents: Array<{ slug: string; name: string; icon: string }>;
+  agents: Array<{ slug: string; name: string; icon: string; team?: string; faceSeed?: string }>;
   liveSlugs: Set<string>;
 }) {
   const inside = pathname.startsWith('/agents');
   const search = useSearchParams();
   const activeSlug = search.get('slug') ?? '';
-  // Agents are the product's first-class citizens — default expanded
-  // so a cold-start user sees the full roster at a glance.
   const [open, setOpen] = useState<boolean>(true);
   useEffect(() => { if (inside) setOpen(true); }, [inside]);
+
+  // Group employees by team. GTM first, then alpha — matches /company.
+  const grouped = useMemo(() => {
+    const map = new Map<string, typeof agents>();
+    for (const a of agents) {
+      const t = a.team || 'GTM';
+      const list = (map.get(t) ?? []) as typeof agents;
+      list.push(a);
+      map.set(t, list);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => {
+      if (a === 'GTM') return -1;
+      if (b === 'GTM') return 1;
+      return a.localeCompare(b);
+    });
+  }, [agents]);
+
   return (
     <div>
       <div
@@ -429,7 +452,7 @@ function AgentsSidebarRow({
           className="flex-1 flex items-center gap-2.5 px-3 py-2 text-[13px] text-ink dark:text-[#E6E0D8] min-w-0"
         >
           <Bot className="w-4 h-4 shrink-0 text-muted dark:text-[#8C837C]" />
-          <span className="truncate">Agents</span>
+          <span className="truncate">Employees</span>
           {liveSlugs.size > 0 && (
             <span className="ml-auto text-[10px] font-mono text-flame">{liveSlugs.size}</span>
           )}
@@ -437,55 +460,65 @@ function AgentsSidebarRow({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          aria-label={open ? 'Collapse Agents' : 'Expand Agents'}
+          aria-label={open ? 'Collapse Employees' : 'Expand Employees'}
           className="px-1.5 py-1.5 text-muted dark:text-[#8C837C] hover:text-ink dark:hover:text-[#F5F1EA]"
         >
           <ChevronRight className={'w-3 h-3 transition-transform ' + (open ? 'rotate-90' : '')} />
         </button>
       </div>
       {open && (
-        <ul className="ml-5 pl-2 border-l border-line dark:border-[#2A241D] mt-0.5 mb-1 space-y-0.5">
-          {agents.length === 0 && (
-            <li className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">no agents</li>
+        <div className="ml-5 pl-2 border-l border-line dark:border-[#2A241D] mt-0.5 mb-1">
+          {agents.length === 0 ? (
+            <div className="px-2 py-1 text-[11px] text-muted dark:text-[#8C837C]">no employees</div>
+          ) : (
+            grouped.map(([teamName, members]) => (
+              <div key={teamName} className="mb-1.5 last:mb-0">
+                {grouped.length > 1 && (
+                  <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-mono uppercase tracking-widest text-muted/70 dark:text-[#6B625C]">
+                    {teamName}
+                  </div>
+                )}
+                <ul className="space-y-0.5">
+                  {members.map((a) => {
+                    const active = inside && activeSlug === a.slug;
+                    const isLive = liveSlugs.has(a.slug.toLowerCase());
+                    return (
+                      <li key={a.slug}>
+                        <Link
+                          href={`/agents?slug=${encodeURIComponent(a.slug)}`}
+                          onClick={() => {
+                            if (typeof window !== 'undefined') {
+                              window.localStorage.setItem('bm-last-agent', a.slug);
+                            }
+                          }}
+                          className={
+                            'flex items-center gap-2 px-2 py-1 rounded-md text-[11.5px] truncate ' +
+                            (active
+                              ? 'bg-white dark:bg-[#1F1B15] text-ink dark:text-[#F5F1EA] font-semibold'
+                              : 'text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
+                          }
+                        >
+                          <EmployeeFace
+                            seed={a.faceSeed || a.slug}
+                            name={a.name}
+                            size="xs"
+                          />
+                          <span className="truncate flex-1">{a.name}</span>
+                          {isLive && (
+                            <span className="relative flex h-1.5 w-1.5 shrink-0">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-flame" />
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))
           )}
-          {agents.map((a) => {
-            // Prefer an explicit per-slug Lucide glyph, then the frontmatter
-            // icon: field, then a generic Bot. The previous mix of monogram
-            // tiles + Lucide icons looked inconsistent in a single list —
-            // every row now uses the same visual treatment.
-            const Icon =
-              AGENT_SLUG_ICON[a.slug] ?? AGENT_ICON_MAP[a.icon] ?? Bot;
-            const active = inside && activeSlug === a.slug;
-            const isLive = liveSlugs.has(a.slug.toLowerCase());
-            return (
-              <li key={a.slug}>
-                <Link
-                  href={`/agents?slug=${encodeURIComponent(a.slug)}`}
-                  onClick={() => {
-                    if (typeof window !== 'undefined') {
-                      window.localStorage.setItem('bm-last-agent', a.slug);
-                    }
-                  }}
-                  className={
-                    'flex items-center gap-1.5 px-2 py-1 rounded-md text-[11.5px] truncate ' +
-                    (active
-                      ? 'bg-white dark:bg-[#1F1B15] text-ink dark:text-[#F5F1EA] font-semibold'
-                      : 'text-ink/80 dark:text-[#E6E0D8] hover:bg-white/60 dark:hover:bg-[#1F1B15]/60')
-                  }
-                >
-                  <Icon className={'w-3.5 h-3.5 shrink-0 ' + (active ? 'text-flame' : 'text-muted dark:text-[#8C837C]')} />
-                  <span className="truncate flex-1">{a.name}</span>
-                  {isLive && (
-                    <span className="relative flex h-1.5 w-1.5 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-flame opacity-75" />
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-flame" />
-                    </span>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        </div>
       )}
     </div>
   );
@@ -700,7 +733,11 @@ function CommandPalette({
       { label: 'Contacts', href: '/contacts', hint: 'Context — contacts' },
       { label: 'Deals', href: '/deals', hint: 'Context — deals' },
       { label: 'Files', href: '/context', hint: 'Context — raw files' },
-      { label: 'Agents', href: '/agents', hint: 'all agents in this project' },
+      { label: 'Employees', href: '/agents', hint: 'all AI employees in this project' },
+      { label: 'Company', href: '/company', hint: 'team-card grid view' },
+      { label: 'Chart', href: '/chart', hint: 'top-down org chart' },
+      { label: 'Team', href: '/team', hint: 'standup — what every team is shipping' },
+      { label: 'Skills', href: '/skills', hint: 'reusable playbooks every employee can run' },
       { label: 'Triggers', href: '/triggers', hint: 'automations — scheduled' },
       { label: 'Ontology', href: '/ontology', hint: 'context graph' },
       { label: 'GEO', href: '/geo', hint: 'dashboard — GEO tab' },
