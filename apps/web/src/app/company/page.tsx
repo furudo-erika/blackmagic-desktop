@@ -38,50 +38,27 @@ type Employee = {
   body: string;
 };
 
-type ChartNode =
-  | {
-      kind: 'company';
-      id: 'company';
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-    }
-  | {
-      kind: 'team';
-      id: string;
-      team: string;
-      members: Employee[];
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-    }
-  | {
-      kind: 'employee';
-      id: string;
-      employee: Employee;
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-    };
+type OrgNode =
+  | { kind: 'company'; id: 'company'; name: string; reports: OrgNode[] }
+  | { kind: 'team'; id: string; name: string; team: string; members: Employee[]; reports: OrgNode[] }
+  | { kind: 'employee'; id: string; name: string; employee: Employee; reports: OrgNode[] };
 
-type ChartEdge = {
+type LayoutNode = {
+  source: OrgNode;
   id: string;
-  from: { x: number; y: number };
-  to: { x: number; y: number };
+  name: string;
+  x: number;
+  y: number;
+  children: LayoutNode[];
 };
 
-const COMPANY_W = 300;
-const COMPANY_H = 84;
-const TEAM_W = 190;
-const TEAM_H = 88;
-const EMPLOYEE_W = 156;
-const EMPLOYEE_H = 66;
-const COL_GAP = 30;
-const ROW_GAP = 72;
-const CHART_PAD = 80;
+const CARD_W = 200;
+const CARD_H = 92;
+const GAP_X = 32;
+const GAP_Y = 80;
+const PADDING = 60;
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 2;
 
 const TEAM_BLURBS: Record<string, string> = {
   GTM: 'Pipeline, outbound, research, brand.',
@@ -109,80 +86,93 @@ function sortTeams(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
-function buildOrgChart(teams: ReadonlyArray<readonly [string, Employee[]]>): {
-  width: number;
-  height: number;
-  nodes: ChartNode[];
-  edges: ChartEdge[];
-} {
-  const columnWidths = teams.map(([, members]) => Math.max(TEAM_W, members.length * EMPLOYEE_W + Math.max(0, members.length - 1) * 14));
-  const contentWidth = Math.max(
-    COMPANY_W,
-    columnWidths.reduce((sum, width) => sum + width, 0) + Math.max(0, teams.length - 1) * COL_GAP,
-  );
-  const width = contentWidth + CHART_PAD * 2;
-  const maxMembers = Math.max(0, ...teams.map(([, members]) => members.length));
-  const height = CHART_PAD + COMPANY_H + ROW_GAP + TEAM_H + ROW_GAP + EMPLOYEE_H + (maxMembers > 0 ? CHART_PAD : 0);
-  const companyX = (width - COMPANY_W) / 2;
-  const companyY = CHART_PAD;
-  const teamY = companyY + COMPANY_H + ROW_GAP;
-  const employeeY = teamY + TEAM_H + ROW_GAP;
-
-  const nodes: ChartNode[] = [{
+function orgTreeFromTeams(teams: ReadonlyArray<readonly [string, Employee[]]>): OrgNode[] {
+  return [{
     kind: 'company',
     id: 'company',
-    x: companyX,
-    y: companyY,
-    w: COMPANY_W,
-    h: COMPANY_H,
-  }];
-  const edges: ChartEdge[] = [];
-
-  let x = CHART_PAD + (contentWidth - columnWidths.reduce((sum, width) => sum + width, 0) - Math.max(0, teams.length - 1) * COL_GAP) / 2;
-  for (let i = 0; i < teams.length; i++) {
-    const [team, members] = teams[i]!;
-    const colW = columnWidths[i] ?? TEAM_W;
-    const teamX = x + (colW - TEAM_W) / 2;
-    const teamNode: ChartNode = {
-      kind: 'team',
+    name: 'The Company',
+    reports: teams.map(([team, members]) => ({
+      kind: 'team' as const,
       id: `team:${team}`,
+      name: team,
       team,
       members,
-      x: teamX,
-      y: teamY,
-      w: TEAM_W,
-      h: TEAM_H,
-    };
-    nodes.push(teamNode);
-    edges.push({
-      id: `company:${team}`,
-      from: { x: companyX + COMPANY_W / 2, y: companyY + COMPANY_H },
-      to: { x: teamX + TEAM_W / 2, y: teamY },
-    });
-
-    let employeeX = x;
-    for (const employee of members) {
-      const empNode: ChartNode = {
-        kind: 'employee',
+      reports: members.map((employee) => ({
+        kind: 'employee' as const,
         id: `employee:${employee.slug}`,
+        name: employee.name,
         employee,
-        x: employeeX,
-        y: employeeY,
-        w: EMPLOYEE_W,
-        h: EMPLOYEE_H,
-      };
-      nodes.push(empNode);
-      edges.push({
-        id: `${team}:${employee.slug}`,
-        from: { x: teamX + TEAM_W / 2, y: teamY + TEAM_H },
-        to: { x: employeeX + EMPLOYEE_W / 2, y: employeeY },
-      });
-      employeeX += EMPLOYEE_W + 14;
-    }
-    x += colW + COL_GAP;
-  }
+        reports: [],
+      })),
+    })),
+  }];
+}
 
-  return { width, height, nodes, edges };
+function subtreeWidth(node: OrgNode): number {
+  if (node.reports.length === 0) return CARD_W;
+  const childrenW = node.reports.reduce((sum, child) => sum + subtreeWidth(child), 0);
+  const gaps = (node.reports.length - 1) * GAP_X;
+  return Math.max(CARD_W, childrenW + gaps);
+}
+
+function layoutTree(node: OrgNode, x: number, y: number): LayoutNode {
+  const totalW = subtreeWidth(node);
+  const children: LayoutNode[] = [];
+  if (node.reports.length > 0) {
+    const childrenW = node.reports.reduce((sum, child) => sum + subtreeWidth(child), 0);
+    const gaps = (node.reports.length - 1) * GAP_X;
+    let childX = x + (totalW - childrenW - gaps) / 2;
+    for (const child of node.reports) {
+      const childW = subtreeWidth(child);
+      children.push(layoutTree(child, childX, y + CARD_H + GAP_Y));
+      childX += childW + GAP_X;
+    }
+  }
+  return {
+    source: node,
+    id: node.id,
+    name: node.name,
+    x: x + (totalW - CARD_W) / 2,
+    y,
+    children,
+  };
+}
+
+function layoutForest(roots: OrgNode[]): LayoutNode[] {
+  let x = PADDING;
+  const out: LayoutNode[] = [];
+  for (const root of roots) {
+    const width = subtreeWidth(root);
+    out.push(layoutTree(root, x, PADDING));
+    x += width + GAP_X;
+  }
+  return out;
+}
+
+function flattenLayout(nodes: LayoutNode[]): LayoutNode[] {
+  const out: LayoutNode[] = [];
+  const visit = (node: LayoutNode) => {
+    out.push(node);
+    node.children.forEach(visit);
+  };
+  nodes.forEach(visit);
+  return out;
+}
+
+function collectEdges(nodes: LayoutNode[]): Array<{ parent: LayoutNode; child: LayoutNode }> {
+  const out: Array<{ parent: LayoutNode; child: LayoutNode }> = [];
+  const visit = (node: LayoutNode) => {
+    for (const child of node.children) {
+      out.push({ parent: node, child });
+      visit(child);
+    }
+  };
+  nodes.forEach(visit);
+  return out;
+}
+
+function clampZoom(value: number): number {
+  return Math.min(Math.max(value, MIN_ZOOM), MAX_ZOOM);
 }
 
 export default function CompanyPage() {
@@ -216,26 +206,38 @@ export default function CompanyPage() {
   }, [employees]);
 
   const selected = selectedSlug ? employees.find((employee) => employee.slug === selectedSlug) ?? null : null;
-  const chart = useMemo(() => buildOrgChart(teams), [teams]);
+  const orgTree = useMemo(() => orgTreeFromTeams(teams), [teams]);
+  const layout = useMemo(() => layoutForest(orgTree), [orgTree]);
+  const allNodes = useMemo(() => flattenLayout(layout), [layout]);
+  const edges = useMemo(() => collectEdges(layout), [layout]);
+  const bounds = useMemo(() => {
+    if (allNodes.length === 0) return { width: 800, height: 600 };
+    let maxX = 0;
+    let maxY = 0;
+    for (const node of allNodes) {
+      maxX = Math.max(maxX, node.x + CARD_W);
+      maxY = Math.max(maxY, node.y + CARD_H);
+    }
+    return { width: maxX + PADDING, height: maxY + PADDING };
+  }, [allNodes]);
 
   const fitChart = () => {
     const viewport = viewportRef.current;
-    if (!viewport || chart.width === 0 || chart.height === 0) return;
-    const padding = 48;
-    const availableW = Math.max(240, viewport.clientWidth - padding);
-    const availableH = Math.max(240, viewport.clientHeight - padding);
-    const nextZoom = Math.min(1.05, Math.max(0.28, Math.min(availableW / chart.width, availableH / chart.height)));
+    if (!viewport || bounds.width === 0 || bounds.height === 0) return;
+    const scaleX = (viewport.clientWidth - 40) / bounds.width;
+    const scaleY = (viewport.clientHeight - 40) / bounds.height;
+    const nextZoom = Math.min(scaleX, scaleY, 1);
     setZoom(Number(nextZoom.toFixed(3)));
     setPan({
-      x: Math.round((viewport.clientWidth - chart.width * nextZoom) / 2),
-      y: Math.round((viewport.clientHeight - chart.height * nextZoom) / 2),
+      x: Math.round((viewport.clientWidth - bounds.width * nextZoom) / 2),
+      y: Math.round((viewport.clientHeight - bounds.height * nextZoom) / 2),
     });
   };
 
   useEffect(() => {
     fitChart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chart.width, chart.height]);
+  }, [bounds.width, bounds.height]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -244,7 +246,7 @@ export default function CompanyPage() {
     observer.observe(viewport);
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chart.width, chart.height]);
+  }, [bounds.width, bounds.height]);
 
   const invalidateOrg = () => {
     qc.invalidateQueries({ queryKey: ['company-employees'] });
@@ -349,8 +351,8 @@ export default function CompanyPage() {
             onMouseLeave={() => setPanning(false)}
             onWheel={(event) => {
               event.preventDefault();
-              const next = event.deltaY < 0 ? zoom * 1.08 : zoom * 0.92;
-              setZoom(Math.min(1.6, Math.max(0.45, Number(next.toFixed(3)))));
+              const next = event.deltaY < 0 ? zoom * 1.1 : zoom * 0.9;
+              setZoom(Number(clampZoom(next).toFixed(3)));
             }}
           >
             {employeesQ.isLoading ? (
@@ -367,14 +369,18 @@ export default function CompanyPage() {
                   transformOrigin: '0 0',
                 }}
               >
-                <div className="relative" style={{ width: chart.width, height: chart.height }}>
-                  <svg className="absolute inset-0 pointer-events-none" width={chart.width} height={chart.height} aria-hidden>
-                    {chart.edges.map((edge) => {
-                      const midY = (edge.from.y + edge.to.y) / 2;
+                <div className="relative" style={{ width: bounds.width, height: bounds.height }}>
+                  <svg className="absolute inset-0 pointer-events-none" width={bounds.width} height={bounds.height} aria-hidden>
+                    {edges.map(({ parent, child }) => {
+                      const x1 = parent.x + CARD_W / 2;
+                      const y1 = parent.y + CARD_H;
+                      const x2 = child.x + CARD_W / 2;
+                      const y2 = child.y;
+                      const midY = (y1 + y2) / 2;
                       return (
                         <path
-                          key={edge.id}
-                          d={`M ${edge.from.x} ${edge.from.y} L ${edge.from.x} ${midY} L ${edge.to.x} ${midY} L ${edge.to.x} ${edge.to.y}`}
+                          key={`${parent.id}-${child.id}`}
+                          d={`M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`}
                           fill="none"
                           stroke="rgba(55,50,47,0.24)"
                           strokeWidth={1.5}
@@ -382,8 +388,8 @@ export default function CompanyPage() {
                       );
                     })}
                   </svg>
-                  {chart.nodes.map((node) => {
-                    if (node.kind === 'company') {
+                  {allNodes.map((node) => {
+                    if (node.source.kind === 'company') {
                       return (
                         <CompanyNode
                           key={node.id}
@@ -393,18 +399,24 @@ export default function CompanyPage() {
                         />
                       );
                     }
-                    if (node.kind === 'team') {
+                    if (node.source.kind === 'team') {
                       return (
                         <TeamNode
                           key={node.id}
                           node={node}
-                          activeDrop={dropTeam === node.team}
-                          onAddEmployee={() => setPendingTeam(node.team)}
-                          onDragEnter={() => setDropTeam(node.team)}
-                          onDragLeave={() => setDropTeam((current) => current === node.team ? null : current)}
+                          activeDrop={node.source.kind === 'team' && dropTeam === node.source.team}
+                          onAddEmployee={() => {
+                            if (node.source.kind === 'team') setPendingTeam(node.source.team);
+                          }}
+                          onDragEnter={() => {
+                            if (node.source.kind === 'team') setDropTeam(node.source.team);
+                          }}
+                          onDragLeave={() => setDropTeam((current) =>
+                            node.source.kind === 'team' && current === node.source.team ? null : current,
+                          )}
                           onDrop={(slug) => {
                             setDropTeam(null);
-                            moveEmployee.mutate({ slug, team: node.team });
+                            if (node.source.kind === 'team') moveEmployee.mutate({ slug, team: node.source.team });
                           }}
                         />
                       );
@@ -413,8 +425,10 @@ export default function CompanyPage() {
                       <EmployeeNode
                         key={node.id}
                         node={node}
-                        selected={selectedSlug === node.employee.slug}
-                        onSelect={() => setSelectedSlug(node.employee.slug)}
+                        selected={node.source.kind === 'employee' && selectedSlug === node.source.employee.slug}
+                        onSelect={() => {
+                          if (node.source.kind === 'employee') setSelectedSlug(node.source.employee.slug);
+                        }}
                       />
                     );
                   })}
@@ -466,7 +480,7 @@ function CompanyNode({
   teamsCount,
   employeesCount,
 }: {
-  node: Extract<ChartNode, { kind: 'company' }>;
+  node: LayoutNode;
   teamsCount: number;
   employeesCount: number;
 }) {
@@ -474,7 +488,7 @@ function CompanyNode({
     <div
       data-org-node
       className="absolute rounded-xl border border-flame/30 bg-gradient-to-br from-flame/12 to-flame/[0.04] flex items-center gap-3 px-4 py-2.5 shadow-sm"
-      style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
+      style={{ left: node.x, top: node.y, width: CARD_W, minHeight: CARD_H }}
     >
       <EmployeeFace seed="ceo" name="CEO" size="md" />
       <div className="min-w-0">
@@ -497,13 +511,14 @@ function TeamNode({
   onDragLeave,
   onDrop,
 }: {
-  node: Extract<ChartNode, { kind: 'team' }>;
+  node: LayoutNode;
   activeDrop: boolean;
   onAddEmployee: () => void;
   onDragEnter: () => void;
   onDragLeave: () => void;
   onDrop: (slug: string) => void;
 }) {
+  if (node.source.kind !== 'team') return null;
   return (
     <div
       data-org-node
@@ -521,12 +536,12 @@ function TeamNode({
           ? 'border-flame/60 bg-flame/[0.06]'
           : 'border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F]')
       }
-      style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
+      style={{ left: node.x, top: node.y, width: CARD_W, minHeight: CARD_H }}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{node.team}</div>
-          <div className="text-[10.5px] font-mono text-muted dark:text-[#8C837C]">{node.members.length} employees</div>
+          <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate">{node.source.team}</div>
+          <div className="text-[10.5px] font-mono text-muted dark:text-[#8C837C]">{node.source.members.length} employees</div>
         </div>
         <button
           type="button"
@@ -538,7 +553,7 @@ function TeamNode({
           add
         </button>
       </div>
-      <p className="text-[11px] text-muted dark:text-[#8C837C] leading-snug line-clamp-2">{blurbFor(node.team)}</p>
+      <p className="text-[11px] text-muted dark:text-[#8C837C] leading-snug line-clamp-2">{blurbFor(node.source.team)}</p>
     </div>
   );
 }
@@ -548,11 +563,12 @@ function EmployeeNode({
   selected,
   onSelect,
 }: {
-  node: Extract<ChartNode, { kind: 'employee' }>;
+  node: LayoutNode;
   selected: boolean;
   onSelect: () => void;
 }) {
-  const employee = node.employee;
+  if (node.source.kind !== 'employee') return null;
+  const employee = node.source.employee;
   return (
     <button
       data-org-node
@@ -569,7 +585,7 @@ function EmployeeNode({
           ? 'border-flame/50 bg-white dark:bg-[#1F1B15]'
           : 'border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] hover:border-flame/30')
       }
-      style={{ left: node.x, top: node.y, width: node.w, height: node.h }}
+      style={{ left: node.x, top: node.y, width: CARD_W, minHeight: CARD_H }}
       title={`${employee.name} · ${employee.team}`}
     >
       <EmployeeFace seed={employee.faceSeed} name={employee.name} size="sm" />
