@@ -906,6 +906,7 @@ async function saveEmployee({
     ...employee.frontmatter,
     name: patch.name ?? employee.name,
     team: patch.team ?? employee.team,
+    reports_to: `team:${patch.team ?? employee.team}`,
     face_seed: patch.faceSeed ?? employee.faceSeed,
   };
   await api.writeFile(employee.path, serializeMarkdown(frontmatter, employee.body));
@@ -950,6 +951,7 @@ kind: agent
 name: ${employeeName}
 slug: ${slug}
 team: ${team}
+reports_to: team:${team}
 icon: Bot
 face_seed: ${slug}
 model: gpt-5.5
