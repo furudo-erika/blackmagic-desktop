@@ -276,8 +276,7 @@ export function Sidebar() {
             point, and the Agents section below owns per-agent threads.
             The /chat route still works by direct URL. */}
 
-        <NavRow icon={Users}           label="Company"   href="/company"   pathname={pathname} />
-        <NavRow icon={Network}         label="Chart"     href="/chart"     pathname={pathname} />
+        <NavRow icon={Network}         label="Company"   href="/company"   pathname={pathname} />
         <NavRow icon={Briefcase}       label="Team"      href="/team"      pathname={pathname} />
         <AgentsSidebarRow
           pathname={pathname}
@@ -734,8 +733,7 @@ function CommandPalette({
       { label: 'Deals', href: '/deals', hint: 'Context — deals' },
       { label: 'Files', href: '/context', hint: 'Context — raw files' },
       { label: 'Employees', href: '/agents', hint: 'all AI employees in this project' },
-      { label: 'Company', href: '/company', hint: 'team-card grid view' },
-      { label: 'Chart', href: '/chart', hint: 'top-down org chart' },
+      { label: 'Company', href: '/company', hint: 'editable org chart' },
       { label: 'Team', href: '/team', hint: 'standup — what every team is shipping' },
       { label: 'Skills', href: '/skills', hint: 'reusable playbooks every employee can run' },
       { label: 'Triggers', href: '/triggers', hint: 'automations — scheduled' },
