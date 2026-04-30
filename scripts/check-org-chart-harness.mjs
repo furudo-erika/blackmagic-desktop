@@ -7,6 +7,10 @@ const required = [
   ['layoutTree', 'Paperclip-style tree layout is missing'],
   ['collectEdges', 'SVG edge collection is missing'],
   ['onWheel=', 'Zoom/pan viewport wheel handler is missing'],
+  ['onTouchStart=', 'Touch pan/pinch handler is missing'],
+  ['touchDistance', 'Paperclip-style pinch zoom helper is missing'],
+  ['zoomTowardPoint', 'Zoom must track the pointer/gesture origin'],
+  ['suppressNextCardClick', 'Dragged chart gestures must not select org cards'],
   ['data-org-node', 'Absolute org node marker is missing'],
   ['reports_to: `team:', 'Paperclip reports_to bridge is missing'],
 ];

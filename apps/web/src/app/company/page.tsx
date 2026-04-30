@@ -8,7 +8,7 @@
  * frontmatter values Black Magic already uses: `name`, `team`, `face_seed`.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -59,6 +59,22 @@ const GAP_Y = 80;
 const PADDING = 60;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2;
+const TOUCH_MOVE_THRESHOLD = 6;
+
+type Point = {
+  x: number;
+  y: number;
+};
+
+type TouchGesture = {
+  mode: 'pan' | 'pinch' | null;
+  startPoint: Point;
+  startPan: Point;
+  startZoom: number;
+  startDistance: number;
+  startCenter: Point;
+  moved: boolean;
+};
 
 const TEAM_BLURBS: Record<string, string> = {
   GTM: 'Pipeline, outbound, research, brand.',
@@ -175,6 +191,24 @@ function clampZoom(value: number): number {
   return Math.min(Math.max(value, MIN_ZOOM), MAX_ZOOM);
 }
 
+function touchPoint(touch: React.Touch): Point {
+  return { x: touch.clientX, y: touch.clientY };
+}
+
+function touchDistance(a: React.Touch, b: React.Touch): number {
+  const dx = a.clientX - b.clientX;
+  const dy = a.clientY - b.clientY;
+  return Math.hypot(dx, dy);
+}
+
+function touchCenter(a: React.Touch, b: React.Touch, container: HTMLElement): Point {
+  const rect = container.getBoundingClientRect();
+  return {
+    x: (a.clientX + b.clientX) / 2 - rect.left,
+    y: (a.clientY + b.clientY) / 2 - rect.top,
+  };
+}
+
 export default function CompanyPage() {
   const qc = useQueryClient();
   const viewportRef = useRef<HTMLElement | null>(null);
@@ -186,6 +220,17 @@ export default function CompanyPage() {
   const [pan, setPan] = useState({ x: 24, y: 24 });
   const [panning, setPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const touchGesture = useRef<TouchGesture>({
+    mode: null,
+    startPoint: { x: 0, y: 0 },
+    startPan: { x: 0, y: 0 },
+    startZoom: 1,
+    startDistance: 0,
+    startCenter: { x: 0, y: 0 },
+    moved: false,
+  });
+  const suppressNextCardClick = useRef(false);
+  const suppressClickTimerRef = useRef<number | null>(null);
 
   const employeesQ = useQuery({
     queryKey: ['company-employees'],
@@ -247,6 +292,132 @@ export default function CompanyPage() {
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bounds.width, bounds.height]);
+
+  useEffect(() => {
+    return () => {
+      if (suppressClickTimerRef.current !== null) window.clearTimeout(suppressClickTimerRef.current);
+    };
+  }, []);
+
+  const zoomTowardPoint = useCallback((nextZoom: number, point: Point) => {
+    setZoom((currentZoom) => {
+      const clamped = clampZoom(nextZoom);
+      const scale = clamped / currentZoom;
+      setPan((currentPan) => ({
+        x: point.x - scale * (point.x - currentPan.x),
+        y: point.y - scale * (point.y - currentPan.y),
+      }));
+      return Number(clamped.toFixed(3));
+    });
+  }, []);
+
+  const handleWheel = useCallback((event: React.WheelEvent<HTMLElement>) => {
+    event.preventDefault();
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const rect = viewport.getBoundingClientRect();
+    const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    const factor = event.deltaY < 0 ? 1.1 : 0.9;
+    zoomTowardPoint(zoom * factor, point);
+  }, [zoom, zoomTowardPoint]);
+
+  const handleTouchStart = useCallback((event: React.TouchEvent<HTMLElement>) => {
+    if (event.touches.length >= 2 && viewportRef.current) {
+      const [first, second] = [event.touches[0]!, event.touches[1]!];
+      touchGesture.current = {
+        mode: 'pinch',
+        startPoint: { x: 0, y: 0 },
+        startPan: pan,
+        startZoom: zoom,
+        startDistance: touchDistance(first, second),
+        startCenter: touchCenter(first, second, viewportRef.current),
+        moved: false,
+      };
+      return;
+    }
+
+    const touch = event.touches[0];
+    if (!touch) return;
+    touchGesture.current = {
+      mode: 'pan',
+      startPoint: touchPoint(touch),
+      startPan: pan,
+      startZoom: zoom,
+      startDistance: 0,
+      startCenter: { x: 0, y: 0 },
+      moved: false,
+    };
+  }, [pan, zoom]);
+
+  const handleTouchMove = useCallback((event: React.TouchEvent<HTMLElement>) => {
+    const viewport = viewportRef.current;
+    if (!viewport || !touchGesture.current.mode) return;
+
+    if (event.touches.length >= 2) {
+      const [first, second] = [event.touches[0]!, event.touches[1]!];
+      const distance = touchDistance(first, second);
+      const center = touchCenter(first, second, viewport);
+
+      if (touchGesture.current.mode !== 'pinch' || touchGesture.current.startDistance === 0) {
+        touchGesture.current = {
+          mode: 'pinch',
+          startPoint: { x: 0, y: 0 },
+          startPan: pan,
+          startZoom: zoom,
+          startDistance: distance,
+          startCenter: center,
+          moved: false,
+        };
+        return;
+      }
+
+      const gesture = touchGesture.current;
+      const nextZoom = clampZoom(gesture.startZoom * (distance / gesture.startDistance));
+      const scale = nextZoom / gesture.startZoom;
+      const dx = center.x - gesture.startCenter.x;
+      const dy = center.y - gesture.startCenter.y;
+      gesture.moved =
+        gesture.moved ||
+        Math.abs(distance - gesture.startDistance) > TOUCH_MOVE_THRESHOLD ||
+        Math.hypot(dx, dy) > TOUCH_MOVE_THRESHOLD;
+      setZoom(Number(nextZoom.toFixed(3)));
+      setPan({
+        x: center.x - scale * (gesture.startCenter.x - gesture.startPan.x),
+        y: center.y - scale * (gesture.startCenter.y - gesture.startPan.y),
+      });
+      return;
+    }
+
+    const touch = event.touches[0];
+    if (!touch || touchGesture.current.mode !== 'pan') return;
+    const dx = touch.clientX - touchGesture.current.startPoint.x;
+    const dy = touch.clientY - touchGesture.current.startPoint.y;
+    touchGesture.current.moved = touchGesture.current.moved || Math.hypot(dx, dy) > TOUCH_MOVE_THRESHOLD;
+    setPan({
+      x: touchGesture.current.startPan.x + dx,
+      y: touchGesture.current.startPan.y + dy,
+    });
+  }, [pan, zoom]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (touchGesture.current.moved) {
+      suppressNextCardClick.current = true;
+      if (suppressClickTimerRef.current !== null) window.clearTimeout(suppressClickTimerRef.current);
+      suppressClickTimerRef.current = window.setTimeout(() => {
+        suppressNextCardClick.current = false;
+        suppressClickTimerRef.current = null;
+      }, 400);
+    }
+    touchGesture.current = {
+      mode: null,
+      startPoint: { x: 0, y: 0 },
+      startPan: pan,
+      startZoom: zoom,
+      startDistance: 0,
+      startCenter: { x: 0, y: 0 },
+      moved: false,
+    };
+  }, [pan, zoom]);
 
   const invalidateOrg = () => {
     qc.invalidateQueries({ queryKey: ['company-employees'] });
@@ -332,7 +503,7 @@ export default function CompanyPage() {
           <section
             ref={viewportRef}
             className="min-h-0 overflow-hidden bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl relative"
-            style={{ cursor: panning ? 'grabbing' : 'grab' }}
+            style={{ cursor: panning ? 'grabbing' : 'grab', touchAction: 'none', overscrollBehavior: 'contain' }}
             onMouseDown={(event) => {
               if (event.button !== 0) return;
               const target = event.target as HTMLElement;
@@ -349,11 +520,11 @@ export default function CompanyPage() {
             }}
             onMouseUp={() => setPanning(false)}
             onMouseLeave={() => setPanning(false)}
-            onWheel={(event) => {
-              event.preventDefault();
-              const next = event.deltaY < 0 ? zoom * 1.1 : zoom * 0.9;
-              setZoom(Number(clampZoom(next).toFixed(3)));
-            }}
+            onWheel={handleWheel}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
           >
             {employeesQ.isLoading ? (
               <div className="text-[13px] text-muted dark:text-[#8C837C] py-12 text-center">loading the org...</div>
@@ -427,6 +598,10 @@ export default function CompanyPage() {
                         node={node}
                         selected={node.source.kind === 'employee' && selectedSlug === node.source.employee.slug}
                         onSelect={() => {
+                          if (suppressNextCardClick.current) {
+                            suppressNextCardClick.current = false;
+                            return;
+                          }
                           if (node.source.kind === 'employee') setSelectedSlug(node.source.employee.slug);
                         }}
                       />
