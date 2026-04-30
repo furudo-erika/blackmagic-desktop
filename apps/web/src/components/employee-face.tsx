@@ -1,20 +1,13 @@
 'use client';
 
 /**
- * EmployeeFace — branded monogram avatar tile for AI employees.
- *
- * Renders entirely inline (no network image fetch) so it works in the
- * sandboxed Electron renderer even when the page can't reach the
- * public internet. Each employee gets a tinted rounded tile with
- * their initials; the color is picked deterministically from a calm
- * 12-color palette so a row of tiles reads as distinct faces.
- *
- * History: previously fetched from pravatar.cc as a fallback to a
- * tinted monogram. The remote-image path failed silently inside the
- * Electron renderer (image decode never settled, leaving empty
- * circles), so we dropped the network entirely. Local tiles look
- * cleaner against the cream + flame brand anyway.
+ * EmployeeFace — circular headshot avatar for AI employees.
+ * Pulls a deterministic face from pravatar.cc using the agent's
+ * `face_seed:` frontmatter (falls back to slug). Falls back to a
+ * tinted initial-monogram if the network image fails to load.
  */
+
+import { useState } from 'react';
 
 const SIZE_PX: Record<EmployeeFaceSize, number> = {
   xs: 20,
@@ -24,38 +17,17 @@ const SIZE_PX: Record<EmployeeFaceSize, number> = {
   xl: 88,
 };
 
-const RADIUS_PX: Record<EmployeeFaceSize, number> = {
-  xs: 5,
-  sm: 7,
-  md: 9,
-  lg: 12,
-  xl: 16,
-};
-
 export type EmployeeFaceSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
-// Cream-friendly palette: each entry is a (background, ink) pair so
-// the initials sit at WCAG-AA contrast on the tinted tile. Mid-tones
-// only — every tile reads on cream-light without screaming.
-const PALETTE: { bg: string; ink: string }[] = [
-  { bg: '#F4DAC1', ink: '#7A3E20' }, // peach
-  { bg: '#E2C9F0', ink: '#5B2A7E' }, // lilac
-  { bg: '#CCE0F0', ink: '#1F4F7E' }, // sky
-  { bg: '#D6E5C9', ink: '#3F6B2A' }, // sage
-  { bg: '#F0D7CE', ink: '#9C3F2A' }, // rose
-  { bg: '#E8D9B6', ink: '#7B5A1F' }, // sand
-  { bg: '#CFE5E2', ink: '#1F5B53' }, // mint
-  { bg: '#E6CECA', ink: '#7C3A35' }, // clay
-  { bg: '#D9DCE8', ink: '#3F4566' }, // slate
-  { bg: '#F0E2C0', ink: '#7A6325' }, // wheat
-  { bg: '#E5D2F0', ink: '#643484' }, // orchid
-  { bg: '#C8DEE5', ink: '#214A57' }, // glacier
-];
-
-function paletteFor(seed: string): { bg: string; ink: string } {
+function tintFor(seed: string): string {
+  const palette = [
+    '#E8523A', '#3F7EC7', '#3FA36B', '#8B6FD6',
+    '#D79B3C', '#C9547C', '#3B9DA8', '#5B6BC7',
+    '#E07A5F', '#81B29A', '#F2CC8F', '#7C8FB8',
+  ];
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
-  return PALETTE[Math.abs(h) % PALETTE.length]!;
+  return palette[Math.abs(h) % palette.length]!;
 }
 
 function initialsFor(name: string): string {
@@ -78,32 +50,37 @@ export function EmployeeFace({
   ring?: boolean;
   className?: string;
 }) {
+  const [broken, setBroken] = useState(false);
   const px = SIZE_PX[size];
-  const radius = RADIUS_PX[size];
-  const fontPx = Math.max(9, Math.floor(px * 0.4));
-  const { bg, ink } = paletteFor(seed);
-  const ringClass = ring ? 'ring-[1.5px] ring-white dark:ring-[#1F1B15]' : '';
+  const ringClass = ring ? 'ring-2 ring-white dark:ring-[#1F1B15]' : '';
+  const cls =
+    'relative shrink-0 rounded-full overflow-hidden border border-line dark:border-[#2A241D] ' +
+    ringClass +
+    (className ? ' ' + className : '');
+  if (broken) {
+    return (
+      <div
+        className={cls + ' flex items-center justify-center text-white font-semibold'}
+        style={{
+          width: px,
+          height: px,
+          background: tintFor(seed),
+          fontSize: Math.max(10, Math.floor(px * 0.4)),
+        }}
+        title={name}
+      >
+        {initialsFor(name)}
+      </div>
+    );
+  }
   return (
-    <div
+    <img
+      src={`https://i.pravatar.cc/160?u=blackmagic-${encodeURIComponent(seed)}`}
+      alt=""
+      onError={() => setBroken(true)}
+      className={cls + ' object-cover'}
+      style={{ width: px, height: px }}
       title={name}
-      className={
-        'relative shrink-0 inline-flex items-center justify-center font-semibold tracking-tight ' +
-        ringClass +
-        (className ? ' ' + className : '')
-      }
-      style={{
-        width: px,
-        height: px,
-        borderRadius: radius,
-        background: bg,
-        color: ink,
-        fontSize: fontPx,
-        // Subtle inner sheen — Vercel/Linear monogram tile aesthetic.
-        boxShadow:
-          'inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 0 rgba(55,50,47,0.06)',
-      }}
-    >
-      {initialsFor(name)}
-    </div>
+    />
   );
 }
