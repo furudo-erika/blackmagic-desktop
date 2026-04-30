@@ -1,29 +1,35 @@
 'use client';
 
 /**
- * /chart — node-graph org chart visualization.
+ * /chart — top-down org chart that fits in the desktop viewport.
  *
- * Sibling of /company (the team-card grid). Where /company optimizes for
- * "what does each team do, and who's on it", /chart optimizes for the
- * spatial / hierarchical view: a single CEO node at the top, branching
- * down to teams, branching down to employees. Hand-rolled SVG so we
- * don't drag in a graph layout library — the whole tree is small (≤ ~30
- * nodes in any realistic project) and a deterministic top-down dagre-
- * style layout is ~50 lines.
+ * Sibling of /company (the team-card grid). The earlier version laid out
+ * every employee as a sibling node in a single row, which blew up to ~3000
+ * pixels wide and could not be read inside the desktop window. This
+ * implementation uses a fluid CSS layout for the boxes and a thin SVG
+ * overlay only for the connector lines, so the whole tree adapts to the
+ * actual rendered width — no horizontal scroll, no cropped nodes.
  *
- * Reads `agents/*.md` exactly the same way /company does, so adding an
- * employee in one shows up in both views immediately.
+ * Default view: one CEO node up top, one row of team cards underneath.
+ * Each team card carries the team name, headcount, and a small face stack
+ * of the team's employees. Clicking a team toggles a second row that
+ * reveals every employee on that team as a clickable face → /agents?slug=…
+ *
+ * Reads `agents/*.md` exactly the same way /company does.
  */
 
-import { useMemo } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Building2,
   Network,
   Users,
   Briefcase,
-  ChevronRight,
+  Code2,
+  HeartHandshake,
+  Wallet,
+  UserPlus2,
+  Scale,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '../../lib/api';
@@ -40,10 +46,12 @@ type Employee = {
 
 const TEAM_ICON: Record<string, LucideIcon> = {
   GTM: Briefcase,
-  Engineering: Network,
-  'Customer Success': Users,
-  'Finance & Ops': Building2,
-  People: Users,
+  Engineering: Code2,
+  'Customer Success': HeartHandshake,
+  'Finance & Ops': Wallet,
+  Finance: Wallet,
+  People: UserPlus2,
+  Legal: Scale,
   Product: Briefcase,
 };
 
@@ -126,24 +134,11 @@ export default function ChartPage() {
 // Layout
 // ---------------------------------------------------------------------
 //
-// Three rows:
-//   row 0: Company (single node, centered)
-//   row 1: Teams   (one node per team, evenly spaced)
-//   row 2: Employees (clustered under their team)
-//
-// We compute employee x-positions cluster-by-cluster, then place each
-// team node at the center of its employee cluster. Finally we center
-// the company node over the median team. This keeps the diagram
-// readable when one team has 8 employees and another has 1 — the wide
-// teams get their own breathing room.
-
-const EMP_W = 140;
-const EMP_GAP_X = 16;
-const TEAM_GAP_X = 48;
-const ROW_PAD = 24;
-const COMPANY_Y = 32;
-const TEAM_Y = 200;
-const EMP_Y = 380;
+// CSS does the placement; a single absolutely-positioned <svg> overlay
+// is sized to the container and draws straight 1px lines between
+// measured anchor points (CEO bottom → each team top, expanded team
+// bottom → each employee top). The line layer is recomputed on resize
+// and on expand/collapse via a ResizeObserver + useLayoutEffect.
 
 function OrgChart({
   teams,
@@ -152,196 +147,257 @@ function OrgChart({
   teams: Array<[string, Employee[]]>;
   totalEmployees: number;
 }) {
-  // Compute x-positions cluster by cluster.
-  const layout = useMemo(() => {
-    let cursor = ROW_PAD;
-    const clusters = teams.map(([teamName, members]) => {
-      const w = members.length * EMP_W + Math.max(0, members.length - 1) * EMP_GAP_X;
-      const start = cursor;
-      const employees = members.map((e, i) => ({
-        emp: e,
-        x: start + i * (EMP_W + EMP_GAP_X) + EMP_W / 2,
-      }));
-      const teamCx = start + w / 2;
-      cursor += w + TEAM_GAP_X;
-      return { teamName, members, employees, teamCx, teamW: w };
-    });
-    const totalW = Math.max(720, cursor - TEAM_GAP_X + ROW_PAD);
-    const companyCx = totalW / 2;
-    return { clusters, totalW, companyCx };
-  }, [teams]);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
-  const height = EMP_Y + 110;
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const ceoRef = useRef<HTMLDivElement | null>(null);
+  const teamRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const empRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
+
+  const [edges, setEdges] = useState<{
+    w: number;
+    h: number;
+    ceoToTeam: Array<{ x1: number; y1: number; x2: number; y2: number; key: string }>;
+    teamToEmp: Array<{ x1: number; y1: number; x2: number; y2: number; key: string }>;
+  }>({ w: 0, h: 0, ceoToTeam: [], teamToEmp: [] });
+
+  const recompute = () => {
+    const root = containerRef.current;
+    const ceoEl = ceoRef.current;
+    if (!root || !ceoEl) return;
+    const rRect = root.getBoundingClientRect();
+    const ceoRect = ceoEl.getBoundingClientRect();
+    const ceoBottom = {
+      x: ceoRect.left - rRect.left + ceoRect.width / 2,
+      y: ceoRect.bottom - rRect.top,
+    };
+
+    const ceoToTeam: typeof edges.ceoToTeam = [];
+    const teamToEmp: typeof edges.teamToEmp = [];
+
+    for (const [teamName] of teams) {
+      const tEl = teamRefs.current.get(teamName);
+      if (!tEl) continue;
+      const tRect = tEl.getBoundingClientRect();
+      const top = {
+        x: tRect.left - rRect.left + tRect.width / 2,
+        y: tRect.top - rRect.top,
+      };
+      ceoToTeam.push({
+        x1: ceoBottom.x,
+        y1: ceoBottom.y,
+        x2: top.x,
+        y2: top.y,
+        key: `c-${teamName}`,
+      });
+
+      if (expanded === teamName) {
+        const teamBottom = {
+          x: tRect.left - rRect.left + tRect.width / 2,
+          y: tRect.bottom - rRect.top,
+        };
+        const members = teams.find(([n]) => n === teamName)?.[1] ?? [];
+        for (const m of members) {
+          const eEl = empRefs.current.get(`${teamName}::${m.slug}`);
+          if (!eEl) continue;
+          const eRect = eEl.getBoundingClientRect();
+          teamToEmp.push({
+            x1: teamBottom.x,
+            y1: teamBottom.y,
+            x2: eRect.left - rRect.left + eRect.width / 2,
+            y2: eRect.top - rRect.top,
+            key: `t-${teamName}-${m.slug}`,
+          });
+        }
+      }
+    }
+
+    setEdges({
+      w: rRect.width,
+      h: rRect.height,
+      ceoToTeam,
+      teamToEmp,
+    });
+  };
+
+  useLayoutEffect(() => {
+    recompute();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, teams]);
+
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    const ro = new ResizeObserver(() => recompute());
+    ro.observe(root);
+    window.addEventListener('resize', recompute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', recompute);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-4 overflow-x-auto">
-      <svg
-        width={layout.totalW}
-        height={height}
-        viewBox={`0 0 ${layout.totalW} ${height}`}
-        className="block"
-      >
-        <defs>
-          <linearGradient id="bm-link" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#E8523A" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#E8523A" stopOpacity="0.12" />
-          </linearGradient>
-        </defs>
-
-        {/* Edges: company → each team */}
-        {layout.clusters.map(({ teamName, teamCx }) => (
-          <CurvePath
-            key={`c-${teamName}`}
-            x1={layout.companyCx}
-            y1={COMPANY_Y + 70}
-            x2={teamCx}
-            y2={TEAM_Y + 8}
-          />
-        ))}
-
-        {/* Edges: team → each employee */}
-        {layout.clusters.map(({ teamName, teamCx, employees }) =>
-          employees.map(({ emp, x }) => (
-            <CurvePath
-              key={`t-${teamName}-${emp.slug}`}
-              x1={teamCx}
-              y1={TEAM_Y + 70}
-              x2={x}
-              y2={EMP_Y + 8}
+    <div className="bg-white dark:bg-[#1F1B15] border border-line dark:border-[#2A241D] rounded-xl p-6">
+      <div ref={containerRef} className="relative">
+        {/* connector overlay — drawn behind cards */}
+        <svg
+          width={edges.w}
+          height={edges.h}
+          className="pointer-events-none absolute inset-0"
+          aria-hidden
+        >
+          {[...edges.ceoToTeam, ...edges.teamToEmp].map((e) => (
+            <line
+              key={e.key}
+              x1={e.x1}
+              y1={e.y1}
+              x2={e.x2}
+              y2={e.y2}
+              stroke="rgba(55,50,47,0.25)"
+              strokeWidth={1}
             />
-          )),
-        )}
+          ))}
+        </svg>
 
-        {/* Company node */}
-        <CompanyNode cx={layout.companyCx} cy={COMPANY_Y} totalEmployees={totalEmployees} teams={teams.length} />
+        {/* CEO row */}
+        <div className="relative flex justify-center">
+          <div
+            ref={ceoRef}
+            className="rounded-xl border border-flame/30 bg-gradient-to-br from-flame/12 to-flame/[0.04] flex items-center gap-3 px-4 py-2.5 max-w-[280px]"
+          >
+            <EmployeeFace seed="ceo" name="CEO" size="md" />
+            <div className="min-w-0">
+              <div className="text-[13px] font-semibold text-ink dark:text-[#F5F1EA] truncate leading-tight">
+                The Company
+              </div>
+              <div className="text-[10.5px] font-mono text-muted dark:text-[#8C837C] truncate leading-tight mt-0.5">
+                {teams.length} teams · {totalEmployees} employees
+              </div>
+            </div>
+          </div>
+        </div>
 
-        {/* Team nodes */}
-        {layout.clusters.map(({ teamName, teamCx, members }) => (
-          <TeamNode key={`tn-${teamName}`} cx={teamCx} cy={TEAM_Y} name={teamName} members={members} />
-        ))}
+        {/* spacer so the line has room to draw */}
+        <div className="h-10" />
 
-        {/* Employee nodes */}
-        {layout.clusters.flatMap(({ employees }) =>
-          employees.map(({ emp, x }) => (
-            <EmployeeNode key={`en-${emp.slug}`} cx={x} cy={EMP_Y} emp={emp} />
-          )),
-        )}
-      </svg>
+        {/* Team row */}
+        <div className="relative grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(teams.length, 6)}, minmax(0, 1fr))` }}>
+          {teams.map(([teamName, members]) => {
+            const isOpen = expanded === teamName;
+            return (
+              <TeamCard
+                key={teamName}
+                refCb={(el) => {
+                  if (el) teamRefs.current.set(teamName, el);
+                  else teamRefs.current.delete(teamName);
+                }}
+                name={teamName}
+                members={members}
+                isOpen={isOpen}
+                onToggle={() => setExpanded(isOpen ? null : teamName)}
+              />
+            );
+          })}
+        </div>
+
+        {/* Expanded employee row */}
+        {expanded &&
+          (() => {
+            const t = teams.find(([n]) => n === expanded);
+            if (!t) return null;
+            const [teamName, members] = t;
+            return (
+              <>
+                <div className="h-10" />
+                <div className="relative">
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    {members.map((m) => (
+                      <Link
+                        key={m.slug}
+                        href={`/agents?slug=${encodeURIComponent(m.slug)}`}
+                        ref={(el) => {
+                          if (el) empRefs.current.set(`${teamName}::${m.slug}`, el);
+                          else empRefs.current.delete(`${teamName}::${m.slug}`);
+                        }}
+                        className="w-[112px] rounded-xl border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] hover:border-flame/40 transition-colors flex flex-col items-center gap-1.5 px-2 py-2.5 text-center"
+                        title={`${m.name} — ${m.role}`}
+                      >
+                        <EmployeeFace seed={m.faceSeed} name={m.name} size="md" />
+                        <div className="text-[11px] font-semibold leading-tight text-ink dark:text-[#F5F1EA] w-full truncate">
+                          {m.name}
+                        </div>
+                        <div className="text-[9.5px] font-mono leading-tight text-muted dark:text-[#8C837C] w-full truncate">
+                          {m.role}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+      </div>
+
+      {/* hint */}
+      <p className="mt-6 text-[11px] font-mono text-muted dark:text-[#8C837C] text-center">
+        click a team to expand its roster.
+      </p>
     </div>
   );
 }
 
-function CurvePath({ x1, y1, x2, y2 }: { x1: number; y1: number; x2: number; y2: number }) {
-  // Smooth top-down cubic — control points placed half-way vertically
-  // so wide spans stay graceful.
-  const my = (y1 + y2) / 2;
-  const d = `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`;
-  return <path d={d} fill="none" stroke="url(#bm-link)" strokeWidth={1.5} />;
-}
-
-function CompanyNode({
-  cx,
-  cy,
-  totalEmployees,
-  teams,
-}: {
-  cx: number;
-  cy: number;
-  totalEmployees: number;
-  teams: number;
-}) {
-  const w = 240;
-  const h = 78;
-  const x = cx - w / 2;
-  return (
-    <g>
-      <foreignObject x={x} y={cy} width={w} height={h}>
-        <div
-          className="w-full h-full rounded-xl border border-flame/30 bg-gradient-to-br from-flame/12 to-flame/[0.04] flex items-center gap-3 px-3.5"
-        >
-          <EmployeeFace seed="ceo" name="CEO" size="md" />
-          <div className="min-w-0 flex-1">
-            <div className="text-[12.5px] font-semibold text-ink dark:text-[#F5F1EA] truncate">
-              The Company
-            </div>
-            <div className="text-[10.5px] font-mono text-muted dark:text-[#8C837C] truncate">
-              {teams} teams · {totalEmployees} employees
-            </div>
-          </div>
-        </div>
-      </foreignObject>
-    </g>
-  );
-}
-
-function TeamNode({
-  cx,
-  cy,
+function TeamCard({
+  refCb,
   name,
   members,
+  isOpen,
+  onToggle,
 }: {
-  cx: number;
-  cy: number;
+  refCb: (el: HTMLButtonElement | null) => void;
   name: string;
   members: Employee[];
+  isOpen: boolean;
+  onToggle: () => void;
 }) {
-  const w = 200;
-  const h = 78;
-  const x = cx - w / 2;
   const Icon = teamIcon(name);
   const stack = members.slice(0, 4);
+  const more = Math.max(0, members.length - stack.length);
   return (
-    <g>
-      <foreignObject x={x} y={cy} width={w} height={h}>
-        <div className="w-full h-full rounded-xl border border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] flex flex-col px-3 py-2 gap-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-6 h-6 shrink-0 rounded-md bg-flame/10 border border-flame/20 flex items-center justify-center">
-              <Icon className="w-3.5 h-3.5 text-flame" />
-            </span>
-            <span className="text-[12px] font-semibold text-ink dark:text-[#F5F1EA] truncate">
-              {name}
-            </span>
-            <span className="ml-auto text-[10px] font-mono text-muted dark:text-[#8C837C] shrink-0">
-              {members.length}
-            </span>
-          </div>
-          <div className="flex -space-x-1.5 items-center">
-            {stack.map((m) => (
-              <EmployeeFace key={m.slug} seed={m.faceSeed} name={m.name} size="xs" ring />
-            ))}
-            {members.length > stack.length && (
-              <span className="ml-1 text-[10px] font-mono text-muted dark:text-[#8C837C]">
-                +{members.length - stack.length}
-              </span>
-            )}
-          </div>
-        </div>
-      </foreignObject>
-    </g>
-  );
-}
-
-function EmployeeNode({ cx, cy, emp }: { cx: number; cy: number; emp: Employee }) {
-  const w = EMP_W;
-  const h = 88;
-  const x = cx - w / 2;
-  return (
-    <g>
-      <foreignObject x={x} y={cy} width={w} height={h}>
-        <Link
-          href={`/agents?slug=${encodeURIComponent(emp.slug)}`}
-          className="w-full h-full rounded-xl border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] hover:border-flame/40 transition-colors flex flex-col items-center justify-center gap-1.5 px-2 py-2 text-center group"
-          title={`${emp.name} — ${emp.role}`}
-        >
-          <EmployeeFace seed={emp.faceSeed} name={emp.name} size="md" />
-          <div className="text-[11px] font-semibold leading-tight text-ink dark:text-[#F5F1EA] truncate w-full">
-            {emp.name}
-          </div>
-          <div className="text-[9.5px] font-mono leading-tight text-muted dark:text-[#8C837C] truncate w-full">
-            {emp.role}
-          </div>
-        </Link>
-      </foreignObject>
-    </g>
+    <button
+      ref={refCb}
+      type="button"
+      onClick={onToggle}
+      aria-expanded={isOpen}
+      className={
+        'w-full text-left rounded-xl px-3 py-2.5 transition-colors flex flex-col gap-2 ' +
+        (isOpen
+          ? 'border border-flame/40 bg-flame/[0.06]'
+          : 'border border-line dark:border-[#2A241D] bg-cream-light dark:bg-[#17140F] hover:border-flame/30')
+      }
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="w-6 h-6 shrink-0 rounded-md bg-flame/10 border border-flame/20 flex items-center justify-center">
+          <Icon className="w-3.5 h-3.5 text-flame" />
+        </span>
+        <span className="text-[12.5px] font-semibold text-ink dark:text-[#F5F1EA] truncate">
+          {name}
+        </span>
+        <span className="ml-auto text-[10px] font-mono text-muted dark:text-[#8C837C] shrink-0 px-1.5 py-px rounded bg-white/60 dark:bg-[#0F0D0A]/60 border border-line/60 dark:border-[#2A241D]">
+          {members.length}
+        </span>
+      </div>
+      <div className="flex items-center -space-x-1.5 min-h-[24px]">
+        {stack.map((m) => (
+          <EmployeeFace key={m.slug} seed={m.faceSeed} name={m.name} size="xs" ring />
+        ))}
+        {more > 0 && (
+          <span className="ml-2 text-[10px] font-mono text-muted dark:text-[#8C837C]">
+            +{more}
+          </span>
+        )}
+      </div>
+    </button>
   );
 }
