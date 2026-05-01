@@ -7,7 +7,7 @@ const required = [
   ['layoutTeamColumn', 'Team column layout is missing'],
   ['layoutEmployeeStack', 'Vertical employee stack layout is missing'],
   ['collectEdges', 'SVG edge collection is missing'],
-  ['onWheel=', 'Zoom/pan viewport wheel handler is missing'],
+  ["addEventListener('wheel'", 'Zoom/pan viewport wheel handler is missing'],
   ['onTouchStart=', 'Touch pan/pinch handler is missing'],
   ['touchDistance', 'Paperclip-style pinch zoom helper is missing'],
   ['zoomTowardPoint', 'Zoom must track the pointer/gesture origin'],

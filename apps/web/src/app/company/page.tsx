@@ -324,7 +324,8 @@ export default function CompanyPage() {
   const [dropManagerSlug, setDropManagerSlug] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 24, y: 24 });
-  const [viewportWidth, setViewportWidth] = useState(0);
+  const userZoomedRef = useRef(false);
+  const lastViewportSizeRef = useRef({ width: 0, height: 0 });
   const [panning, setPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const touchGesture = useRef<TouchGesture>({
@@ -359,15 +360,12 @@ export default function CompanyPage() {
 
   const selected = selectedSlug ? employees.find((employee) => employee.slug === selectedSlug) ?? null : null;
   const orgTree = useMemo(() => orgTreeFromTeams(teams, employees), [teams, employees]);
-  const teamsPerRow = useMemo(
-    () => teamsPerRowFor(viewportWidth || 1200, orgTree.length),
-    [viewportWidth, orgTree.length],
-  );
+  const teamsPerRow = Math.max(1, Math.min(orgTree.length, 3));
   const { layout, bounds } = useMemo(() => layoutOrg(orgTree, teamsPerRow), [orgTree, teamsPerRow]);
   const allNodes = useMemo(() => flattenLayout(layout), [layout]);
   const edges = useMemo(() => collectEdges(layout), [layout]);
 
-  const fitChart = () => {
+  const fitChart = useCallback(() => {
     const viewport = viewportRef.current;
     if (!viewport || bounds.width === 0 || bounds.height === 0) return;
     const scaleX = (viewport.clientWidth - 40) / bounds.width;
@@ -379,26 +377,30 @@ export default function CompanyPage() {
       x: Math.round(Math.max(20, (viewport.clientWidth - bounds.width * nextZoom) / 2)),
       y: Math.round(Math.max(20, (viewport.clientHeight - bounds.height * nextZoom) / 2)),
     });
-  };
+    userZoomedRef.current = false;
+  }, [bounds.width, bounds.height]);
 
   useEffect(() => {
     fitChart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bounds.width, bounds.height]);
+    userZoomedRef.current = false;
+  }, [fitChart]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
-    const update = () => setViewportWidth(viewport.clientWidth);
-    update();
-    const observer = new ResizeObserver(() => {
-      update();
-      fitChart();
+    lastViewportSizeRef.current = { width: viewport.clientWidth, height: viewport.clientHeight };
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      const prev = lastViewportSizeRef.current;
+      if (Math.abs(width - prev.width) < 1 && Math.abs(height - prev.height) < 1) return;
+      lastViewportSizeRef.current = { width, height };
+      if (!userZoomedRef.current) fitChart();
     });
     observer.observe(viewport);
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bounds.width, bounds.height]);
+  }, [fitChart]);
 
   useEffect(() => {
     return () => {
@@ -407,6 +409,7 @@ export default function CompanyPage() {
   }, []);
 
   const zoomTowardPoint = useCallback((nextZoom: number, point: Point) => {
+    userZoomedRef.current = true;
     setZoom((currentZoom) => {
       const clamped = clampZoom(nextZoom);
       const scale = clamped / currentZoom;
@@ -418,15 +421,45 @@ export default function CompanyPage() {
     });
   }, []);
 
-  const handleWheel = useCallback((event: React.WheelEvent<HTMLElement>) => {
-    event.preventDefault();
+  const adjustZoom = useCallback((delta: number) => {
+    const viewport = viewportRef.current;
+    const point = viewport
+      ? { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 }
+      : { x: 0, y: 0 };
+    setZoom((currentZoom) => {
+      const next = clampZoom(Number((currentZoom + delta).toFixed(2)));
+      const scale = next / currentZoom;
+      setPan((currentPan) => ({
+        x: point.x - scale * (point.x - currentPan.x),
+        y: point.y - scale * (point.y - currentPan.y),
+      }));
+      return next;
+    });
+    userZoomedRef.current = true;
+  }, []);
+
+  useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
-    const rect = viewport.getBoundingClientRect();
-    const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    const factor = event.deltaY < 0 ? 1.1 : 0.9;
-    zoomTowardPoint(zoom * factor, point);
-  }, [zoom, zoomTowardPoint]);
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+      const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      const factor = event.deltaY < 0 ? 1.1 : 0.9;
+      setZoom((currentZoom) => {
+        const next = clampZoom(currentZoom * factor);
+        const scale = next / currentZoom;
+        setPan((currentPan) => ({
+          x: point.x - scale * (point.x - currentPan.x),
+          y: point.y - scale * (point.y - currentPan.y),
+        }));
+        return Number(next.toFixed(3));
+      });
+      userZoomedRef.current = true;
+    };
+    viewport.addEventListener('wheel', onWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', onWheel);
+  }, []);
 
   const handleTouchStart = useCallback((event: React.TouchEvent<HTMLElement>) => {
     if (event.touches.length >= 2 && viewportRef.current) {
@@ -492,6 +525,7 @@ export default function CompanyPage() {
         x: center.x - scale * (gesture.startCenter.x - gesture.startPan.x),
         y: center.y - scale * (gesture.startCenter.y - gesture.startPan.y),
       });
+      userZoomedRef.current = true;
       return;
     }
 
@@ -579,7 +613,7 @@ export default function CompanyPage() {
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setZoom((value) => Math.max(0.45, Number((value - 0.1).toFixed(2))))}
+              onClick={() => adjustZoom(-0.15)}
               className="w-8 h-8 rounded-md border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] flex items-center justify-center text-muted hover:text-ink dark:hover:text-[#F5F1EA]"
               title="Zoom out"
             >
@@ -587,17 +621,15 @@ export default function CompanyPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                fitChart();
-              }}
+              onClick={() => fitChart()}
               className="w-8 h-8 rounded-md border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] flex items-center justify-center text-muted hover:text-ink dark:hover:text-[#F5F1EA]"
-              title="Reset zoom"
+              title="Fit to view"
             >
               <Maximize2 className="w-3.5 h-3.5" />
             </button>
             <button
               type="button"
-              onClick={() => setZoom((value) => Math.min(1.6, Number((value + 0.1).toFixed(2))))}
+              onClick={() => adjustZoom(0.15)}
               className="w-8 h-8 rounded-md border border-line dark:border-[#2A241D] bg-white dark:bg-[#1F1B15] flex items-center justify-center text-muted hover:text-ink dark:hover:text-[#F5F1EA]"
               title="Zoom in"
             >
@@ -626,6 +658,7 @@ export default function CompanyPage() {
               const target = event.target as HTMLElement;
               if (target.closest('[data-org-node]')) return;
               setPanning(true);
+              userZoomedRef.current = true;
               panStart.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y };
             }}
             onMouseMove={(event) => {
@@ -637,7 +670,11 @@ export default function CompanyPage() {
             }}
             onMouseUp={() => setPanning(false)}
             onMouseLeave={() => setPanning(false)}
-            onWheel={handleWheel}
+            onDoubleClick={(event) => {
+              const target = event.target as HTMLElement;
+              if (target.closest('[data-org-node]')) return;
+              fitChart();
+            }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.57 - 2026-05-01
+
+- Org chart zoom controls work again. Fixed a feedback loop where the
+  ResizeObserver kept refitting the chart after every render, immediately
+  overwriting the user's wheel/button/pinch zoom.
+- Wheel zoom now uses a non-passive native listener so `preventDefault()`
+  actually stops the page from scrolling while zooming.
+- Auto-fit only re-runs when the viewport actually resizes and the user
+  hasn't already zoomed/panned themselves.
+- Double-click empty chart space to refit. Header zoom in/out buttons
+  now zoom around the viewport center instead of jumping pan.
+
 ## 0.5.56 - 2026-05-01
 
 - Company org chart switches to a compact grid layout: teams flow into rows
