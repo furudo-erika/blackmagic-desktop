@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.56 - 2026-05-01
+
+- Company org chart switches to a compact grid layout: teams flow into rows
+  that auto-fit the viewport width, employees stack vertically under each team
+  with file-tree style indentation for `reports_to` chains.
+- Auto-fit now floors at a readable zoom and the new layout fits even large
+  orgs (27+ employees) without shrinking cards into an unreadable strip.
+- Edge routing redrawn as left-spine connectors so vertical employee stacks
+  read like an org tree instead of overlapping vertical lines.
+
 ## 0.5.55 - 2026-04-30
 
 - Company org chart now supports Paperclip-style employee reporting lines via

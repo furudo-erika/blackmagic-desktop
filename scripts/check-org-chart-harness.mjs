@@ -4,7 +4,8 @@ const companyPage = readFileSync('apps/web/src/app/company/page.tsx', 'utf8');
 const sidebar = readFileSync('apps/web/src/components/sidebar.tsx', 'utf8');
 
 const required = [
-  ['layoutTree', 'Paperclip-style tree layout is missing'],
+  ['layoutTeamColumn', 'Team column layout is missing'],
+  ['layoutEmployeeStack', 'Vertical employee stack layout is missing'],
   ['collectEdges', 'SVG edge collection is missing'],
   ['onWheel=', 'Zoom/pan viewport wheel handler is missing'],
   ['onTouchStart=', 'Touch pan/pinch handler is missing'],
