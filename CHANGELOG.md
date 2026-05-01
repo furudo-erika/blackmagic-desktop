@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.58 - 2026-05-01
+
+- App icon redrawn full-bleed so macOS Tahoe stops nesting it inside the
+  system squircle. The bullseye now sits on a cream square that fills the
+  whole canvas; Tahoe applies its own rounded mask, no more "icon inside
+  a gray frame" double-squircle look in the Dock and Finder.
+
 ## 0.5.57 - 2026-05-01
 
 - Org chart zoom controls work again. Fixed a feedback loop where the
