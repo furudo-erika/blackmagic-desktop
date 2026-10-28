@@ -5108,9 +5108,13 @@ Weekly LinkedIn intelligence on competitors + KOLs.
 1. Build the watchlist: competitor company pages + KOL personal
    profiles. Cap at 25 total to keep Apify spend bounded.
 2. For each LinkedIn URL, call \`scrape_apify_actor({ actorId:
-   "apimaestro/linkedin-profile-scraper", input: { profileUrls:
-   [<url>], includePosts: true } })\`. Save raw to
-   \`signals/linkedin/raw/<iso-week>/<slug>.json\` for diffing.
+   "johnvc/linkedin-posts-api", input: { profileUrls: [<url>] } })\`
+   for its recent posts (one item per post, with postUrl, datePosted,
+   text, numLikes, numComments). For KOL personal profiles (\`/in/\`
+   URLs), also call \`scrape_apify_actor({ actorId:
+   "johnvc/linkedin-profile-api", input: { profileUrls: [<url>] } })\`
+   for headline, currentTitle and currentCompany. Save the raw results
+   to \`signals/linkedin/raw/<iso-week>/<slug>.json\` for diffing.
 3. Diff each profile's recent posts against last week's snapshot
    (file in \`signals/linkedin/raw/<prev-iso-week>/\` if present).
    New posts → score on engagement (likes + comments * 5) and
